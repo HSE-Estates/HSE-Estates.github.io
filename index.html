@@ -1,1151 +1,748 @@
 <!DOCTYPE html>
-
 <html lang="en-GB">
-
 <head>
-
   <meta charset="UTF-8">
-
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <title>HSE Optimism Bias Calculator</title>
-
- 
-
-  <!-- Favicons -->
-
-  <link rel="icon" href=https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico>
-
-  <link rel="mask-icon" href=https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.svg color="#006858">
-
- 
-
+  
   <!-- Tailwind CSS -->
-
-  <script src=https://cdn.tailwindcss.com></script>
-
- 
-
-  <!-- Chart.js for Cumulative Spend Visualisation -->
-
-  <script src=https://cdn.jsdelivr.net/npm/chart.js></script>
-
- 
-
+  <script src="https://cdn.tailwindcss.com"></script>
+  
   <!-- React & ReactDOM -->
-
-  <script crossorigin src=https://unpkg.com/react@18/umd/react.production.min.js></script>
-
-  <script crossorigin src=https://unpkg.com/react-dom@18/umd/react-dom.production.min.js></script>
-
- 
-
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
   <!-- Babel for JSX -->
-
-  <script src=https://unpkg.com/@babel/standalone/babel.min.js></script>
-
- 
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-
     /* Custom styles */
-
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-
-   
-
-    /* Custom Slider Styling */
-
+    
+    /* Slider Styling */
     input[type=range]::-webkit-slider-thumb {
-
       -webkit-appearance: none;
-
       height: 16px;
-
       width: 16px;
-
       border-radius: 50%;
-
       background: currentColor;
-
       cursor: pointer;
-
-      margin-top: -6px;
-
+      margin-top: -6px; 
     }
-
     input[type=range]::-moz-range-thumb {
-
       height: 16px;
-
       width: 16px;
-
       border-radius: 50%;
-
       background: currentColor;
-
       cursor: pointer;
-
       border: none;
-
     }
-
     input[type=range]::-webkit-slider-runnable-track {
-
       width: 100%;
-
       height: 4px;
-
       cursor: pointer;
-
       background: #e2e8f0;
-
       border-radius: 2px;
-
     }
-
- 
 
     /* Print Styling */
-
     @media print {
-
       @page { size: A4; margin: 1.5cm; }
-
       body { background-color: white; color: black; font-size: 11pt; }
-
       header, .no-print, .fixed-summary { display: none !important; }
-
       .print-break-inside-avoid { break-inside: avoid; }
-
       .print-shadow-none { box-shadow: none !important; border: 1px solid #ccc !important; }
-
       main { padding: 0 !important; max-width: 100% !important; }
-
       .print-visible { display: block !important; margin-bottom: 20px; }
-
       .page-break { page-break-before: always; }
-
-     
-
+      
+      /* Hide sliders in print, just show values */
       input[type=range] { display: none; }
-
       .mitigation-value { display: block !important; font-weight: bold; }
-
-      .chart-container { height: 300px !important; width: 100% !important; }
-
     }
-
   </style>
-
 </head>
-
 <body class="bg-slate-50 text-slate-900">
-
   <div id="root"></div>
-
- 
-
-  <!-- Placeholder for Saved State - Do not remove -->
-
+  
+  <!-- Placeholder for Saved State -->
   <script id="saved-state">window.SAVED_STATE = null;</script>
 
- 
-
   <script type="text/babel">
-
-    const { useState, useEffect, useMemo, useRef } = React;
-
- 
+    const { useState, useEffect, useMemo } = React;
 
     // --- ICONS ---
-
     const Icon = ({ path, className }) => (
-
-      <svg xmlns=http://www.w3.org/2000/svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         {path}
-
       </svg>
-
     );
-
- 
 
     const Icons = {
-
       Calculator: (props) => <Icon {...props} path={<><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></>} />,
-
       TrendingUp: (props) => <Icon {...props} path={<><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></>} />,
-
       AlertCircle: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></>} />,
-
+      Settings2: (props) => <Icon {...props} path={<><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></>} />,
       Calendar: (props) => <Icon {...props} path={<><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></>} />,
-
       Euro: (props) => <Icon {...props} path={<><path d="M4 10h12"/><path d="M4 14h9"/><path d="M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2"/></>} />,
-
       BarChart3: (props) => <Icon {...props} path={<><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></>} />,
-
-      ChevronDown: (props) => <Icon {...props} path={<><path d="m6 9 6 6 6-6"/></>} />,
-
       ChevronRight: (props) => <Icon {...props} path={<><path d="m9 18 6-6-6-6"/></>} />,
-
+      Info: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></>} />,
       CheckSquare: (props) => <Icon {...props} path={<><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>} />,
-
       Square: (props) => <Icon {...props} path={<><rect width="18" height="18" x="3" y="3" rx="2"/></>} />,
-
       Briefcase: (props) => <Icon {...props} path={<><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></>} />,
-
       HardHat: (props) => <Icon {...props} path={<><path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v2z"/><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M4 15v-3a6 6 0 0 1 6-6h0"/><path d="M14 6h0a6 6 0 0 1 6 6v3"/></>} />,
-
       Monitor: (props) => <Icon {...props} path={<><rect width="20" height="14" x="2" y="3" rx="2" ry="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></>} />,
-
       Printer: (props) => <Icon {...props} path={<><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></>} />,
-
       Save: (props) => <Icon {...props} path={<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>} />,
-
     };
 
- 
-
+    // --- DATA CONFIGURATION WITH LOGICAL WEIGHTS ---
     const CATEGORIES = {
-
       buildings: {
-
         id: 'buildings',
-
         name: 'Buildings Projects',
-
         icon: Icons.Briefcase,
-
-        types: [{ id: 'standard', label: 'Standard Buildings' }, { id: 'ns', label: 'Non-Standard Buildings' }, { id: 'combined', label: 'Combined' }],
-
-        upper: { ns: { duration: 39, capex: 51 }, s: { duration: 4, capex: 24 } },
-
+        types: [
+          { id: 'standard', label: 'Standard Buildings' },
+          { id: 'ns', label: 'Non-Standard Buildings' },
+          { id: 'combined', label: 'Combined' }
+        ],
+        upper: {
+          ns: { duration: 39, capex: 51 },
+          s: { duration: 4, capex: 24 }
+        },
         factors: {
-
           'procurement': [
-
             { name: 'Complexity of Contract Structure', ns: { d: 3, c: 1 }, s: { d: 1, c: 0 } },
-
-            { name: 'Late Contractor Involvement', ns: { d: 6, c: 2 }, s: { d: 3, c: 2 } },
-
+            { name: 'Late Contractor Involvement in Design', ns: { d: 6, c: 2 }, s: { d: 3, c: 2 } },
             { name: 'Poor Contractor Capabilities', ns: { d: 5, c: 5 }, s: { d: 4, c: 9 } },
-
-            { name: 'Government Guidelines', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
-
+            { name: 'Government Guidelines', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } }, // Corrected from 0
             { name: 'Dispute & Claims Occurred', ns: { d: 5, c: 11 }, s: { d: 4, c: 29 } },
-
-            { name: 'Information Management', ns: { d: 3, c: 2 }, s: { d: 2, c: 2 } },
-
+            { name: 'Information Management', ns: { d: 3, c: 2 }, s: { d: 2, c: 2 } }, // Corrected from 0
             { name: 'Other Procurement Factors', ns: { d: 1, c: 1 }, s: { d: 1, c: 1 } }
-
           ],
-
           'project_specific': [
-
             { name: 'Design Complexity', ns: { d: 2, c: 3 }, s: { d: 3, c: 1 } },
-
             { name: 'Degree of Innovation', ns: { d: 8, c: 9 }, s: { d: 1, c: 4 } },
-
-            { name: 'Environmental Impact', ns: { d: 4, c: 4 }, s: { d: 2, c: 2 } },
-
+            { name: 'Environmental Impact', ns: { d: 4, c: 4 }, s: { d: 2, c: 2 } }, // Corrected from 0
             { name: 'Other Project Specifics', ns: { d: 5, c: 5 }, s: { d: 1, c: 1 } }
-
           ],
-
           'client_specification': [
-
-            { name: 'Inadequacy of Business Case', ns: { d: 22, c: 23 }, s: { d: 31, c: 34 } },
-
-            { name: 'Large Number of Stakeholders', ns: { d: 4, c: 3 }, s: { d: 6, c: 2 } },
-
+            { name: 'Inadequacy of the Business Case', ns: { d: 22, c: 23 }, s: { d: 31, c: 34 } },
+            { name: 'Large Number of Stakeholders', ns: { d: 4, c: 3 }, s: { d: 6, c: 2 } }, // Corrected from 0
             { name: 'Funding Availability', ns: { d: 3, c: 0 }, s: { d: 8, c: 0 } },
-
             { name: 'Project Management Team', ns: { d: 5, c: 2 }, s: { d: 0, c: 1 } },
-
             { name: 'Poor Project Intelligence', ns: { d: 5, c: 6 }, s: { d: 6, c: 2 } },
-
             { name: 'Other Specification Factors', ns: { d: 1, c: 2 }, s: { d: 0, c: 0 } }
-
           ],
-
           'environment': [
-
-            { name: 'Public Relations', ns: { d: 3, c: 3 }, s: { d: 8, c: 2 } },
-
+            { name: 'Public Relations', ns: { d: 3, c: 3 }, s: { d: 8, c: 2 } }, // Corrected from 0
             { name: 'Site Characteristics', ns: { d: 3, c: 1 }, s: { d: 5, c: 2 } },
-
-            { name: 'Permits / Consents / Approvals', ns: { d: 5, c: 3 }, s: { d: 9, c: 4 } },
-
+            { name: 'Permits / Consents / Approvals', ns: { d: 5, c: 3 }, s: { d: 9, c: 4 } }, // Corrected from 0 on capex
             { name: 'Other Environmental Factors', ns: { d: 1, c: 3 }, s: { d: 1, c: 1 } }
-
           ],
-
           'external_influences': [
-
             { name: 'Political', ns: { d: 13, c: 2 }, s: { d: 2, c: 1 } },
-
             { name: 'Economic', ns: { d: 2, c: 13 }, s: { d: 1, c: 11 } },
-
             { name: 'Legislation / Regulations', ns: { d: 6, c: 7 }, s: { d: 9, c: 3 } },
-
             { name: 'Technology', ns: { d: 4, c: 5 }, s: { d: 0, c: 0 } },
-
             { name: 'Other External Influences', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } }
-
           ]
-
         }
-
       },
-
       civil: {
-
         id: 'civil',
-
         name: 'Civil Engineering',
-
         icon: Icons.HardHat,
-
-        types: [{ id: 'standard', label: 'Standard Civil Eng' }, { id: 'ns', label: 'Non-Standard Civil Eng' }, { id: 'combined', label: 'Combined' }],
-
-        upper: { ns: { duration: 18.5, capex: 50 }, s: { duration: 18.2, capex: 40.5 } },
-
+        types: [
+          { id: 'standard', label: 'Standard Civil Eng' },
+          { id: 'ns', label: 'Non-Standard Civil Eng' },
+          { id: 'combined', label: 'Combined' }
+        ],
+        upper: {
+          ns: { duration: 18.5, capex: 50 },
+          s: { duration: 18.2, capex: 40.5 }
+        },
         factors: {
-
           'procurement': [
-
             { name: 'Complexity of Contract Structure', ns: { d: 4, c: 2 }, s: { d: 1, c: 1 } },
-
             { name: 'Late Contractor Involvement', ns: { d: 1, c: 1 }, s: { d: 0, c: 3 } },
-
             { name: 'Poor Contractor Capabilities', ns: { d: 2, c: 3 }, s: { d: 16, c: 5 } },
-
             { name: 'Government Guidelines', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
-
             { name: 'Dispute & Claims Occurred', ns: { d: 4, c: 6 }, s: { d: 3, c: 14 } },
-
             { name: 'Information Management', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
-
             { name: 'Other Procurement', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } }
-
           ],
-
           'project_specific': [
-
             { name: 'Design Complexity', ns: { d: 5, c: 3 }, s: { d: 4, c: 2 } },
-
             { name: 'Degree of Innovation', ns: { d: 2, c: 4 }, s: { d: 0, c: 6 } },
-
-            { name: 'Environmental Impact', ns: { d: 8, c: 7 }, s: { d: 6, c: 4 } },
-
+            { name: 'Environmental Impact', ns: { d: 8, c: 7 }, s: { d: 6, c: 4 } }, // Civil specific impact
             { name: 'Other Specifics', ns: { d: 2, c: 4 }, s: { d: 0, c: 0 } }
-
           ],
-
           'client_specification': [
-
-            { name: 'Inadequacy of Business Case', ns: { d: 12, c: 30 }, s: { d: 36, c: 49 } },
-
+            { name: 'Inadequacy of the Business Case', ns: { d: 12, c: 30 }, s: { d: 36, c: 49 } },
             { name: 'Large Number of Stakeholders', ns: { d: 4, c: 4 }, s: { d: 6, c: 3 } },
-
             { name: 'Funding Availability', ns: { d: 2, c: 1 }, s: { d: 8, c: 1 } },
-
             { name: 'Project Management Team', ns: { d: 5, c: 2 }, s: { d: 0, c: 2 } },
-
             { name: 'Poor Project Intelligence', ns: { d: 5, c: 11 }, s: { d: 7, c: 5 } },
-
             { name: 'Other Specs', ns: { d: 1, c: 2 }, s: { d: 0, c: 0 } }
-
           ],
-
           'environment': [
-
             { name: 'Public Relations', ns: { d: 4, c: 6 }, s: { d: 2, c: 9 } },
-
             { name: 'Site Characteristics', ns: { d: 5, c: 5 }, s: { d: 10, c: 3 } },
-
             { name: 'Permits / Consents / Approvals', ns: { d: 7, c: 5 }, s: { d: 10, c: 4 } },
-
             { name: 'Other Environmental', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } }
-
           ],
-
           'external_influences': [
-
             { name: 'Political', ns: { d: 19, c: 5 }, s: { d: 3, c: 2 } },
-
             { name: 'Economic', ns: { d: 24, c: 20 }, s: { d: 4, c: 7 } },
-
             { name: 'Legislation / Regulations', ns: { d: 6, c: 12 }, s: { d: 3, c: 3 } },
-
             { name: 'Technology', ns: { d: 4, c: 2 }, s: { d: 0, c: 0 } },
-
             { name: 'Other External', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } }
-
           ]
-
         }
-
       },
-
       equip: {
-
         id: 'equip',
-
         name: 'Equip/Dev & Outsource',
-
         icon: Icons.Monitor,
-
-        types: [{ id: 'ns', label: 'Equipment / Development' }, { id: 'standard', label: 'Outsourcing' }],
-
-        upper: { ns: { duration: 54, capex: 200 }, s: { duration: 0, capex: 41 } },
-
+        types: [
+          { id: 'ns', label: 'Equipment / Development' },
+          { id: 'standard', label: 'Outsourcing' }
+        ],
+        upper: {
+          ns: { duration: 54, capex: 200 },
+          s: { duration: 0, capex: 41 }
+        },
         factors: {
-
           'procurement': [
-
             { name: 'Complexity of Contract Structure', ns: { d: 13, c: 7 }, s: { d: 2, c: 2 } },
-
             { name: 'Late Contractor Involvement', ns: { d: 2, c: 7 }, s: { d: 0, c: 0 } },
-
             { name: 'Poor Contractor Capabilities', ns: { d: 11, c: 4 }, s: { d: 0, c: 0 } },
-
             { name: 'Government Guidelines', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
-
             { name: 'Dispute & Claims Occurred', ns: { d: 24, c: 18 }, s: { d: 0, c: 0 } },
-
             { name: 'Information Management', ns: { d: 4, c: 8 }, s: { d: 5, c: 23 } },
-
             { name: 'Other Procurement', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } }
-
           ],
-
           'project_specific': [
-
             { name: 'Design Complexity', ns: { d: 12, c: 13 }, s: { d: 0, c: 0 } },
-
             { name: 'Degree of Innovation', ns: { d: 15, c: 23 }, s: { d: 0, c: 37 } },
-
             { name: 'Environmental Impact', ns: { d: 2, c: 2 }, s: { d: 0, c: 0 } },
-
             { name: 'Other Specifics', ns: { d: 5, c: 8 }, s: { d: 0, c: 0 } }
-
           ],
-
           'client_specification': [
-
             { name: 'Inadequacy of Business Case', ns: { d: 5, c: 6 }, s: { d: 5, c: 12 } },
-
             { name: 'Large Number of Stakeholders', ns: { d: 4, c: 4 }, s: { d: 2, c: 2 } },
-
             { name: 'Funding Availability', ns: { d: 5, c: 2 }, s: { d: 0, c: 0 } },
-
             { name: 'Project Management Team', ns: { d: 2, c: 5 }, s: { d: 0, c: 15 } },
-
             { name: 'Poor Project Intelligence', ns: { d: 2, c: 1 }, s: { d: 0, c: 0 } },
-
             { name: 'Other Specs', ns: { d: 1, c: 4 }, s: { d: 0, c: 0 } }
-
           ],
-
           'environment': [
-
             { name: 'Public Relations', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
-
             { name: 'Site Characteristics', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } },
-
             { name: 'Permits / Consents / Approvals', ns: { d: 2, c: 2 }, s: { d: 0, c: 0 } },
-
             { name: 'Other Environmental', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } }
-
           ],
-
           'external_influences': [
-
             { name: 'Political', ns: { d: 7, c: 2 }, s: { d: 1, c: 1 } },
-
             { name: 'Economic', ns: { d: 2, c: 2 }, s: { d: 2, c: 5 } },
-
             { name: 'Legislation / Regulations', ns: { d: 4, c: 7 }, s: { d: 2, c: 8 } },
-
             { name: 'Technology', ns: { d: 2, c: 3 }, s: { d: 0, c: 0 } },
-
             { name: 'Other External', ns: { d: 1, c: 1 }, s: { d: 1, c: 1 } }
-
           ]
-
         }
-
       }
-
     };
 
- 
-
-    const RISK_AREAS_TITLES = { procurement: 'Procurement', project_specific: 'Project Specific', client_specification: 'Client Specification', environment: 'Environment', external_influences: 'External Influences' };
-
- 
-
-    // SCurve Component for fancy Chart.js plotting
-
-    const SCurveChart = ({ originalData, modelledData, themeColor }) => {
-
-      const chartRef = useRef(null);
-
-      const canvasRef = useRef(null);
-
-      useEffect(() => {
-
-        if (!canvasRef.current) return;
-
-        if (chartRef.current) chartRef.current.destroy();
-
-        const maxMonths = Math.max(originalData.length, modelledData.length);
-
-        const labels = Array.from({ length: maxMonths }, (_, i) => `Month ${i + 1}`);
-
-        const cumulative = (arr) => { let sum = 0; return arr.map(v => (sum += v)); };
-
-        const ctx = canvasRef.current.getContext('2d');
-
-        chartRef.current = new Chart(ctx, {
-
-          type: 'line',
-
-          data: {
-
-            labels,
-
-            datasets: [
-
-              { label: 'Original Programme (Cumulative)', data: cumulative(originalData), borderColor: '#94a3b8', backgroundColor: 'rgba(148, 163, 184, 0.1)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3 },
-
-              { label: 'Modelled Programme (Cumulative)', data: cumulative(modelledData), borderColor: themeColor, backgroundColor: `${themeColor}20`, borderWidth: 3, pointRadius: 0, fill: true, tension: 0.3 }
-
-            ]
-
-          },
-
-          options: {
-
-            responsive: true,
-
-            maintainAspectRatio: false,
-
-            interaction: { intersect: false, mode: 'index' },
-
-            plugins: {
-
-              legend: { position: 'top', labels: { usePointStyle: true, font: { size: 11, weight: 'bold' } } },
-
-              tooltip: { backgroundColor: 'rgba(0, 0, 0, 0.8)', callbacks: { label: (c) => `${c.dataset.label}: €${c.raw.toLocaleString(undefined, { maximumFractionDigits: 0 })}` } }
-
-            },
-
-            scales: {
-
-              y: { beginAtZero: true, title: { display: true, text: 'Cumulative Expenditure (€)' } },
-
-              x: { title: { display: true, text: 'Programme Months' } }
-
-            }
-
-          }
-
-        });
-
-        return () => { if (chartRef.current) chartRef.current.destroy(); };
-
-      }, [originalData, modelledData, themeColor]);
-
-      return <div className="h-[350px] w-full chart-container"><canvas ref={canvasRef}></canvas></div>;
-
+    const RISK_AREAS_TITLES = {
+      'procurement': 'Procurement',
+      'project_specific': 'Project Specific',
+      'client_specification': 'Client Specification',
+      'environment': 'Environment',
+      'external_influences': 'External Influences'
     };
 
-   
-
+    // --- COMPONENTS ---
+    
     const Card = ({ children, className = '', noBg = false }) => (
-
       <div className={`${noBg ? '' : 'bg-white'} rounded-lg shadow-sm border border-slate-200 print-break-inside-avoid print-shadow-none ${className}`}>
-
         {children}
-
       </div>
-
     );
-
- 
 
     const SectionHeader = ({ title, icon: Icon, colorClass = "text-emerald-600" }) => (
-
       <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
-
         {Icon && <Icon className={`w-5 h-5 ${colorClass}`} />}
-
         <h3 className="font-semibold text-slate-800">{title}</h3>
-
       </div>
-
     );
-
- 
 
     const Slider = ({ value, onChange, disabled, colorClass = "accent-emerald-600" }) => (
-
       <div className="relative w-full h-6 flex items-center no-print">
-
-        <input type="range" min="0" max="100" value={value} onChange={(e) => onChange(Number(e.target.value))} disabled={disabled} className={`w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer ${colorClass} ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`} />
-
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          disabled={disabled}
+          className={`w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer ${colorClass} ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
+        />
       </div>
-
     );
 
- 
-
     function App() {
-
       const saved = window.SAVED_STATE || {};
-
-      const [activeTab, setActiveTab] = useState('projects');
-
+      
+      const [activeTab, setActiveTab] = useState('projects'); 
       const [projectName, setProjectName] = useState(saved.projectName || '');
-
-      const [category, setCategory] = useState(saved.category || 'buildings');
-
+      const [category, setCategory] = useState(saved.category || 'buildings'); 
       const [projectType, setProjectType] = useState(saved.projectType || 'combined');
-
       const [split, setSplit] = useState(saved.split !== undefined ? saved.split : 50);
-
+      
       const [mitigations, setMitigations] = useState(() => {
-
         if (saved.mitigations) return saved.mitigations;
-
         const initial = {};
-
-        Object.entries(CATEGORIES[category].factors).forEach(([areaKey, factorList]) => { factorList.forEach(f => { initial[`${areaKey}-${f.name}`] = 0; }); });
-
+        Object.entries(CATEGORIES[category].factors).forEach(([areaKey, factorList]) => {
+          factorList.forEach(f => { initial[`${areaKey}-${f.name}`] = 0; });
+        });
         return initial;
-
       });
 
       const [activeFactors, setActiveFactors] = useState(() => {
-
         if (saved.activeFactors) return saved.activeFactors;
-
         const initial = {};
-
-        Object.entries(CATEGORIES[category].factors).forEach(([areaKey, factorList]) => { factorList.forEach(f => { initial[`${areaKey}-${f.name}`] = true; }); });
-
+        Object.entries(CATEGORIES[category].factors).forEach(([areaKey, factorList]) => {
+          factorList.forEach(f => { initial[`${areaKey}-${f.name}`] = true; });
+        });
         return initial;
-
       });
 
       const [linkTimeOB, setLinkTimeOB] = useState(saved.linkTimeOB !== undefined ? saved.linkTimeOB : true);
-
       const [manualTimeOB, setManualTimeOB] = useState(saved.manualTimeOB || 10);
-
       const [linkCostOB, setLinkCostOB] = useState(saved.linkCostOB !== undefined ? saved.linkCostOB : true);
-
       const [manualCostOB, setManualCostOB] = useState(saved.manualCostOB || 10);
-
       const [originalCosts, setOriginalCosts] = useState(saved.originalCosts || Array(11).fill(0).map((_, i) => i === 0 ? 100 : 0));
-
       const [startYear, setStartYear] = useState(saved.startYear || 0);
-
-      const [startMonth, setStartMonth] = useState(saved.startMonth || 1);
-
+      const [startMonth, setStartMonth] = useState(saved.startMonth || 1); 
       const [originalDuration, setOriginalDuration] = useState(saved.originalDuration || 12);
 
- 
-
       const currentCategoryData = CATEGORIES[category];
-
       const isOutsourcing = category === 'equip' && projectType === 'standard';
-
-     
-
-      const themeBase = category === 'civil' ? 'amber-600' : category === 'equip' ? 'blue-600' : 'emerald-600';
-
-      const colorClass = `text-${themeBase}`;
-
-      const bgClass = `bg-${themeBase}`;
-
-      const borderColorClass = `border-${themeBase}`;
-
-      const hexColor = category === 'civil' ? '#d97706' : category === 'equip' ? '#2563eb' : '#059669';
-
+      
+      // COLOR THEME LOGIC
+      const colorClass = category === 'civil' ? 'text-amber-600' : category === 'equip' ? 'text-blue-600' : 'text-emerald-600';
+      const bgClass = category === 'civil' ? 'bg-amber-600' : category === 'equip' ? 'bg-blue-600' : 'bg-emerald-600';
       const headerBg = category === 'civil' ? 'bg-amber-800' : category === 'equip' ? 'bg-blue-800' : 'bg-emerald-900';
-
       const subHeaderBg = category === 'civil' ? 'bg-amber-700' : category === 'equip' ? 'bg-blue-700' : 'bg-emerald-800';
-
       const summaryBg = category === 'civil' ? 'bg-amber-900' : category === 'equip' ? 'bg-blue-900' : 'bg-emerald-900';
-
       const lightBgClass = category === 'civil' ? 'bg-amber-50' : category === 'equip' ? 'bg-blue-50' : 'bg-emerald-50';
-
       const textClass = category === 'civil' ? 'text-amber-700' : category === 'equip' ? 'text-blue-700' : 'text-emerald-700';
-
-      const sliderClass = `accent-${themeBase}`;
-
- 
+      const sliderClass = category === 'civil' ? 'accent-amber-600' : category === 'equip' ? 'accent-blue-600' : 'accent-emerald-600';
 
       const handleCategoryChange = (e) => {
-
-        const newCat = e.target.value; setCategory(newCat); setProjectType(newCat === 'equip' ? 'ns' : 'combined');
-
-        const cf = CATEGORIES[newCat].factors; const nm = {}; const na = {};
-
-        Object.entries(cf).forEach(([k, fl]) => { fl.forEach(f => { nm[`${k}-${f.name}`] = 0; na[`${k}-${f.name}`] = true; }); });
-
-        setMitigations(nm); setActiveFactors(na);
-
+        const newCat = e.target.value;
+        setCategory(newCat);
+        setProjectType(newCat === 'equip' ? 'ns' : 'combined');
+        
+        const currentFactors = CATEGORIES[newCat].factors;
+        const newMit = {};
+        const newActive = {};
+        Object.entries(currentFactors).forEach(([areaKey, factorList]) => {
+          factorList.forEach(f => {
+            const uniqueId = `${areaKey}-${f.name}`;
+            newMit[uniqueId] = 0;
+            newActive[uniqueId] = true;
+          });
+        });
+        setMitigations(newMit);
+        setActiveFactors(newActive);
       };
-
- 
 
       const results = useMemo(() => {
+        let totalNsDurWeight = 0, totalNsCapWeight = 0;
+        let totalSDurWeight = 0, totalSCapWeight = 0;
+        let maxNsDurWeight = 0, maxNsCapWeight = 0;
+        let maxSDurWeight = 0, maxSCapWeight = 0;
 
-        let nsd = 0, nsc = 0, sd = 0, sc = 0, mnsd = 0, mnsc = 0, msd = 0, msc = 0;
+        Object.entries(currentCategoryData.factors).forEach(([areaKey, factorList]) => {
+          factorList.forEach(f => {
+            const uniqueId = `${areaKey}-${f.name}`;
+            const isApplicable = activeFactors[uniqueId] !== false; 
+            const mitigation = isApplicable ? (mitigations[uniqueId] || 0) : 100;
+            const riskFactor = 1 - (mitigation / 100);
 
-        Object.entries(currentCategoryData.factors).forEach(([k, fl]) => {
-
-          fl.forEach(f => {
-
-            const id = `${k}-${f.name}`; const mit = (activeFactors[id] !== false) ? (mitigations[id] || 0) : 100; const r = 1 - (mit / 100);
-
-            nsd += f.ns.d * r; nsc += f.ns.c * r; sd += f.s.d * r; sc += f.s.c * r;
-
-            mnsd += f.ns.d; mnsc += f.ns.c; msd += f.s.d; msc += f.s.c;
-
+            totalNsDurWeight += f.ns.d * riskFactor;
+            totalNsCapWeight += f.ns.c * riskFactor;
+            totalSDurWeight += f.s.d * riskFactor;
+            totalSCapWeight += f.s.c * riskFactor;
+            
+            maxNsDurWeight += f.ns.d;
+            maxNsCapWeight += f.ns.c;
+            maxSDurWeight += f.s.d;
+            maxSCapWeight += f.s.c;
           });
-
         });
 
-        const nDur = mnsd > 0 ? currentCategoryData.upper.ns.duration * (nsd / mnsd) : 0;
+        const nsDurOB = maxNsDurWeight > 0 ? currentCategoryData.upper.ns.duration * (totalNsDurWeight / maxNsDurWeight) : 0;
+        const nsCapOB = maxNsCapWeight > 0 ? currentCategoryData.upper.ns.capex * (totalNsCapWeight / maxNsCapWeight) : 0;
+        const sDurOB = maxSDurWeight > 0 ? currentCategoryData.upper.s.duration * (totalSDurWeight / maxSDurWeight) : 0;
+        const sCapOB = maxSCapWeight > 0 ? currentCategoryData.upper.s.capex * (totalSCapWeight / maxSCapWeight) : 0;
 
-        const nCap = mnsc > 0 ? currentCategoryData.upper.ns.capex * (nsc / mnsc) : 0;
+        let finalDurOB = 0, finalCapOB = 0;
+        if (projectType === 'ns') {
+          finalDurOB = nsDurOB; finalCapOB = nsCapOB;
+        } else if (projectType === 'standard') {
+          finalDurOB = sDurOB; finalCapOB = sCapOB;
+        } else {
+          const nsRatio = split / 100;
+          finalDurOB = (nsDurOB * nsRatio) + (sDurOB * (1 - nsRatio));
+          finalCapOB = (nsCapOB * nsRatio) + (sCapOB * (1 - nsRatio));
+        }
 
-        const sDur = msd > 0 ? currentCategoryData.upper.s.duration * (sd / msd) : 0;
-
-        const sCap = msc > 0 ? currentCategoryData.upper.s.capex * (sc / msc) : 0;
-
-        if (projectType === 'ns') return { finalDurOB: nDur, finalCapOB: nCap };
-
-        if (projectType === 'standard') return { finalDurOB: sDur, finalCapOB: sCap };
-
-        const ratio = split / 100;
-
-        return { finalDurOB: (nDur * ratio) + (sDur * (1 - ratio)), finalCapOB: (nCap * ratio) + (sCap * (1 - ratio)) };
-
+        return { finalDurOB, finalCapOB };
       }, [mitigations, activeFactors, projectType, split, currentCategoryData]);
 
- 
-
       const reprofileResults = useMemo(() => {
+        const timeOverrunPct = (linkTimeOB ? results.finalDurOB : manualTimeOB) / 100;
+        const costOverrunPct = (linkCostOB ? results.finalCapOB : manualCostOB) / 100;
+        const totalOriginalCost = originalCosts.reduce((a, b) => a + b, 0);
+        const totalRevisedCost = totalOriginalCost * (1 + costOverrunPct);
+        const revisedDuration = Math.ceil(originalDuration * (1 + timeOverrunPct));
 
-        const tOver = (linkTimeOB ? results.finalDurOB : manualTimeOB) / 100;
+        let originalMonthly = [];
+        originalCosts.forEach((yearCost, idx) => {
+          let months = idx === 0 ? (13 - startMonth) : 12;
+          const monthly = yearCost / months;
+          for (let m = 0; m < months; m++) originalMonthly.push(monthly);
+        });
 
-        const cOver = (linkCostOB ? results.finalCapOB : manualCostOB) / 100;
+        if (originalMonthly.length > originalDuration) originalMonthly = originalMonthly.slice(0, originalDuration);
+        else while (originalMonthly.length < originalDuration) originalMonthly.push(0);
 
-        const tOrig = originalCosts.reduce((a, b) => a + b, 0); const tRev = tOrig * (1 + cOver); const revD = Math.ceil(originalDuration * (1 + tOver));
+        let revisedMonthly = new Array(revisedDuration).fill(0);
+        const scale = originalDuration / revisedDuration; 
+        for (let i = 0; i < revisedDuration; i++) {
+          revisedMonthly[i] = originalMonthly[Math.min(Math.floor(i * scale), originalMonthly.length - 1)];
+        }
 
-        let om = []; originalCosts.forEach((v, i) => { let mc = i === 0 ? (13 - startMonth) : 12; const mon = v / mc; for (let m = 0; m < mc; m++) om.push(mon); });
+        const currentSum = revisedMonthly.reduce((a,b) => a+b, 0);
+        const norm = currentSum === 0 ? 0 : totalRevisedCost / currentSum;
+        revisedMonthly = revisedMonthly.map(v => v * norm);
 
-        while (om.length < originalDuration) om.push(0); if (om.length > originalDuration) om = om.slice(0, originalDuration);
+        let revisedYearly = Array(11).fill(0);
+        let curM = 0;
+        for (let y = 0; y < 11; y++) {
+          let months = y === 0 ? (13 - startMonth) : 12;
+          for (let m = 0; m < months && curM < revisedMonthly.length; m++, curM++) {
+            revisedYearly[y] += revisedMonthly[curM];
+          }
+        }
 
-        let rm = new Array(revD).fill(0); const scale = originalDuration / revD;
-
-        for (let i = 0; i < revD; i++) { rm[i] = om[Math.min(Math.floor(i * scale), om.length - 1)]; }
-
-        const cs = rm.reduce((a,b) => a+b, 0); const n = cs === 0 ? 0 : tRev / cs; rm = rm.map(v => v * n);
-
-        let ry = Array(11).fill(0); let ci = 0;
-
-        for (let y = 0; y < 11; y++) { let mc = y === 0 ? (13 - startMonth) : 12; for (let m = 0; m < mc && ci < rm.length; m++, ci++) ry[y] += rm[ci]; }
-
-        return { totalOriginalCost: tOrig, totalRevisedCost: tRev, revisedDuration: revD, revisedYearly: ry, originalMonthly: om, revisedMonthly: rm };
-
+        return { totalOriginalCost, totalRevisedCost, revisedDuration, revisedYearly };
       }, [results, linkTimeOB, manualTimeOB, linkCostOB, manualCostOB, originalCosts, startMonth, originalDuration]);
 
- 
-
-      const handleMitigationChange = (id, val) => setMitigations(p => ({ ...p, [id]: val }));
-
-      const toggleFactor = (id) => setActiveFactors(p => ({ ...p, [id]: !p[id] }));
-
- 
+      const handleMitigationChange = (uniqueId, value) => setMitigations(prev => ({ ...prev, [uniqueId]: value }));
+      const toggleFactor = (uniqueId) => setActiveFactors(prev => ({ ...prev, [uniqueId]: !prev[uniqueId] }));
 
       const saveProjectFile = () => {
-
-        const stateStr = JSON.stringify({ projectName, category, projectType, split, mitigations, activeFactors, linkTimeOB, manualTimeOB, linkCostOB, manualCostOB, originalCosts, startYear, startMonth, originalDuration });
-
-        const startMarker = '<script id="saved-state">window.SAVED_STATE = ';
-
-        const endMarker = ';</' + 'script>';
-
-        const docHtml = document.documentElement.outerHTML;
-
-        const regex = /<script id="saved-state">.*?<\/script>/s;
-
-        const newHtml = docHtml.replace(regex, startMarker + stateStr + endMarker);
-
-        const blob = new Blob([newHtml], { type: 'text/html' });
-
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${projectName || 'Project'}_OptimismBias_Calculator.html`; a.click();
-
+        const state = JSON.stringify({ projectName, category, projectType, split, mitigations, activeFactors, linkTimeOB, manualTimeOB, linkCostOB, manualCostOB, originalCosts, startYear, startMonth, originalDuration });
+        const html = document.documentElement.outerHTML.replace(/<script id="saved-state">.*?<\/script>/s, `<script id="saved-state">window.SAVED_STATE = ${state};<\/script>`);
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${projectName || 'Project'}_OptimismBias_Calculator.html`;
+        a.click();
       };
 
- 
-
       return (
-
         <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-
           <header className={`text-white p-4 shadow-md sticky top-0 z-50 transition-colors duration-500 no-print ${headerBg}`}>
-
             <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-
-              <div className="flex items-center gap-4">
-
-                <div className="bg-white p-1.5 rounded-lg shadow-sm">
-
-                  <img src=https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png alt="HSE Logo" className="h-8 w-auto" />
-
-                </div>
-
+              <div className="flex items-center gap-3">
+                <Icons.Calculator className={`w-6 h-6 ${category === 'civil' ? 'text-amber-200' : category === 'equip' ? 'text-blue-200' : 'text-emerald-300'}`} />
                 <div>
-
-                  <h1 className="text-xl font-bold tracking-tight">Optimism Bias Estimator</h1>
-
+                  <h1 className="text-xl font-bold tracking-tight">HSE Optimism Bias Estimator</h1>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${subHeaderBg}`}>{currentCategoryData.name}</span>
-
                 </div>
-
               </div>
-
               <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-
-                 <input type="text" placeholder="Project Name..." value={projectName} onChange={(e) => setProjectName(e.target.value)} className="px-3 py-1.5 rounded text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-white/50 bg-white/90" />
-
+                 <input 
+                   type="text" 
+                   placeholder="Project Name..." 
+                   value={projectName}
+                   onChange={(e) => setProjectName(e.target.value)}
+                   className="px-3 py-1.5 rounded text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-white/50 bg-white/90"
+                 />
                  <div className="flex bg-black/20 p-1 rounded-lg">
-
                    <button onClick={() => setActiveTab('projects')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'projects' ? 'bg-white shadow text-slate-900' : 'text-white/70 hover:text-white'}`}>Adjustments</button>
-
                    <button onClick={() => setActiveTab('reprofiler')} disabled={isOutsourcing} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'reprofiler' ? 'bg-white shadow text-slate-900' : isOutsourcing ? 'text-white/30 cursor-not-allowed' : 'text-white/70 hover:text-white'}`}>Reprofilling</button>
-
                  </div>
-
-                 <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm text-white transition-colors"><Icons.Printer className="w-4 h-4" /></button>
-
-                 <button onClick={saveProjectFile} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm text-white transition-colors"><Icons.Save className="w-4 h-4" /></button>
-
+                 <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm text-white transition-colors">
+                   <Icons.Printer className="w-4 h-4" />
+                 </button>
+                 <button onClick={saveProjectFile} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm text-white transition-colors">
+                   <Icons.Save className="w-4 h-4" />
+                 </button>
               </div>
-
             </div>
-
           </header>
 
- 
-
           <main className="max-w-6xl mx-auto p-4 md:p-6 pb-24">
-
-            <div className="grid md:grid-cols-2 gap-6 mb-6 no-print">
-
-               <Card className="p-4 flex items-center gap-4">
-
-                  <div className={`p-3 rounded-full ${lightBgClass}`}><currentCategoryData.icon className={`w-6 h-6 ${colorClass}`} /></div>
-
-                  <div className="flex-1 relative">
-
-                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Project Category</label>
-
-                     <div className="flex items-center group">
-
-                        <select value={category} onChange={handleCategoryChange} className="w-full appearance-none bg-transparent font-semibold text-lg text-slate-800 focus:outline-none cursor-pointer pr-8 z-10">
-
-                           {Object.values(CATEGORIES).map(cat => (<option key={cat.id} value={cat.id}>{cat.name}</option>))}
-
-                        </select>
-
-                        <Icons.ChevronDown className="w-4 h-4 absolute right-0 text-slate-400 pointer-events-none group-hover:text-slate-600 transition-colors" />
-
+            {/* PRINT-ONLY REPORT HEADER */}
+            <div className="hidden print-visible mb-8 border-b-2 border-slate-800 pb-4">
+               <h1 className="text-2xl font-bold text-slate-900">HSE Optimism Bias Report</h1>
+               <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
+                  <div><strong>Project Name:</strong> {projectName || 'Untitled'}</div>
+                  <div><strong>Date:</strong> {new Date().toLocaleDateString()}</div>
+                  <div><strong>Category:</strong> {currentCategoryData.name}</div>
+                  <div><strong>Type:</strong> {currentCategoryData.types.find(t => t.id === projectType)?.label}</div>
+               </div>
+               <div className="mt-6 p-4 bg-slate-100 rounded border-l-4 border-slate-600">
+                  <div className="grid grid-cols-2 gap-4">
+                     <div>
+                       <div className="text-xs uppercase tracking-wider text-slate-500 font-bold">Works Duration Adjustment</div>
+                       <div className="text-xl font-bold text-slate-900">{results.finalDurOB.toFixed(1)}%</div>
                      </div>
-
-                  </div>
-
-               </Card>
-
-               <Card className="p-4">
-
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Project Type</label>
-
-                  <div className="flex flex-wrap gap-3">
-
-                    {currentCategoryData.types.map(t => (
-
-                      <button key={t.id} onClick={() => setProjectType(t.id)} className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${projectType === t.id ? `${lightBgClass} ${textClass} ${borderColorClass}` : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>{t.label}</button>
-
-                    ))}
-
-                  </div>
-
-                  {projectType === 'combined' && (
-
-                     <div className="mt-3 pt-3 border-t border-slate-100">
-
-                        <div className="flex justify-between text-[10px] font-black text-slate-400 mb-1 uppercase tracking-tighter"><span>Standard ({100-split}%)</span><span>Non-Standard ({split}%)</span></div>
-
-                        <Slider value={split} onChange={setSplit} colorClass={sliderClass} />
-
+                     <div>
+                       <div className="text-xs uppercase tracking-wider text-slate-500 font-bold">{isOutsourcing ? 'Operating' : 'Capital'} Expenditure Adjustment</div>
+                       <div className="text-xl font-bold text-slate-900">{results.finalCapOB.toFixed(1)}%</div>
                      </div>
-
-                  )}
-
-               </Card>
-
+                  </div>
+               </div>
             </div>
 
- 
+            <div className="grid md:grid-cols-2 gap-6 mb-6">
+               <Card className="p-4 flex items-center gap-4">
+                  <div className={`p-3 rounded-full ${lightBgClass}`}>
+                     <currentCategoryData.icon className={`w-6 h-6 ${colorClass}`} />
+                  </div>
+                  <div className="flex-1">
+                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Project Category</label>
+                     <select value={category} onChange={handleCategoryChange} className="no-print w-full appearance-none bg-transparent font-semibold text-lg text-slate-800 focus:outline-none cursor-pointer">
+                        {Object.values(CATEGORIES).map(cat => (<option key={cat.id} value={cat.id}>{cat.name}</option>))}
+                     </select>
+                     <div className="hidden print-visible font-bold text-lg">{currentCategoryData.name}</div>
+                  </div>
+               </Card>
+               <Card className="p-4">
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Project Type</label>
+                  <div className="flex flex-wrap gap-3 no-print">
+                    {currentCategoryData.types.map(t => (
+                      <button key={t.id} onClick={() => setProjectType(t.id)} className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${projectType === t.id ? `${lightBgClass} ${textClass} border-${bgClass}` : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>{t.label}</button>
+                    ))}
+                  </div>
+                  <div className="hidden print-visible font-bold">{currentCategoryData.types.find(t => t.id === projectType)?.label}</div>
+                  {projectType === 'combined' && (
+                     <div className="mt-3 pt-3 border-t border-slate-100">
+                        <div className="flex justify-between text-[10px] font-black text-slate-400 mb-1 uppercase tracking-tighter">
+                          <span>Standard ({100-split}%)</span>
+                          <span>Non-Standard ({split}%)</span>
+                        </div>
+                        <Slider value={split} onChange={setSplit} colorClass={sliderClass} />
+                     </div>
+                  )}
+               </Card>
+            </div>
 
             <div className={`${activeTab === 'projects' ? 'block' : 'hidden'} print-visible`}>
-
                 <div className="grid lg:grid-cols-2 gap-6">
-
                   {Object.entries(currentCategoryData.factors).map(([areaKey, factors]) => (
-
                     <Card key={areaKey} className="p-5">
-
                         <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-4">
-
                            <h3 className="font-bold text-slate-800">{RISK_AREAS_TITLES[areaKey]}</h3>
-
                            <div className="flex gap-2 no-print">
-
-                             <button onClick={() => factors.forEach(f => setMitigations(p => ({ ...p, [`${areaKey}-${f.name}`]: 100 })))} className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">Max All</button>
-
-                             <button onClick={() => factors.forEach(f => setMitigations(p => ({ ...p, [`${areaKey}-${f.name}`]: 0 })))} className="text-[10px] uppercase font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">Reset</button>
-
+                             <button onClick={() => {
+                               Object.values(factors).forEach(f => {
+                                 setMitigations(prev => ({ ...prev, [`${areaKey}-${f.name}`]: 100 }));
+                               });
+                             }} className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">Max All</button>
+                             <button onClick={() => {
+                               Object.values(factors).forEach(f => {
+                                 setMitigations(prev => ({ ...prev, [`${areaKey}-${f.name}`]: 0 }));
+                               });
+                             }} className="text-[10px] uppercase font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">Reset</button>
                            </div>
-
                         </div>
-
                         <div className="space-y-6">
-
                           {factors.map((factor, idx) => {
-
-                            const id = `${areaKey}-${factor.name}`; const active = activeFactors[id] !== false; const mit = mitigations[id] || 0;
-
+                            const id = `${areaKey}-${factor.name}`;
+                            const active = activeFactors[id] !== false;
+                            const mit = mitigations[id] || 0;
                             return (
-
                               <div key={idx} className={`${active ? 'opacity-100' : 'opacity-40'}`}>
-
                                 <div className="flex items-start gap-3">
-
-                                  <button onClick={() => toggleFactor(id)} className={`mt-0.5 no-print ${active ? colorClass : 'text-slate-300'}`}>{active ? <Icons.CheckSquare className="w-5 h-5" /> : <Icons.Square className="w-5 h-5" />}</button>
-
+                                  <button onClick={() => toggleFactor(id)} className={`mt-0.5 no-print ${active ? colorClass : 'text-slate-300'}`}>
+                                    {active ? <Icons.CheckSquare className="w-5 h-5" /> : <Icons.Square className="w-5 h-5" />}
+                                  </button>
                                   <div className="flex-1">
-
                                     <div className="flex justify-between items-start mb-1">
-
                                       <label className="text-sm font-semibold text-slate-700 leading-tight">{factor.name}</label>
-
-                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${!active ? 'bg-slate-100' : mit === 100 ? 'bg-green-100 text-green-700' : lightBgClass + ' ' + textClass}`}>{active ? `${mit}%` : 'N/A'}</span>
-
+                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${!active ? 'bg-slate-100' : mit === 100 ? 'bg-green-100 text-green-700' : lightBgClass + ' ' + textClass}`}>
+                                        {active ? `${mit}%` : 'N/A'}
+                                      </span>
+                                      <span className="hidden mitigation-value ml-2 text-sm">{active ? `${mit}%` : 'N/A'}</span>
                                     </div>
-
                                     <Slider value={mit} onChange={(v) => handleMitigationChange(id, v)} disabled={!active} colorClass={sliderClass} />
-
                                   </div>
-
                                 </div>
-
                               </div>
-
                             );
-
                           })}
-
                         </div>
-
                     </Card>
-
                   ))}
-
                 </div>
-
             </div>
 
- 
-
+            {/* REPROFILLING TAB */}
             {(!isOutsourcing) && (
-
               <div className={`${activeTab === 'reprofiler' ? 'block' : 'hidden'} print-visible page-break`}>
-
-                <div className="grid md:grid-cols-2 gap-6 mb-6">
-
+                <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-md flex gap-2 no-print mb-6">
+                  <Icons.Info className="w-5 h-5 flex-shrink-0" />
+                  <p className="text-sm">This tool models a revised expenditure profile by applying a duration stretch (Time OB) and cost rescaling (Cost OB).</p>
+                </div>
+                
+                <div className="grid md:grid-cols-2 gap-6">
                   <Card className="p-5">
-
                     <SectionHeader title="Duration Parameters" icon={Icons.Calendar} colorClass={colorClass} />
-
                     <div className="grid grid-cols-2 gap-4 mb-4">
-
-                      <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Start Year</label><select value={startYear} onChange={(e) => setStartYear(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print">{[0,1,2,3,4,5].map(y => <option key={y} value={y}>Year {y}</option>)}</select></div>
-
-                      <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Start Month</label><select value={startMonth} onChange={(e) => setStartMonth(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print">{Array(12).fill(0).map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}</select></div>
-
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Start Year</label>
+                        <select value={startYear} onChange={(e) => setStartYear(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print">
+                           {[0,1,2,3,4,5].map(y => <option key={y} value={y}>Year {y}</option>)}
+                        </select>
+                        <div className="hidden print-visible font-bold">Year {startYear}</div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Start Month</label>
+                        <select value={startMonth} onChange={(e) => setStartMonth(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print">
+                           {Array(12).fill(0).map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}
+                        </select>
+                        <div className="hidden print-visible font-bold">{startMonth}</div>
+                      </div>
                     </div>
-
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Original Duration (Months)</label><input type="number" value={originalDuration} onChange={(e) => setOriginalDuration(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print" />
-
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Original Duration (Months)</label>
+                    <input type="number" value={originalDuration} onChange={(e) => setOriginalDuration(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print" />
+                    <div className="hidden print-visible font-bold">{originalDuration}</div>
                   </Card>
-
                   <Card className="p-5">
-
                     <SectionHeader title="Overrun Adjustments" icon={Icons.TrendingUp} colorClass={colorClass} />
-
                     <div className="space-y-4">
-
-                      <div className="flex items-center justify-between"><span className="text-sm font-medium"><input type="checkbox" checked={linkTimeOB} onChange={(e) => setLinkTimeOB(e.target.checked)} className="mr-2 no-print" /> Link Time OB</span><input type="number" disabled={linkTimeOB} value={linkTimeOB ? results.finalDurOB.toFixed(1) : manualTimeOB} onChange={(e) => setManualTimeOB(Number(e.target.value))} className="w-20 text-right text-sm border-slate-200 rounded p-1" /></div>
-
-                      <div className="flex items-center justify-between"><span className="text-sm font-medium"><input type="checkbox" checked={linkCostOB} onChange={(e) => setLinkCostOB(e.target.checked)} className="mr-2 no-print" /> Link Cost OB</span><input type="number" disabled={linkCostOB} value={linkCostOB ? results.finalCapOB.toFixed(1) : manualCostOB} onChange={(e) => setManualCostOB(Number(e.target.value))} className="w-20 text-right text-sm border-slate-200 rounded p-1" /></div>
-
+                      <div className="flex items-center justify-between">
+                         <span className="text-sm font-medium"><input type="checkbox" checked={linkTimeOB} onChange={(e) => setLinkTimeOB(e.target.checked)} className="mr-2 no-print" /> Link Time OB</span>
+                         <input type="number" disabled={linkTimeOB} value={linkTimeOB ? results.finalDurOB.toFixed(1) : manualTimeOB} onChange={(e) => setManualTimeOB(Number(e.target.value))} className="w-20 text-right text-sm border-slate-200 rounded p-1" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                         <span className="text-sm font-medium"><input type="checkbox" checked={linkCostOB} onChange={(e) => setLinkCostOB(e.target.checked)} className="mr-2 no-print" /> Link Cost OB</span>
+                         <input type="number" disabled={linkCostOB} value={linkCostOB ? results.finalCapOB.toFixed(1) : manualCostOB} onChange={(e) => setManualCostOB(Number(e.target.value))} className="w-20 text-right text-sm border-slate-200 rounded p-1" />
+                      </div>
                     </div>
-
                   </Card>
-
                 </div>
 
-               
-
-                <Card className="p-6 mt-6 overflow-x-auto">
-
-                  <SectionHeader title="Cumulative Expenditure Profile (S-Curve)" icon={Icons.TrendingUp} colorClass={colorClass} />
-
-                  <SCurveChart originalData={reprofileResults.originalMonthly} modelledData={reprofileResults.revisedMonthly} themeColor={hexColor} />
-
+                <Card className="p-6 mt-6">
+                  <SectionHeader title="Initial Budget Profile (Annual)" icon={Icons.Euro} colorClass={colorClass} />
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                       <thead>
+                         <tr className="text-[10px] text-slate-400 uppercase">
+                           {originalCosts.map((_, i) => <th key={i} className="p-2 text-left">Year {i}</th>)}
+                           <th className="p-2 text-right">Total</th>
+                         </tr>
+                       </thead>
+                       <tbody>
+                         <tr>
+                           {originalCosts.map((val, i) => (
+                             <td key={i} className="p-1"><input type="number" value={val} onChange={(e) => {
+                                 const next = [...originalCosts]; next[i] = Number(e.target.value); setOriginalCosts(next);
+                               }} className="w-full border border-slate-100 rounded text-right p-1 no-print" /><span className="hidden print-visible text-right">{val}</span></td>
+                           ))}
+                           <td className="p-2 text-right font-bold">€{reprofileResults.totalOriginalCost.toLocaleString()}</td>
+                         </tr>
+                       </tbody>
+                    </table>
+                  </div>
                 </Card>
 
- 
-
                 <div className="grid lg:grid-cols-3 gap-6 mt-6">
-
-                  <Card noBg={true} className="p-6 lg:col-span-1 bg-slate-900 text-white border-none shadow-lg">
-
-                     <h3 className="font-bold text-white mb-6 uppercase tracking-widest text-[11px] border-b border-white/10 pb-2 tracking-widest">Modelled Impact</h3>
-
+                  <Card className="p-6 bg-slate-800 text-white border-none">
+                     <h3 className="font-bold text-slate-200 mb-6 flex items-center gap-2 tracking-widest text-[10px] uppercase">Revised Impact</h3>
                      <div className="space-y-6">
-
                        <div>
-
-                         <div className="text-[10px] text-slate-100 font-bold uppercase mb-1 tracking-tight">Modelled Duration</div>
-
-                         <div className="text-3xl font-black text-white">{reprofileResults.revisedDuration} <span className="text-xs font-normal text-slate-300">months</span></div>
-
+                         <div className="text-[10px] text-slate-500 font-black uppercase mb-1">Modelled Duration</div>
+                         <div className="text-2xl font-black">{reprofileResults.revisedDuration} <span className="text-xs font-normal opacity-50">months</span></div>
                        </div>
-
-                       <div className="w-full h-px bg-white/10"></div>
-
+                       <div className="w-full h-px bg-slate-700"></div>
                        <div>
-
-                         <div className="text-[10px] text-slate-100 font-bold uppercase mb-1 tracking-tight">Total Revised Capex</div>
-
-                         <div className="text-3xl font-black text-emerald-400">€{reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-
+                         <div className="text-[10px] text-slate-500 font-black uppercase mb-1">Total Revised Capex</div>
+                         <div className="text-2xl font-black text-green-400">€{reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
                        </div>
-
                      </div>
-
                   </Card>
-
                   <Card className="p-6 lg:col-span-2 overflow-x-auto">
-
-                    <SectionHeader title="Reprofilled Plan" icon={Icons.BarChart3} colorClass={colorClass} />
-
+                    <SectionHeader title="Reprofilled Expenditure Plan" icon={Icons.BarChart3} colorClass={colorClass} />
                     <table className="w-full text-sm">
-
-                       <thead><tr className="text-[10px] text-slate-400 uppercase border-b border-slate-100">{reprofileResults.revisedYearly.map((_, i) => <th key={i} className="p-2 text-right">Year {i}</th>)}</tr></thead>
-
-                       <tbody><tr className="font-mono">{reprofileResults.revisedYearly.map((v, i) => <td key={i} className="p-2 text-right text-slate-600">{v > 0 ? v.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '-'}</td>)}</tr></tbody>
-
+                       <thead>
+                         <tr className="text-[10px] text-slate-400 uppercase">
+                           {reprofileResults.revisedYearly.map((_, i) => <th key={i} className="p-2 text-right">Year {i}</th>)}
+                         </tr>
+                       </thead>
+                       <tbody>
+                         <tr className="font-mono">
+                           {reprofileResults.revisedYearly.map((val, i) => (
+                             <td key={i} className="p-2 text-right">{val > 0 ? val.toLocaleString(undefined, { maximumFractionDigits: 1 }) : '-'}</td>
+                           ))}
+                         </tr>
+                       </tbody>
                     </table>
-
                   </Card>
-
                 </div>
-
               </div>
-
             )}
 
-           
-
             <footer className="mt-16 mb-24 border-t border-slate-200 pt-8 text-center no-print">
-
                <p className="text-sm font-semibold text-slate-600">Created by Dave Maher</p>
-
-               <p className="text-[10px] text-slate-400 mt-2">&copy; {new Date().getFullYear()} Dave Maher. All Rights Reserved.</p>
-
+               <p className="text-[10px] text-slate-400 mt-2 max-w-lg mx-auto leading-relaxed">
+                 All intellectual property rights associated with this application, its calculation logic, and its interface design belong to Dave Maher. &copy; {new Date().getFullYear()}
+               </p>
             </footer>
 
- 
-
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-100 to-transparent pointer-events-none z-40 no-print fixed-summary">
-
-               <Card noBg className={`max-w-6xl mx-auto ${summaryBg} text-white border-none shadow-2xl p-4 md:p-6 pointer-events-auto`}>
-
+            {/* FIXED BOTTOM SUMMARY BAR - RESTORED PREMIUM DESIGN */}
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-100 via-slate-100 to-transparent pointer-events-none z-40 no-print fixed-summary">
+               <Card noBg className={`max-w-6xl mx-auto ${summaryBg} text-white border-none shadow-xl p-4 md:p-6 pointer-events-auto`}>
                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-
                    <div>
-
-                     <h2 className="text-lg font-bold text-white tracking-tight">Calculated Optimism Bias</h2>
-
+                     <h2 className="text-lg font-bold text-white">Calculated Optimism Bias</h2>
                      <p className="text-[10px] uppercase font-black text-white/50 tracking-widest">{currentCategoryData.name}</p>
-
                    </div>
-
                    <div className="flex gap-12">
-
                      <div className="text-center">
-
                        <div className="text-3xl font-black">{results.finalDurOB.toFixed(1)}%</div>
-
                        <div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">Duration OB</div>
-
                      </div>
-
                      <div className="w-px bg-white/20 self-stretch"></div>
-
                      <div className="text-center">
-
                        <div className="text-3xl font-black text-green-300">{results.finalCapOB.toFixed(1)}%</div>
-
-                       <div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">{isOutsourcing ? 'OpEx OB' : 'CapEx OB'}</div>
-
+                       <div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">
+                         {isOutsourcing ? 'OpEx OB' : 'CapEx OB'}
+                       </div>
                      </div>
-
                    </div>
-
                  </div>
-
                </Card>
-
             </div>
-
           </main>
-
         </div>
-
       );
-
     }
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
-
     root.render(<App />);
-
   </script>
-
 </body>
-
 </html>
+
