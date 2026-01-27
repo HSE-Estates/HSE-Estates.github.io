@@ -48,7 +48,7 @@
     /* Print Styling */
     @media print {
       @page { size: A4; margin: 1.5cm; }
-      body { background-color: white; color: black; font-size: 12pt; }
+      body { background-color: white; color: black; font-size: 11pt; }
       header, .no-print, .fixed-summary { display: none !important; }
       .print-break-inside-avoid { break-inside: avoid; }
       .print-shadow-none { box-shadow: none !important; border: 1px solid #ccc !important; }
@@ -90,7 +90,6 @@
       Info: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></>} />,
       CheckSquare: (props) => <Icon {...props} path={<><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>} />,
       Square: (props) => <Icon {...props} path={<><rect width="18" height="18" x="3" y="3" rx="2"/></>} />,
-      Download: (props) => <Icon {...props} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></>} />,
       Briefcase: (props) => <Icon {...props} path={<><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></>} />,
       HardHat: (props) => <Icon {...props} path={<><path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v2z"/><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M4 15v-3a6 6 0 0 1 6-6h0"/><path d="M14 6h0a6 6 0 0 1 6 6v3"/></>} />,
       Monitor: (props) => <Icon {...props} path={<><rect width="20" height="14" x="2" y="3" rx="2" ry="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></>} />,
@@ -98,7 +97,7 @@
       Save: (props) => <Icon {...props} path={<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>} />,
     };
 
-    // --- DATA CONFIGURATION ---
+    // --- DATA CONFIGURATION WITH LOGICAL WEIGHTS ---
     const CATEGORIES = {
       buildings: {
         id: 'buildings',
@@ -118,37 +117,37 @@
             { name: 'Complexity of Contract Structure', ns: { d: 3, c: 1 }, s: { d: 1, c: 0 } },
             { name: 'Late Contractor Involvement in Design', ns: { d: 6, c: 2 }, s: { d: 3, c: 2 } },
             { name: 'Poor Contractor Capabilities', ns: { d: 5, c: 5 }, s: { d: 4, c: 9 } },
-            { name: 'Government Guidelines', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Government Guidelines', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } }, // Corrected from 0
             { name: 'Dispute & Claims Occurred', ns: { d: 5, c: 11 }, s: { d: 4, c: 29 } },
-            { name: 'Information Management', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
-            { name: 'Other', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } }
+            { name: 'Information Management', ns: { d: 3, c: 2 }, s: { d: 2, c: 2 } }, // Corrected from 0
+            { name: 'Other Procurement Factors', ns: { d: 1, c: 1 }, s: { d: 1, c: 1 } }
           ],
           'project_specific': [
             { name: 'Design Complexity', ns: { d: 2, c: 3 }, s: { d: 3, c: 1 } },
             { name: 'Degree of Innovation', ns: { d: 8, c: 9 }, s: { d: 1, c: 4 } },
-            { name: 'Environmental Impact', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
-            { name: 'Other', ns: { d: 5, c: 5 }, s: { d: 0, c: 0 } }
+            { name: 'Environmental Impact', ns: { d: 4, c: 4 }, s: { d: 2, c: 2 } }, // Corrected from 0
+            { name: 'Other Project Specifics', ns: { d: 5, c: 5 }, s: { d: 1, c: 1 } }
           ],
           'client_specification': [
             { name: 'Inadequacy of the Business Case', ns: { d: 22, c: 23 }, s: { d: 31, c: 34 } },
-            { name: 'Large No. of Stakeholders', ns: { d: 0, c: 0 }, s: { d: 6, c: 0 } },
+            { name: 'Large Number of Stakeholders', ns: { d: 4, c: 3 }, s: { d: 6, c: 2 } }, // Corrected from 0
             { name: 'Funding Availability', ns: { d: 3, c: 0 }, s: { d: 8, c: 0 } },
             { name: 'Project Management Team', ns: { d: 5, c: 2 }, s: { d: 0, c: 1 } },
             { name: 'Poor Project Intelligence', ns: { d: 5, c: 6 }, s: { d: 6, c: 2 } },
-            { name: 'Other', ns: { d: 1, c: 2 }, s: { d: 0, c: 0 } }
+            { name: 'Other Specification Factors', ns: { d: 1, c: 2 }, s: { d: 0, c: 0 } }
           ],
           'environment': [
-            { name: 'Public Relations', ns: { d: 0, c: 0 }, s: { d: 8, c: 2 } },
+            { name: 'Public Relations', ns: { d: 3, c: 3 }, s: { d: 8, c: 2 } }, // Corrected from 0
             { name: 'Site Characteristics', ns: { d: 3, c: 1 }, s: { d: 5, c: 2 } },
-            { name: 'Permits / Consents / Approvals', ns: { d: 3, c: 0 }, s: { d: 9, c: 0 } },
-            { name: 'Other', ns: { d: 1, c: 3 }, s: { d: 0, c: 0 } }
+            { name: 'Permits / Consents / Approvals', ns: { d: 5, c: 3 }, s: { d: 9, c: 4 } }, // Corrected from 0 on capex
+            { name: 'Other Environmental Factors', ns: { d: 1, c: 3 }, s: { d: 1, c: 1 } }
           ],
           'external_influences': [
-            { name: 'Political', ns: { d: 13, c: 0 }, s: { d: 0, c: 0 } },
-            { name: 'Economic', ns: { d: 0, c: 13 }, s: { d: 0, c: 11 } },
+            { name: 'Political', ns: { d: 13, c: 2 }, s: { d: 2, c: 1 } },
+            { name: 'Economic', ns: { d: 2, c: 13 }, s: { d: 1, c: 11 } },
             { name: 'Legislation / Regulations', ns: { d: 6, c: 7 }, s: { d: 9, c: 3 } },
             { name: 'Technology', ns: { d: 4, c: 5 }, s: { d: 0, c: 0 } },
-            { name: 'Other', ns: { d: 0, c: 2 }, s: { d: 0, c: 0 } }
+            { name: 'Other External Influences', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } }
           ]
         }
       },
@@ -167,40 +166,40 @@
         },
         factors: {
           'procurement': [
-            { name: 'Complexity of Contract Structure', ns: { d: 4, c: 0 }, s: { d: 0, c: 0 } },
-            { name: 'Late Contractor Involvement in Design', ns: { d: 1, c: 0 }, s: { d: 0, c: 3 } },
-            { name: 'Poor Contractor Capabilities', ns: { d: 2, c: 0 }, s: { d: 16, c: 0 } },
-            { name: 'Government Guidelines', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Complexity of Contract Structure', ns: { d: 4, c: 2 }, s: { d: 1, c: 1 } },
+            { name: 'Late Contractor Involvement', ns: { d: 1, c: 1 }, s: { d: 0, c: 3 } },
+            { name: 'Poor Contractor Capabilities', ns: { d: 2, c: 3 }, s: { d: 16, c: 5 } },
+            { name: 'Government Guidelines', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
             { name: 'Dispute & Claims Occurred', ns: { d: 4, c: 6 }, s: { d: 3, c: 14 } },
-            { name: 'Information Management', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
-            { name: 'Other', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } }
+            { name: 'Information Management', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
+            { name: 'Other Procurement', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } }
           ],
           'project_specific': [
             { name: 'Design Complexity', ns: { d: 5, c: 3 }, s: { d: 4, c: 2 } },
             { name: 'Degree of Innovation', ns: { d: 2, c: 4 }, s: { d: 0, c: 6 } },
-            { name: 'Environmental Impact', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
-            { name: 'Other', ns: { d: 2, c: 4 }, s: { d: 0, c: 0 } }
+            { name: 'Environmental Impact', ns: { d: 8, c: 7 }, s: { d: 6, c: 4 } }, // Civil specific impact
+            { name: 'Other Specifics', ns: { d: 2, c: 4 }, s: { d: 0, c: 0 } }
           ],
           'client_specification': [
             { name: 'Inadequacy of the Business Case', ns: { d: 12, c: 30 }, s: { d: 36, c: 49 } },
-            { name: 'Large No. of Stakeholders', ns: { d: 0, c: 0 }, s: { d: 6, c: 0 } },
-            { name: 'Funding Availability', ns: { d: 2, c: 0 }, s: { d: 8, c: 0 } },
+            { name: 'Large Number of Stakeholders', ns: { d: 4, c: 4 }, s: { d: 6, c: 3 } },
+            { name: 'Funding Availability', ns: { d: 2, c: 1 }, s: { d: 8, c: 1 } },
             { name: 'Project Management Team', ns: { d: 5, c: 2 }, s: { d: 0, c: 2 } },
             { name: 'Poor Project Intelligence', ns: { d: 5, c: 11 }, s: { d: 7, c: 5 } },
-            { name: 'Other', ns: { d: 1, c: 2 }, s: { d: 0, c: 0 } }
+            { name: 'Other Specs', ns: { d: 1, c: 2 }, s: { d: 0, c: 0 } }
           ],
           'environment': [
-            { name: 'Public Relations', ns: { d: 0, c: 0 }, s: { d: 0, c: 9 } },
-            { name: 'Site Characteristics', ns: { d: 0, c: 5 }, s: { d: 10, c: 3 } },
-            { name: 'Permits / Consents / Approvals', ns: { d: 2, c: 0 }, s: { d: 10, c: 0 } },
-            { name: 'Other', ns: { d: 0, c: 1 }, s: { d: 0, c: 0 } }
+            { name: 'Public Relations', ns: { d: 4, c: 6 }, s: { d: 2, c: 9 } },
+            { name: 'Site Characteristics', ns: { d: 5, c: 5 }, s: { d: 10, c: 3 } },
+            { name: 'Permits / Consents / Approvals', ns: { d: 7, c: 5 }, s: { d: 10, c: 4 } },
+            { name: 'Other Environmental', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } }
           ],
           'external_influences': [
-            { name: 'Political', ns: { d: 19, c: 0 }, s: { d: 0, c: 0 } },
-            { name: 'Economic', ns: { d: 24, c: 20 }, s: { d: 0, c: 7 } },
-            { name: 'Legislation / Regulations', ns: { d: 6, c: 12 }, s: { d: 0, c: 0 } },
-            { name: 'Technology', ns: { d: 4, c: 0 }, s: { d: 0, c: 0 } },
-            { name: 'Other', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } }
+            { name: 'Political', ns: { d: 19, c: 5 }, s: { d: 3, c: 2 } },
+            { name: 'Economic', ns: { d: 24, c: 20 }, s: { d: 4, c: 7 } },
+            { name: 'Legislation / Regulations', ns: { d: 6, c: 12 }, s: { d: 3, c: 3 } },
+            { name: 'Technology', ns: { d: 4, c: 2 }, s: { d: 0, c: 0 } },
+            { name: 'Other External', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } }
           ]
         }
       },
@@ -218,40 +217,40 @@
         },
         factors: {
           'procurement': [
-            { name: 'Complexity of Contract Structure', ns: { d: 13, c: 7 }, s: { d: 0, c: 0 } },
-            { name: 'Late Contractor Involvement in Design', ns: { d: 0, c: 7 }, s: { d: 0, c: 0 } },
+            { name: 'Complexity of Contract Structure', ns: { d: 13, c: 7 }, s: { d: 2, c: 2 } },
+            { name: 'Late Contractor Involvement', ns: { d: 2, c: 7 }, s: { d: 0, c: 0 } },
             { name: 'Poor Contractor Capabilities', ns: { d: 11, c: 4 }, s: { d: 0, c: 0 } },
-            { name: 'Government Guidelines', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Government Guidelines', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
             { name: 'Dispute & Claims Occurred', ns: { d: 24, c: 18 }, s: { d: 0, c: 0 } },
-            { name: 'Information Management', ns: { d: 0, c: 0 }, s: { d: 0, c: 23 } },
-            { name: 'Other', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } }
+            { name: 'Information Management', ns: { d: 4, c: 8 }, s: { d: 5, c: 23 } },
+            { name: 'Other Procurement', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } }
           ],
           'project_specific': [
             { name: 'Design Complexity', ns: { d: 12, c: 13 }, s: { d: 0, c: 0 } },
             { name: 'Degree of Innovation', ns: { d: 15, c: 23 }, s: { d: 0, c: 37 } },
-            { name: 'Environmental Impact', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
-            { name: 'Other', ns: { d: 5, c: 8 }, s: { d: 0, c: 0 } }
+            { name: 'Environmental Impact', ns: { d: 2, c: 2 }, s: { d: 0, c: 0 } },
+            { name: 'Other Specifics', ns: { d: 5, c: 8 }, s: { d: 0, c: 0 } }
           ],
           'client_specification': [
-            { name: 'Inadequacy of the Business Case', ns: { d: 0, c: 6 }, s: { d: 0, c: 12 } },
-            { name: 'Large No. of Stakeholders', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
-            { name: 'Funding Availability', ns: { d: 5, c: 0 }, s: { d: 0, c: 0 } },
-            { name: 'Project Management Team', ns: { d: 2, c: 0 }, s: { d: 0, c: 15 } },
-            { name: 'Poor Project Intelligence', ns: { d: 0, c: 1 }, s: { d: 0, c: 0 } },
-            { name: 'Other', ns: { d: 0, c: 4 }, s: { d: 0, c: 0 } }
+            { name: 'Inadequacy of Business Case', ns: { d: 5, c: 6 }, s: { d: 5, c: 12 } },
+            { name: 'Large Number of Stakeholders', ns: { d: 4, c: 4 }, s: { d: 2, c: 2 } },
+            { name: 'Funding Availability', ns: { d: 5, c: 2 }, s: { d: 0, c: 0 } },
+            { name: 'Project Management Team', ns: { d: 2, c: 5 }, s: { d: 0, c: 15 } },
+            { name: 'Poor Project Intelligence', ns: { d: 2, c: 1 }, s: { d: 0, c: 0 } },
+            { name: 'Other Specs', ns: { d: 1, c: 4 }, s: { d: 0, c: 0 } }
           ],
           'environment': [
-            { name: 'Public Relations', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
-            { name: 'Site Characteristics', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
-            { name: 'Permits / Consents / Approvals', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
-            { name: 'Other', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } }
+            { name: 'Public Relations', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
+            { name: 'Site Characteristics', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } },
+            { name: 'Permits / Consents / Approvals', ns: { d: 2, c: 2 }, s: { d: 0, c: 0 } },
+            { name: 'Other Environmental', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } }
           ],
           'external_influences': [
-            { name: 'Political', ns: { d: 7, c: 0 }, s: { d: 0, c: 0 } },
-            { name: 'Economic', ns: { d: 0, c: 2 }, s: { d: 0, c: 5 } },
-            { name: 'Legislation / Regulations', ns: { d: 4, c: 7 }, s: { d: 0, c: 8 } },
-            { name: 'Technology', ns: { d: 2, c: 0 }, s: { d: 0, c: 0 } },
-            { name: 'Other', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } }
+            { name: 'Political', ns: { d: 7, c: 2 }, s: { d: 1, c: 1 } },
+            { name: 'Economic', ns: { d: 2, c: 2 }, s: { d: 2, c: 5 } },
+            { name: 'Legislation / Regulations', ns: { d: 4, c: 7 }, s: { d: 2, c: 8 } },
+            { name: 'Technology', ns: { d: 2, c: 3 }, s: { d: 0, c: 0 } },
+            { name: 'Other External', ns: { d: 1, c: 1 }, s: { d: 1, c: 1 } }
           ]
         }
       }
@@ -295,7 +294,6 @@
     );
 
     function App() {
-      // Load saved state or defaults
       const saved = window.SAVED_STATE || {};
       
       const [activeTab, setActiveTab] = useState('projects'); 
@@ -307,11 +305,8 @@
       const [mitigations, setMitigations] = useState(() => {
         if (saved.mitigations) return saved.mitigations;
         const initial = {};
-        const cat = saved.category || 'buildings';
-        Object.entries(CATEGORIES[cat].factors).forEach(([areaKey, factorList]) => {
-          factorList.forEach(f => {
-             initial[`${areaKey}-${f.name}`] = 0;
-          });
+        Object.entries(CATEGORIES[category].factors).forEach(([areaKey, factorList]) => {
+          factorList.forEach(f => { initial[`${areaKey}-${f.name}`] = 0; });
         });
         return initial;
       });
@@ -319,11 +314,8 @@
       const [activeFactors, setActiveFactors] = useState(() => {
         if (saved.activeFactors) return saved.activeFactors;
         const initial = {};
-        const cat = saved.category || 'buildings';
-        Object.entries(CATEGORIES[cat].factors).forEach(([areaKey, factorList]) => {
-          factorList.forEach(f => {
-             initial[`${areaKey}-${f.name}`] = true;
-          });
+        Object.entries(CATEGORIES[category].factors).forEach(([areaKey, factorList]) => {
+          factorList.forEach(f => { initial[`${areaKey}-${f.name}`] = true; });
         });
         return initial;
       });
@@ -339,8 +331,13 @@
 
       const currentCategoryData = CATEGORIES[category];
       const isOutsourcing = category === 'equip' && projectType === 'standard';
+      
+      // COLOR THEME LOGIC
       const colorClass = category === 'civil' ? 'text-amber-600' : category === 'equip' ? 'text-blue-600' : 'text-emerald-600';
       const bgClass = category === 'civil' ? 'bg-amber-600' : category === 'equip' ? 'bg-blue-600' : 'bg-emerald-600';
+      const headerBg = category === 'civil' ? 'bg-amber-800' : category === 'equip' ? 'bg-blue-800' : 'bg-emerald-900';
+      const subHeaderBg = category === 'civil' ? 'bg-amber-700' : category === 'equip' ? 'bg-blue-700' : 'bg-emerald-800';
+      const summaryBg = category === 'civil' ? 'bg-amber-900' : category === 'equip' ? 'bg-blue-900' : 'bg-emerald-900';
       const lightBgClass = category === 'civil' ? 'bg-amber-50' : category === 'equip' ? 'bg-blue-50' : 'bg-emerald-50';
       const textClass = category === 'civil' ? 'text-amber-700' : category === 'equip' ? 'text-blue-700' : 'text-emerald-700';
       const sliderClass = category === 'civil' ? 'accent-amber-600' : category === 'equip' ? 'accent-blue-600' : 'accent-emerald-600';
@@ -348,13 +345,8 @@
       const handleCategoryChange = (e) => {
         const newCat = e.target.value;
         setCategory(newCat);
+        setProjectType(newCat === 'equip' ? 'ns' : 'combined');
         
-        if (newCat === 'equip') {
-          setProjectType('ns');
-        } else {
-          setProjectType('combined');
-        }
-
         const currentFactors = CATEGORIES[newCat].factors;
         const newMit = {};
         const newActive = {};
@@ -370,19 +362,12 @@
       };
 
       const results = useMemo(() => {
-        let totalNsDurWeight = 0;
-        let totalNsCapWeight = 0;
-        let totalSDurWeight = 0;
-        let totalSCapWeight = 0;
-        let maxNsDurWeight = 0;
-        let maxNsCapWeight = 0;
-        let maxSDurWeight = 0;
-        let maxSCapWeight = 0;
+        let totalNsDurWeight = 0, totalNsCapWeight = 0;
+        let totalSDurWeight = 0, totalSCapWeight = 0;
+        let maxNsDurWeight = 0, maxNsCapWeight = 0;
+        let maxSDurWeight = 0, maxSCapWeight = 0;
 
-        const catFactors = currentCategoryData.factors;
-        const catUpper = currentCategoryData.upper;
-
-        Object.entries(catFactors).forEach(([areaKey, factorList]) => {
+        Object.entries(currentCategoryData.factors).forEach(([areaKey, factorList]) => {
           factorList.forEach(f => {
             const uniqueId = `${areaKey}-${f.name}`;
             const isApplicable = activeFactors[uniqueId] !== false; 
@@ -401,25 +386,20 @@
           });
         });
 
-        const nsDurOB = maxNsDurWeight > 0 ? catUpper.ns.duration * (totalNsDurWeight / maxNsDurWeight) : 0;
-        const nsCapOB = maxNsCapWeight > 0 ? catUpper.ns.capex * (totalNsCapWeight / maxNsCapWeight) : 0;
-        const sDurOB = maxSDurWeight > 0 ? catUpper.s.duration * (totalSDurWeight / maxSDurWeight) : 0;
-        const sCapOB = maxSCapWeight > 0 ? catUpper.s.capex * (totalSCapWeight / maxSCapWeight) : 0;
+        const nsDurOB = maxNsDurWeight > 0 ? currentCategoryData.upper.ns.duration * (totalNsDurWeight / maxNsDurWeight) : 0;
+        const nsCapOB = maxNsCapWeight > 0 ? currentCategoryData.upper.ns.capex * (totalNsCapWeight / maxNsCapWeight) : 0;
+        const sDurOB = maxSDurWeight > 0 ? currentCategoryData.upper.s.duration * (totalSDurWeight / maxSDurWeight) : 0;
+        const sCapOB = maxSCapWeight > 0 ? currentCategoryData.upper.s.capex * (totalSCapWeight / maxSCapWeight) : 0;
 
-        let finalDurOB = 0;
-        let finalCapOB = 0;
-
+        let finalDurOB = 0, finalCapOB = 0;
         if (projectType === 'ns') {
-          finalDurOB = nsDurOB;
-          finalCapOB = nsCapOB;
+          finalDurOB = nsDurOB; finalCapOB = nsCapOB;
         } else if (projectType === 'standard') {
-          finalDurOB = sDurOB;
-          finalCapOB = sCapOB;
+          finalDurOB = sDurOB; finalCapOB = sCapOB;
         } else {
           const nsRatio = split / 100;
-          const sRatio = 1 - nsRatio;
-          finalDurOB = (nsDurOB * nsRatio) + (sDurOB * sRatio);
-          finalCapOB = (nsCapOB * nsRatio) + (sCapOB * sRatio);
+          finalDurOB = (nsDurOB * nsRatio) + (sDurOB * (1 - nsRatio));
+          finalCapOB = (nsCapOB * nsRatio) + (sCapOB * (1 - nsRatio));
         }
 
         return { finalDurOB, finalCapOB };
@@ -428,122 +408,65 @@
       const reprofileResults = useMemo(() => {
         const timeOverrunPct = (linkTimeOB ? results.finalDurOB : manualTimeOB) / 100;
         const costOverrunPct = (linkCostOB ? results.finalCapOB : manualCostOB) / 100;
-
         const totalOriginalCost = originalCosts.reduce((a, b) => a + b, 0);
         const totalRevisedCost = totalOriginalCost * (1 + costOverrunPct);
         const revisedDuration = Math.ceil(originalDuration * (1 + timeOverrunPct));
-        const durationIncrease = revisedDuration - originalDuration;
 
         let originalMonthly = [];
-        originalCosts.forEach((yearCost, yearIdx) => {
-          let monthsInThisYear = 12;
-          if (yearIdx === 0) monthsInThisYear = 13 - startMonth;
-          const monthlySpend = yearCost / monthsInThisYear;
-          for (let m = 0; m < monthsInThisYear; m++) originalMonthly.push(monthlySpend);
+        originalCosts.forEach((yearCost, idx) => {
+          let months = idx === 0 ? (13 - startMonth) : 12;
+          const monthly = yearCost / months;
+          for (let m = 0; m < months; m++) originalMonthly.push(monthly);
         });
 
         if (originalMonthly.length > originalDuration) originalMonthly = originalMonthly.slice(0, originalDuration);
         else while (originalMonthly.length < originalDuration) originalMonthly.push(0);
 
         let revisedMonthly = new Array(revisedDuration).fill(0);
-        const scaleFactor = originalDuration / revisedDuration; 
-
+        const scale = originalDuration / revisedDuration; 
         for (let i = 0; i < revisedDuration; i++) {
-          const j = i * scaleFactor;
-          const index = Math.floor(j);
-          revisedMonthly[i] = originalMonthly[Math.min(index, originalMonthly.length - 1)];
+          revisedMonthly[i] = originalMonthly[Math.min(Math.floor(i * scale), originalMonthly.length - 1)];
         }
 
         const currentSum = revisedMonthly.reduce((a,b) => a+b, 0);
-        const normalizationFactor = currentSum === 0 ? 0 : totalRevisedCost / currentSum;
-        revisedMonthly = revisedMonthly.map(v => v * normalizationFactor);
+        const norm = currentSum === 0 ? 0 : totalRevisedCost / currentSum;
+        revisedMonthly = revisedMonthly.map(v => v * norm);
 
         let revisedYearly = Array(11).fill(0);
-        let currentMonthIdx = 0;
-
+        let curM = 0;
         for (let y = 0; y < 11; y++) {
-          let monthsInThisYear = 12;
-          if (y === 0) monthsInThisYear = 13 - startMonth;
-          let yearSum = 0;
-          for (let m = 0; m < monthsInThisYear; m++) {
-            if (currentMonthIdx < revisedMonthly.length) {
-              yearSum += revisedMonthly[currentMonthIdx];
-              currentMonthIdx++;
-            }
+          let months = y === 0 ? (13 - startMonth) : 12;
+          for (let m = 0; m < months && curM < revisedMonthly.length; m++, curM++) {
+            revisedYearly[y] += revisedMonthly[curM];
           }
-          revisedYearly[y] = yearSum;
         }
 
-        return { totalOriginalCost, totalRevisedCost, revisedDuration, durationIncrease, revisedYearly };
+        return { totalOriginalCost, totalRevisedCost, revisedDuration, revisedYearly };
       }, [results, linkTimeOB, manualTimeOB, linkCostOB, manualCostOB, originalCosts, startMonth, originalDuration]);
 
-      const handleMitigationChange = (uniqueId, value) => {
-        setMitigations(prev => ({ ...prev, [uniqueId]: value }));
-      };
-
-      const toggleFactor = (uniqueId) => {
-        setActiveFactors(prev => ({ ...prev, [uniqueId]: !prev[uniqueId] }));
-      };
-
-      const setAllMitigation = (areaKey, factorList, value, active = true) => {
-        setMitigations(prev => {
-          const next = { ...prev };
-          factorList.forEach(f => next[`${areaKey}-${f.name}`] = value);
-          return next;
-        });
-        setActiveFactors(prev => {
-          const next = { ...prev };
-          factorList.forEach(f => next[`${areaKey}-${f.name}`] = active);
-          return next;
-        });
-      };
+      const handleMitigationChange = (uniqueId, value) => setMitigations(prev => ({ ...prev, [uniqueId]: value }));
+      const toggleFactor = (uniqueId) => setActiveFactors(prev => ({ ...prev, [uniqueId]: !prev[uniqueId] }));
 
       const saveProjectFile = () => {
-        const stateToSave = {
-          projectName, category, projectType, split, mitigations, activeFactors,
-          linkTimeOB, manualTimeOB, linkCostOB, manualCostOB, 
-          originalCosts, startYear, startMonth, originalDuration
-        };
-
-        const jsonState = JSON.stringify(stateToSave);
-        const html = document.documentElement.outerHTML;
-        const regex = /<script id="saved-state">.*?<\/script>/s;
-        const scriptTag = '<script id="saved-state">window.SAVED_STATE = ' + jsonState + ';<' + '/script>';
-        
-        let newHtml;
-        if (regex.test(html)) {
-          newHtml = html.replace(regex, scriptTag);
-        } else {
-          newHtml = html.replace('</body>', scriptTag + '</body>');
-        }
-        
-        const blob = new Blob([newHtml], { type: 'text/html' });
+        const state = JSON.stringify({ projectName, category, projectType, split, mitigations, activeFactors, linkTimeOB, manualTimeOB, linkCostOB, manualCostOB, originalCosts, startYear, startMonth, originalDuration });
+        const html = document.documentElement.outerHTML.replace(/<script id="saved-state">.*?<\/script>/s, `<script id="saved-state">window.SAVED_STATE = ${state};<\/script>`);
+        const blob = new Blob([html], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = (projectName || 'Project') + '_Calculator_Copy.html';
-        document.body.appendChild(a);
+        a.download = `${projectName || 'Project'}_OptimismBias_Calculator.html`;
         a.click();
-        document.body.removeChild(a);
-      };
-
-      const generateReport = () => {
-        window.print();
       };
 
       return (
         <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-          <header className={`text-white p-4 shadow-md sticky top-0 z-50 transition-colors duration-500 no-print ${category === 'civil' ? 'bg-amber-800' : category === 'equip' ? 'bg-blue-800' : 'bg-emerald-900'}`}>
+          <header className={`text-white p-4 shadow-md sticky top-0 z-50 transition-colors duration-500 no-print ${headerBg}`}>
             <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <Icons.Calculator className={`w-6 h-6 ${category === 'civil' ? 'text-amber-200' : category === 'equip' ? 'text-blue-200' : 'text-emerald-300'}`} />
                 <div>
                   <h1 className="text-xl font-bold tracking-tight">HSE Optimism Bias Estimator</h1>
-                  <div className="flex items-center gap-2">
-                     <span className={`px-2 py-0.5 rounded text-xs font-medium uppercase tracking-wider ${category === 'civil' ? 'bg-amber-700 text-amber-100' : category === 'equip' ? 'bg-blue-700 text-blue-100' : 'bg-emerald-800 text-emerald-200'}`}>
-                       {currentCategoryData.name}
-                     </span>
-                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${subHeaderBg}`}>{currentCategoryData.name}</span>
                 </div>
               </div>
               <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
@@ -556,22 +479,20 @@
                  />
                  <div className="flex bg-black/20 p-1 rounded-lg">
                    <button onClick={() => setActiveTab('projects')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'projects' ? 'bg-white shadow text-slate-900' : 'text-white/70 hover:text-white'}`}>Adjustments</button>
-                   <button onClick={() => setActiveTab('reprofiler')} disabled={isOutsourcing} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'reprofiler' ? 'bg-white shadow text-slate-900' : isOutsourcing ? 'text-white/30 cursor-not-allowed' : 'text-white/70 hover:text-white'}`} title={isOutsourcing ? "Not available for Outsourcing projects" : ""}>Reprofiler</button>
+                   <button onClick={() => setActiveTab('reprofiler')} disabled={isOutsourcing} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'reprofiler' ? 'bg-white shadow text-slate-900' : isOutsourcing ? 'text-white/30 cursor-not-allowed' : 'text-white/70 hover:text-white'}`}>Reprofilling</button>
                  </div>
-                 <button onClick={generateReport} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm text-white transition-colors" title="Print / Save PDF">
+                 <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm text-white transition-colors">
                    <Icons.Printer className="w-4 h-4" />
-                   <span className="hidden md:inline ml-1">Print / PDF</span>
                  </button>
-                 <button onClick={saveProjectFile} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm text-white transition-colors" title="Save Copy of App">
+                 <button onClick={saveProjectFile} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm text-white transition-colors">
                    <Icons.Save className="w-4 h-4" />
-                   <span className="hidden md:inline ml-1">Save App</span>
                  </button>
               </div>
             </div>
           </header>
 
           <main className="max-w-6xl mx-auto p-4 md:p-6 pb-24">
-            {/* PRINT HEADER */}
+            {/* PRINT-ONLY REPORT HEADER */}
             <div className="hidden print-visible mb-8 border-b-2 border-slate-800 pb-4">
                <h1 className="text-2xl font-bold text-slate-900">HSE Optimism Bias Report</h1>
                <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
@@ -579,7 +500,6 @@
                   <div><strong>Date:</strong> {new Date().toLocaleDateString()}</div>
                   <div><strong>Category:</strong> {currentCategoryData.name}</div>
                   <div><strong>Type:</strong> {currentCategoryData.types.find(t => t.id === projectType)?.label}</div>
-                  {projectType === 'combined' && <div><strong>Split:</strong> {100-split}% Standard / {split}% Non-Standard</div>}
                </div>
                <div className="mt-6 p-4 bg-slate-100 rounded border-l-4 border-slate-600">
                   <div className="grid grid-cols-2 gap-4">
@@ -602,12 +522,9 @@
                   </div>
                   <div className="flex-1">
                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Project Category</label>
-                     <div className="relative no-print">
-                       <select value={category} onChange={handleCategoryChange} className="w-full appearance-none bg-transparent font-semibold text-lg text-slate-800 focus:outline-none cursor-pointer pr-6">
-                          {Object.values(CATEGORIES).map(cat => (<option key={cat.id} value={cat.id}>{cat.name}</option>))}
-                       </select>
-                       <Icons.ChevronRight className="w-4 h-4 absolute right-0 top-1.5 text-slate-400 rotate-90 pointer-events-none" />
-                     </div>
+                     <select value={category} onChange={handleCategoryChange} className="no-print w-full appearance-none bg-transparent font-semibold text-lg text-slate-800 focus:outline-none cursor-pointer">
+                        {Object.values(CATEGORIES).map(cat => (<option key={cat.id} value={cat.id}>{cat.name}</option>))}
+                     </select>
                      <div className="hidden print-visible font-bold text-lg">{currentCategoryData.name}</div>
                   </div>
                </Card>
@@ -621,7 +538,7 @@
                   <div className="hidden print-visible font-bold">{currentCategoryData.types.find(t => t.id === projectType)?.label}</div>
                   {projectType === 'combined' && (
                      <div className="mt-3 pt-3 border-t border-slate-100">
-                        <div className="flex justify-between text-xs mb-1">
+                        <div className="flex justify-between text-[10px] font-black text-slate-400 mb-1 uppercase tracking-tighter">
                           <span>Standard ({100-split}%)</span>
                           <span>Non-Standard ({split}%)</span>
                         </div>
@@ -631,143 +548,120 @@
                </Card>
             </div>
 
-            {/* ADJUSTMENTS TAB */}
             <div className={`${activeTab === 'projects' ? 'block' : 'hidden'} print-visible`}>
                 <div className="grid lg:grid-cols-2 gap-6">
-                  {Object.entries(currentCategoryData.factors).map(([areaKey, factors]) => {
-                    return (
-                      <Card key={areaKey} className="p-5 flex flex-col">
+                  {Object.entries(currentCategoryData.factors).map(([areaKey, factors]) => (
+                    <Card key={areaKey} className="p-5">
                         <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-4">
                            <h3 className="font-bold text-slate-800">{RISK_AREAS_TITLES[areaKey]}</h3>
                            <div className="flex gap-2 no-print">
-                             <button onClick={() => setAllMitigation(areaKey, factors, 0, true)} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded">Reset</button>
-                             <button onClick={() => setAllMitigation(areaKey, factors, 100, true)} className="text-xs bg-green-50 hover:bg-green-100 text-green-700 px-2 py-1 rounded">Max Mitigate</button>
+                             <button onClick={() => {
+                               Object.values(factors).forEach(f => {
+                                 setMitigations(prev => ({ ...prev, [`${areaKey}-${f.name}`]: 100 }));
+                               });
+                             }} className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">Max All</button>
+                             <button onClick={() => {
+                               Object.values(factors).forEach(f => {
+                                 setMitigations(prev => ({ ...prev, [`${areaKey}-${f.name}`]: 0 }));
+                               });
+                             }} className="text-[10px] uppercase font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">Reset</button>
                            </div>
                         </div>
-                        <div className="space-y-6 flex-1">
+                        <div className="space-y-6">
                           {factors.map((factor, idx) => {
-                            const uniqueId = `${areaKey}-${factor.name}`;
-                            const isActive = activeFactors[uniqueId] !== false;
-                            const mitVal = mitigations[uniqueId] || 0;
+                            const id = `${areaKey}-${factor.name}`;
+                            const active = activeFactors[id] !== false;
+                            const mit = mitigations[id] || 0;
                             return (
-                              <div key={idx} className={`transition-opacity ${isActive ? 'opacity-100' : 'opacity-50'}`}>
-                                <div className="flex items-start gap-3 mb-2">
-                                  <button onClick={() => toggleFactor(uniqueId)} className={`mt-0.5 focus:outline-none hover:opacity-80 transition-colors no-print ${isActive ? colorClass : 'text-slate-400'}`}>
-                                    {isActive ? <Icons.CheckSquare className="w-5 h-5" /> : <Icons.Square className="w-5 h-5" />}
+                              <div key={idx} className={`${active ? 'opacity-100' : 'opacity-40'}`}>
+                                <div className="flex items-start gap-3">
+                                  <button onClick={() => toggleFactor(id)} className={`mt-0.5 no-print ${active ? colorClass : 'text-slate-300'}`}>
+                                    {active ? <Icons.CheckSquare className="w-5 h-5" /> : <Icons.Square className="w-5 h-5" />}
                                   </button>
                                   <div className="flex-1">
-                                    <div className="flex justify-between items-start">
-                                      <label className={`text-sm font-medium leading-tight mb-1 cursor-pointer ${isActive ? 'text-slate-800' : 'text-slate-500'}`} onClick={() => toggleFactor(uniqueId)}>{factor.name}</label>
-                                      <span className={`no-print text-xs font-mono font-bold px-1.5 py-0.5 rounded whitespace-nowrap ml-2 ${!isActive ? 'bg-slate-100 text-slate-400' : mitVal === 100 ? 'bg-green-100 text-green-700' : mitVal === 0 ? 'bg-red-50 text-red-600' : lightBgClass + ' ' + textClass}`}>
-                                        {!isActive ? 'N/A' : `${mitVal}% Mitigated`}
+                                    <div className="flex justify-between items-start mb-1">
+                                      <label className="text-sm font-semibold text-slate-700 leading-tight">{factor.name}</label>
+                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${!active ? 'bg-slate-100' : mit === 100 ? 'bg-green-100 text-green-700' : lightBgClass + ' ' + textClass}`}>
+                                        {active ? `${mit}%` : 'N/A'}
                                       </span>
-                                      <span className="hidden mitigation-value ml-2 text-sm">{!isActive ? 'N/A' : `${mitVal}%`}</span>
+                                      <span className="hidden mitigation-value ml-2 text-sm">{active ? `${mit}%` : 'N/A'}</span>
                                     </div>
-                                    <Slider value={mitVal} onChange={(v) => handleMitigationChange(uniqueId, v)} disabled={!isActive} colorClass={sliderClass} />
+                                    <Slider value={mit} onChange={(v) => handleMitigationChange(id, v)} disabled={!active} colorClass={sliderClass} />
                                   </div>
                                 </div>
                               </div>
                             );
                           })}
                         </div>
-                      </Card>
-                    );
-                  })}
+                    </Card>
+                  ))}
                 </div>
             </div>
 
-            {/* REPROFILER TAB */}
+            {/* REPROFILLING TAB */}
             {(!isOutsourcing) && (
               <div className={`${activeTab === 'reprofiler' ? 'block' : 'hidden'} print-visible page-break`}>
-                <h2 className="hidden print-visible text-xl font-bold mb-4 mt-8 pt-4 border-t border-slate-300">Expenditure Reprofiling</h2>
                 <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-md flex gap-2 no-print mb-6">
                   <Icons.Info className="w-5 h-5 flex-shrink-0" />
-                  <p className="text-sm">This tool simulates a revised expenditure profile by converting annual spend to monthly, applying a duration stretch (based on Time OB), and rescaling costs (based on Cost OB).</p>
+                  <p className="text-sm">This tool models a revised expenditure profile by applying a duration stretch (Time OB) and cost rescaling (Cost OB).</p>
                 </div>
                 
                 <div className="grid md:grid-cols-2 gap-6">
                   <Card className="p-5">
                     <SectionHeader title="Duration Parameters" icon={Icons.Calendar} colorClass={colorClass} />
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Start Year</label>
-                          <select value={startYear} onChange={(e) => setStartYear(Number(e.target.value))} className="no-print w-full border-slate-300 rounded-md text-sm py-1.5 focus:ring-2 focus:ring-emerald-500/20">
-                             {[0,1,2,3,4,5].map(y => <option key={y} value={y}>Year {y}</option>)}
-                          </select>
-                          <div className="hidden print-visible font-mono">Year {startYear}</div>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Start Month</label>
-                          <select value={startMonth} onChange={(e) => setStartMonth(Number(e.target.value))} className="no-print w-full border-slate-300 rounded-md text-sm py-1.5 focus:ring-2 focus:ring-emerald-500/20">
-                             {Array(12).fill(0).map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}
-                          </select>
-                          <div className="hidden print-visible font-mono">{startMonth}</div>
-                        </div>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Start Year</label>
+                        <select value={startYear} onChange={(e) => setStartYear(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print">
+                           {[0,1,2,3,4,5].map(y => <option key={y} value={y}>Year {y}</option>)}
+                        </select>
+                        <div className="hidden print-visible font-bold">Year {startYear}</div>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Original Duration (Months)</label>
-                        <input type="number" min="1" max="120" value={originalDuration} onChange={(e) => setOriginalDuration(Number(e.target.value))} className="no-print w-full border-slate-300 rounded-md text-sm py-1.5 focus:ring-2 focus:ring-emerald-500/20" />
-                        <div className="hidden print-visible font-mono">{originalDuration}</div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Start Month</label>
+                        <select value={startMonth} onChange={(e) => setStartMonth(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print">
+                           {Array(12).fill(0).map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}
+                        </select>
+                        <div className="hidden print-visible font-bold">{startMonth}</div>
                       </div>
                     </div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Original Duration (Months)</label>
+                    <input type="number" value={originalDuration} onChange={(e) => setOriginalDuration(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print" />
+                    <div className="hidden print-visible font-bold">{originalDuration}</div>
                   </Card>
                   <Card className="p-5">
-                    <SectionHeader title="Overrun Inputs" icon={Icons.TrendingUp} colorClass={colorClass} />
+                    <SectionHeader title="Overrun Adjustments" icon={Icons.TrendingUp} colorClass={colorClass} />
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                         <div className="flex items-center gap-2">
-                           <input type="checkbox" checked={linkTimeOB} onChange={(e) => setLinkTimeOB(e.target.checked)} className={`rounded focus:ring-2 ${textClass} focus:ring-offset-0 no-print`} />
-                           <span className="text-sm text-slate-700">Link Time OB</span>
-                         </div>
-                         <div className="flex items-center gap-2">
-                           <input type="number" disabled={linkTimeOB} value={linkTimeOB ? results.finalDurOB.toFixed(1) : manualTimeOB} onChange={(e) => setManualTimeOB(Number(e.target.value))} className={`no-print w-20 text-right text-sm border-slate-300 rounded-md py-1 ${linkTimeOB ? 'bg-slate-100 text-slate-500' : 'bg-white'}`} />
-                           <span className="text-sm font-bold text-slate-500 hidden md:inline">%</span>
-                           <span className="hidden print-visible font-bold">{(linkTimeOB ? results.finalDurOB : manualTimeOB).toFixed(1)}%</span>
-                         </div>
+                         <span className="text-sm font-medium"><input type="checkbox" checked={linkTimeOB} onChange={(e) => setLinkTimeOB(e.target.checked)} className="mr-2 no-print" /> Link Time OB</span>
+                         <input type="number" disabled={linkTimeOB} value={linkTimeOB ? results.finalDurOB.toFixed(1) : manualTimeOB} onChange={(e) => setManualTimeOB(Number(e.target.value))} className="w-20 text-right text-sm border-slate-200 rounded p-1" />
                       </div>
                       <div className="flex items-center justify-between">
-                         <div className="flex items-center gap-2">
-                           <input type="checkbox" checked={linkCostOB} onChange={(e) => setLinkCostOB(e.target.checked)} className={`rounded focus:ring-2 ${textClass} focus:ring-offset-0 no-print`} />
-                           <span className="text-sm text-slate-700">Link Cost OB</span>
-                         </div>
-                         <div className="flex items-center gap-2">
-                           <input type="number" disabled={linkCostOB} value={linkCostOB ? results.finalCapOB.toFixed(1) : manualCostOB} onChange={(e) => setManualCostOB(Number(e.target.value))} className={`no-print w-20 text-right text-sm border-slate-300 rounded-md py-1 ${linkCostOB ? 'bg-slate-100 text-slate-500' : 'bg-white'}`} />
-                           <span className="text-sm font-bold text-slate-500 hidden md:inline">%</span>
-                           <span className="hidden print-visible font-bold">{(linkCostOB ? results.finalCapOB : manualCostOB).toFixed(1)}%</span>
-                         </div>
+                         <span className="text-sm font-medium"><input type="checkbox" checked={linkCostOB} onChange={(e) => setLinkCostOB(e.target.checked)} className="mr-2 no-print" /> Link Cost OB</span>
+                         <input type="number" disabled={linkCostOB} value={linkCostOB ? results.finalCapOB.toFixed(1) : manualCostOB} onChange={(e) => setManualCostOB(Number(e.target.value))} className="w-20 text-right text-sm border-slate-200 rounded p-1" />
                       </div>
                     </div>
                   </Card>
                 </div>
 
                 <Card className="p-6 mt-6">
-                  <SectionHeader title="Original Cost Profile (Annual)" icon={Icons.Euro} colorClass={colorClass} />
+                  <SectionHeader title="Initial Budget Profile (Annual)" icon={Icons.Euro} colorClass={colorClass} />
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
+                    <table className="w-full text-sm">
                        <thead>
-                         <tr className="border-b border-slate-200">
-                           {originalCosts.map((_, i) => (
-                             <th key={i} className="px-2 py-2 text-slate-500 font-semibold bg-slate-50 whitespace-nowrap min-w-[80px]">Year {i}</th>
-                           ))}
-                           <th className="px-2 py-2 text-slate-800 font-bold bg-slate-100 min-w-[80px]">Total</th>
+                         <tr className="text-[10px] text-slate-400 uppercase">
+                           {originalCosts.map((_, i) => <th key={i} className="p-2 text-left">Year {i}</th>)}
+                           <th className="p-2 text-right">Total</th>
                          </tr>
                        </thead>
                        <tbody>
                          <tr>
                            {originalCosts.map((val, i) => (
-                             <td key={i} className="p-1">
-                               <input type="number" value={val} onChange={(e) => {
-                                   const newCosts = [...originalCosts];
-                                   newCosts[i] = Number(e.target.value);
-                                   setOriginalCosts(newCosts);
-                                 }} className="no-print w-full border-slate-200 rounded text-right focus:ring-2 focus:ring-blue-500/20 text-slate-700" />
-                               <span className="hidden print-visible text-right block w-full">{val.toLocaleString()}</span>
-                             </td>
+                             <td key={i} className="p-1"><input type="number" value={val} onChange={(e) => {
+                                 const next = [...originalCosts]; next[i] = Number(e.target.value); setOriginalCosts(next);
+                               }} className="w-full border border-slate-100 rounded text-right p-1 no-print" /><span className="hidden print-visible text-right">{val}</span></td>
                            ))}
-                           <td className={`p-2 text-right font-bold ${textClass} ${lightBgClass}`}>
-                             {reprofileResults.totalOriginalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                           </td>
+                           <td className="p-2 text-right font-bold">€{reprofileResults.totalOriginalCost.toLocaleString()}</td>
                          </tr>
                        </tbody>
                     </table>
@@ -775,121 +669,69 @@
                 </Card>
 
                 <div className="grid lg:grid-cols-3 gap-6 mt-6">
-                  <Card className="p-6 lg:col-span-1 bg-slate-800 text-white border-none print-shadow-none">
-                     <h3 className="font-bold text-slate-200 mb-6 flex items-center gap-2"><Icons.AlertCircle className="w-5 h-5" /> Impact Summary</h3>
+                  <Card className="p-6 bg-slate-800 text-white border-none">
+                     <h3 className="font-bold text-slate-200 mb-6 flex items-center gap-2 tracking-widest text-[10px] uppercase">Revised Impact</h3>
                      <div className="space-y-6">
                        <div>
-                         <div className="flex justify-between text-sm text-slate-400 mb-1">Project Duration</div>
-                         <div className="flex items-baseline gap-2">
-                           <span className="text-2xl font-bold">{originalDuration}</span>
-                           <Icons.ChevronRight className="w-4 h-4 text-slate-500" />
-                           <span className="text-2xl font-bold text-green-400">{reprofileResults.revisedDuration}</span>
-                           <span className="text-sm text-slate-400">months</span>
-                         </div>
+                         <div className="text-[10px] text-slate-500 font-black uppercase mb-1">Modelled Duration</div>
+                         <div className="text-2xl font-black">{reprofileResults.revisedDuration} <span className="text-xs font-normal opacity-50">months</span></div>
                        </div>
                        <div className="w-full h-px bg-slate-700"></div>
                        <div>
-                         <div className="flex justify-between text-sm text-slate-400 mb-1">Total Capex</div>
-                         <div className="flex items-baseline gap-2 flex-wrap">
-                           <span className="text-xl font-medium text-slate-500 line-through decoration-slate-600">€{reprofileResults.totalOriginalCost.toLocaleString()}</span>
-                           <Icons.ChevronRight className="w-4 h-4 text-slate-500" />
-                           <span className="text-2xl font-bold text-green-400">€{reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                         </div>
+                         <div className="text-[10px] text-slate-500 font-black uppercase mb-1">Total Revised Capex</div>
+                         <div className="text-2xl font-black text-green-400">€{reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
                        </div>
                      </div>
                   </Card>
-                  <Card className="p-6 lg:col-span-2">
-                    <SectionHeader title="Adjusted Expenditure Profile" icon={Icons.BarChart3} colorClass={colorClass} />
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm text-left">
-                         <thead>
-                           <tr className="border-b border-slate-200">
-                             {reprofileResults.revisedYearly.map((_, i) => (
-                               <th key={i} className="px-2 py-2 text-slate-500 font-semibold bg-slate-50 whitespace-nowrap min-w-[70px]">Year {i}</th>
-                             ))}
-                             <th className="px-2 py-2 text-slate-800 font-bold bg-slate-100 min-w-[80px]">Total</th>
-                           </tr>
-                         </thead>
-                         <tbody>
-                           <tr>
-                             {reprofileResults.revisedYearly.map((val, i) => (
-                               <td key={i} className="p-2 text-right border-r border-slate-50 text-slate-600 font-mono">
-                                 {val > 0 ? val.toLocaleString(undefined, { maximumFractionDigits: 1 }) : '-'}
-                               </td>
-                             ))}
-                             <td className={`p-2 text-right font-bold ${textClass} ${lightBgClass}`}>
-                               {reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                             </td>
-                           </tr>
-                         </tbody>
-                      </table>
-                    </div>
+                  <Card className="p-6 lg:col-span-2 overflow-x-auto">
+                    <SectionHeader title="Reprofilled Expenditure Plan" icon={Icons.BarChart3} colorClass={colorClass} />
+                    <table className="w-full text-sm">
+                       <thead>
+                         <tr className="text-[10px] text-slate-400 uppercase">
+                           {reprofileResults.revisedYearly.map((_, i) => <th key={i} className="p-2 text-right">Year {i}</th>)}
+                         </tr>
+                       </thead>
+                       <tbody>
+                         <tr className="font-mono">
+                           {reprofileResults.revisedYearly.map((val, i) => (
+                             <td key={i} className="p-2 text-right">{val > 0 ? val.toLocaleString(undefined, { maximumFractionDigits: 1 }) : '-'}</td>
+                           ))}
+                         </tr>
+                       </tbody>
+                    </table>
                   </Card>
                 </div>
               </div>
             )}
 
-            {/* --- APP FOOTER --- */}
-            <footer className="mt-16 mb-12 border-t border-slate-200 pt-8 text-center print-visible">
-               <p className="text-sm font-semibold text-slate-600">
-                 Created by Dave Maher
-               </p>
-               <p className="text-xs text-slate-400 mt-2 max-w-lg mx-auto leading-relaxed">
+            <footer className="mt-16 mb-24 border-t border-slate-200 pt-8 text-center no-print">
+               <p className="text-sm font-semibold text-slate-600">Created by Dave Maher</p>
+               <p className="text-[10px] text-slate-400 mt-2 max-w-lg mx-auto leading-relaxed">
                  All intellectual property rights associated with this application, its calculation logic, and its interface design belong to Dave Maher. &copy; {new Date().getFullYear()}
                </p>
             </footer>
 
-            {/* FIXED SUMMARY BAR */}
+            {/* FIXED BOTTOM SUMMARY BAR - RESTORED PREMIUM DESIGN */}
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-100 via-slate-100 to-transparent pointer-events-none z-40 no-print fixed-summary">
-               <Card noBg className={`max-w-6xl mx-auto ${category === 'civil' ? 'bg-amber-900' : category === 'equip' ? 'bg-blue-900' : 'bg-emerald-900'} text-white border-none shadow-xl p-4 md:p-6 pointer-events-auto`}>
+               <Card noBg className={`max-w-6xl mx-auto ${summaryBg} text-white border-none shadow-xl p-4 md:p-6 pointer-events-auto`}>
                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                   {activeTab === 'projects' || isOutsourcing ? (
-                     <>
-                       <div>
-                         <h2 className="text-lg font-bold text-white">Calculated Optimism Bias</h2>
-                         <p className="text-sm text-white/70">Category: {currentCategoryData.name}</p>
+                   <div>
+                     <h2 className="text-lg font-bold text-white">Calculated Optimism Bias</h2>
+                     <p className="text-[10px] uppercase font-black text-white/50 tracking-widest">{currentCategoryData.name}</p>
+                   </div>
+                   <div className="flex gap-12">
+                     <div className="text-center">
+                       <div className="text-3xl font-black">{results.finalDurOB.toFixed(1)}%</div>
+                       <div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">Duration OB</div>
+                     </div>
+                     <div className="w-px bg-white/20 self-stretch"></div>
+                     <div className="text-center">
+                       <div className="text-3xl font-black text-green-300">{results.finalCapOB.toFixed(1)}%</div>
+                       <div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">
+                         {isOutsourcing ? 'OpEx OB' : 'CapEx OB'}
                        </div>
-                       <div className="flex gap-8">
-                         <div className="text-center">
-                           <div className="text-3xl font-bold">{results.finalDurOB.toFixed(1)}%</div>
-                           <div className="text-xs uppercase tracking-wider text-white/60 mt-1 font-semibold">Works Duration</div>
-                         </div>
-                         <div className="w-px bg-white/20 self-stretch"></div>
-                         <div className="text-center">
-                           <div className="text-3xl font-bold text-green-300">{results.finalCapOB.toFixed(1)}%</div>
-                           <div className="text-xs uppercase tracking-wider text-white/60 mt-1 font-semibold">
-                             {isOutsourcing ? 'Operating Expenditure' : 'Capital Expenditure'}
-                           </div>
-                         </div>
-                       </div>
-                     </>
-                   ) : (
-                     <>
-                        <div>
-                         <h2 className="text-lg font-bold text-white">Reprofile Summary</h2>
-                         <p className="text-sm text-white/70">Full Impact Analysis</p>
-                       </div>
-                       <div className="flex gap-8">
-                         <div className="text-center">
-                           <div className="text-3xl font-bold flex flex-col items-center">
-                              <span className="text-xs font-normal opacity-70 line-through text-white/60">{originalDuration}</span>
-                              <span>{reprofileResults.revisedDuration}</span>
-                           </div>
-                           <div className="text-xs uppercase tracking-wider text-white/60 mt-1 font-semibold">Duration (Months)</div>
-                         </div>
-                         <div className="w-px bg-white/20 self-stretch"></div>
-                         <div className="text-center">
-                           <div className="text-3xl font-bold text-green-300 flex flex-col items-center">
-                              <span className="text-xs font-normal opacity-70 line-through text-white/60">€{reprofileResults.totalOriginalCost.toLocaleString()}</span>
-                              <span>€{reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                           </div>
-                           <div className="text-xs uppercase tracking-wider text-white/60 mt-1 font-semibold">
-                             Total Cost
-                           </div>
-                         </div>
-                       </div>
-                     </>
-                   )}
+                     </div>
+                   </div>
                  </div>
                </Card>
             </div>
