@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HSE Optimism Bias Calculator</title>
   
+  <!-- Favicons -->
+  <link rel="icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico">
+  <link rel="mask-icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.svg" color="#006858">
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
@@ -87,6 +91,7 @@
       Euro: (props) => <Icon {...props} path={<><path d="M4 10h12"/><path d="M4 14h9"/><path d="M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2"/></>} />,
       BarChart3: (props) => <Icon {...props} path={<><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></>} />,
       ChevronRight: (props) => <Icon {...props} path={<><path d="m9 18 6-6-6-6"/></>} />,
+      ChevronDown: (props) => <Icon {...props} path={<><polyline points="6 9 12 15 18 9"/></>} />,
       Info: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></>} />,
       CheckSquare: (props) => <Icon {...props} path={<><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>} />,
       Square: (props) => <Icon {...props} path={<><rect width="18" height="18" x="3" y="3" rx="2"/></>} />,
@@ -97,7 +102,10 @@
       Save: (props) => <Icon {...props} path={<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>} />,
     };
 
-    // --- DATA CONFIGURATION WITH LOGICAL WEIGHTS ---
+    // --- DATA CONFIGURATION ---
+    // Note: Weights are percentage contributions (0-100) to the Upper Bound.
+    // Government Guidelines set to 0 as per spreadsheets.
+    
     const CATEGORIES = {
       buildings: {
         id: 'buildings',
@@ -109,45 +117,45 @@
           { id: 'combined', label: 'Combined' }
         ],
         upper: {
-          ns: { duration: 39, capex: 51 },
-          s: { duration: 4, capex: 24 }
+          ns: { duration: 39.0, capex: 51.0 },
+          s: { duration: 4.0, capex: 24.0 }
         },
         factors: {
           'procurement': [
             { name: 'Complexity of Contract Structure', ns: { d: 3, c: 1 }, s: { d: 1, c: 0 } },
             { name: 'Late Contractor Involvement in Design', ns: { d: 6, c: 2 }, s: { d: 3, c: 2 } },
             { name: 'Poor Contractor Capabilities', ns: { d: 5, c: 5 }, s: { d: 4, c: 9 } },
-            { name: 'Government Guidelines', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } }, // Corrected from 0
+            { name: 'Government Guidelines', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
             { name: 'Dispute & Claims Occurred', ns: { d: 5, c: 11 }, s: { d: 4, c: 29 } },
-            { name: 'Information Management', ns: { d: 3, c: 2 }, s: { d: 2, c: 2 } }, // Corrected from 0
-            { name: 'Other Procurement Factors', ns: { d: 1, c: 1 }, s: { d: 1, c: 1 } }
+            { name: 'Information Management', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Other Procurement Factors', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } }
           ],
           'project_specific': [
             { name: 'Design Complexity', ns: { d: 2, c: 3 }, s: { d: 3, c: 1 } },
             { name: 'Degree of Innovation', ns: { d: 8, c: 9 }, s: { d: 1, c: 4 } },
-            { name: 'Environmental Impact', ns: { d: 4, c: 4 }, s: { d: 2, c: 2 } }, // Corrected from 0
-            { name: 'Other Project Specifics', ns: { d: 5, c: 5 }, s: { d: 1, c: 1 } }
+            { name: 'Environmental Impact', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Other Project Specifics', ns: { d: 5, c: 5 }, s: { d: 0, c: 0 } }
           ],
           'client_specification': [
             { name: 'Inadequacy of the Business Case', ns: { d: 22, c: 23 }, s: { d: 31, c: 34 } },
-            { name: 'Large Number of Stakeholders', ns: { d: 4, c: 3 }, s: { d: 6, c: 2 } }, // Corrected from 0
+            { name: 'Large Number of Stakeholders', ns: { d: 0, c: 0 }, s: { d: 6, c: 0 } },
             { name: 'Funding Availability', ns: { d: 3, c: 0 }, s: { d: 8, c: 0 } },
             { name: 'Project Management Team', ns: { d: 5, c: 2 }, s: { d: 0, c: 1 } },
             { name: 'Poor Project Intelligence', ns: { d: 5, c: 6 }, s: { d: 6, c: 2 } },
             { name: 'Other Specification Factors', ns: { d: 1, c: 2 }, s: { d: 0, c: 0 } }
           ],
           'environment': [
-            { name: 'Public Relations', ns: { d: 3, c: 3 }, s: { d: 8, c: 2 } }, // Corrected from 0
+            { name: 'Public Relations', ns: { d: 0, c: 0 }, s: { d: 8, c: 2 } },
             { name: 'Site Characteristics', ns: { d: 3, c: 1 }, s: { d: 5, c: 2 } },
-            { name: 'Permits / Consents / Approvals', ns: { d: 5, c: 3 }, s: { d: 9, c: 4 } }, // Corrected from 0 on capex
-            { name: 'Other Environmental Factors', ns: { d: 1, c: 3 }, s: { d: 1, c: 1 } }
+            { name: 'Permits / Consents / Approvals', ns: { d: 3, c: 0 }, s: { d: 9, c: 0 } },
+            { name: 'Other Environmental Factors', ns: { d: 1, c: 3 }, s: { d: 0, c: 0 } }
           ],
           'external_influences': [
-            { name: 'Political', ns: { d: 13, c: 2 }, s: { d: 2, c: 1 } },
-            { name: 'Economic', ns: { d: 2, c: 13 }, s: { d: 1, c: 11 } },
+            { name: 'Political', ns: { d: 13, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Economic', ns: { d: 0, c: 13 }, s: { d: 0, c: 11 } },
             { name: 'Legislation / Regulations', ns: { d: 6, c: 7 }, s: { d: 9, c: 3 } },
             { name: 'Technology', ns: { d: 4, c: 5 }, s: { d: 0, c: 0 } },
-            { name: 'Other External Influences', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } }
+            { name: 'Other External Influences', ns: { d: 0, c: 2 }, s: { d: 0, c: 0 } }
           ]
         }
       },
@@ -161,44 +169,44 @@
           { id: 'combined', label: 'Combined' }
         ],
         upper: {
-          ns: { duration: 18.5, capex: 50 },
-          s: { duration: 18.2, capex: 40.5 }
+          ns: { duration: 25.0, capex: 66.0 },
+          s: { duration: 20.0, capex: 44.0 }
         },
         factors: {
           'procurement': [
-            { name: 'Complexity of Contract Structure', ns: { d: 4, c: 2 }, s: { d: 1, c: 1 } },
-            { name: 'Late Contractor Involvement', ns: { d: 1, c: 1 }, s: { d: 0, c: 3 } },
-            { name: 'Poor Contractor Capabilities', ns: { d: 2, c: 3 }, s: { d: 16, c: 5 } },
-            { name: 'Government Guidelines', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
-            { name: 'Dispute & Claims Occurred', ns: { d: 4, c: 6 }, s: { d: 3, c: 14 } },
-            { name: 'Information Management', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
-            { name: 'Other Procurement', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } }
+            { name: 'Complexity of Contract Structure', ns: { d: 4, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Late Contractor Involvement', ns: { d: 1, c: 0 }, s: { d: 0, c: 3 } },
+            { name: 'Poor Contractor Capabilities', ns: { d: 2, c: 0 }, s: { d: 16, c: 0 } },
+            { name: 'Government Guidelines', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Dispute & Claims Occurred', ns: { d: 16, c: 0 }, s: { d: 0, c: 21 } },
+            { name: 'Information Management', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Other Procurement', ns: { d: 1, c: 2 }, s: { d: 0, c: 0 } }
           ],
           'project_specific': [
-            { name: 'Design Complexity', ns: { d: 5, c: 3 }, s: { d: 4, c: 2 } },
-            { name: 'Degree of Innovation', ns: { d: 2, c: 4 }, s: { d: 0, c: 6 } },
-            { name: 'Environmental Impact', ns: { d: 8, c: 7 }, s: { d: 6, c: 4 } }, // Civil specific impact
-            { name: 'Other Specifics', ns: { d: 2, c: 4 }, s: { d: 0, c: 0 } }
+            { name: 'Design Complexity', ns: { d: 5, c: 8 }, s: { d: 0, c: 0 } },
+            { name: 'Degree of Innovation', ns: { d: 13, c: 9 }, s: { d: 0, c: 0 } },
+            { name: 'Environmental Impact', ns: { d: 0, c: 5 }, s: { d: 46, c: 22 } },
+            { name: 'Other Specifics', ns: { d: 3, c: 0 }, s: { d: 0, c: 18 } }
           ],
           'client_specification': [
-            { name: 'Inadequacy of the Business Case', ns: { d: 12, c: 30 }, s: { d: 36, c: 49 } },
-            { name: 'Large Number of Stakeholders', ns: { d: 4, c: 4 }, s: { d: 6, c: 3 } },
-            { name: 'Funding Availability', ns: { d: 2, c: 1 }, s: { d: 8, c: 1 } },
-            { name: 'Project Management Team', ns: { d: 5, c: 2 }, s: { d: 0, c: 2 } },
-            { name: 'Poor Project Intelligence', ns: { d: 5, c: 11 }, s: { d: 7, c: 5 } },
-            { name: 'Other Specs', ns: { d: 1, c: 2 }, s: { d: 0, c: 0 } }
+            { name: 'Inadequacy of the Business Case', ns: { d: 3, c: 35 }, s: { d: 8, c: 10 } },
+            { name: 'Large Number of Stakeholders', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Funding Availability', ns: { d: 0, c: 5 }, s: { d: 6, c: 0 } },
+            { name: 'Project Management Team', ns: { d: 0, c: 2 }, s: { d: 0, c: 0 } },
+            { name: 'Poor Project Intelligence', ns: { d: 3, c: 9 }, s: { d: 14, c: 7 } },
+            { name: 'Other Specs', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } }
           ],
           'environment': [
-            { name: 'Public Relations', ns: { d: 4, c: 6 }, s: { d: 2, c: 9 } },
-            { name: 'Site Characteristics', ns: { d: 5, c: 5 }, s: { d: 10, c: 3 } },
-            { name: 'Permits / Consents / Approvals', ns: { d: 7, c: 5 }, s: { d: 10, c: 4 } },
-            { name: 'Other Environmental', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } }
+            { name: 'Public Relations', ns: { d: 0, c: 0 }, s: { d: 0, c: 9 } },
+            { name: 'Site Characteristics', ns: { d: 0, c: 5 }, s: { d: 10, c: 3 } },
+            { name: 'Permits / Consents / Approvals', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Other Environmental', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } }
           ],
           'external_influences': [
-            { name: 'Political', ns: { d: 19, c: 5 }, s: { d: 3, c: 2 } },
-            { name: 'Economic', ns: { d: 24, c: 20 }, s: { d: 4, c: 7 } },
-            { name: 'Legislation / Regulations', ns: { d: 6, c: 12 }, s: { d: 3, c: 3 } },
-            { name: 'Technology', ns: { d: 4, c: 2 }, s: { d: 0, c: 0 } },
+            { name: 'Political', ns: { d: 19, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Economic', ns: { d: 24, c: 3 }, s: { d: 0, c: 7 } },
+            { name: 'Legislation / Regulations', ns: { d: 0, c: 8 }, s: { d: 0, c: 0 } },
+            { name: 'Technology', ns: { d: 6, c: 8 }, s: { d: 0, c: 0 } },
             { name: 'Other External', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } }
           ]
         }
@@ -212,45 +220,48 @@
           { id: 'standard', label: 'Outsourcing' }
         ],
         upper: {
-          ns: { duration: 54, capex: 200 },
-          s: { duration: 0, capex: 41 }
+          ns: { duration: 54.0, capex: 200.0 },
+          s: { duration: 0.0, capex: 41.0 }
         },
         factors: {
+          // Note: For 'equip', 'ns' key maps to Equip/Dev, 's' key maps to Outsourcing.
+          // ns.d = Equip Duration, ns.c = Equip Capex
+          // s.d = Outsource Duration (always 0), s.c = Outsource Opex
           'procurement': [
-            { name: 'Complexity of Contract Structure', ns: { d: 13, c: 7 }, s: { d: 2, c: 2 } },
-            { name: 'Late Contractor Involvement', ns: { d: 2, c: 7 }, s: { d: 0, c: 0 } },
+            { name: 'Complexity of Contract Structure', ns: { d: 13, c: 7 }, s: { d: 0, c: 0 } },
+            { name: 'Late Contractor Involvement', ns: { d: 0, c: 7 }, s: { d: 0, c: 0 } },
             { name: 'Poor Contractor Capabilities', ns: { d: 11, c: 4 }, s: { d: 0, c: 0 } },
-            { name: 'Government Guidelines', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
-            { name: 'Dispute & Claims Occurred', ns: { d: 24, c: 18 }, s: { d: 0, c: 0 } },
-            { name: 'Information Management', ns: { d: 4, c: 8 }, s: { d: 5, c: 23 } },
-            { name: 'Other Procurement', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } }
+            { name: 'Government Guidelines', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Dispute & Claims Occurred', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Information Management', ns: { d: 0, c: 5 }, s: { d: 0, c: 0 } },
+            { name: 'Other Procurement', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } }
           ],
           'project_specific': [
-            { name: 'Design Complexity', ns: { d: 12, c: 13 }, s: { d: 0, c: 0 } },
-            { name: 'Degree of Innovation', ns: { d: 15, c: 23 }, s: { d: 0, c: 37 } },
-            { name: 'Environmental Impact', ns: { d: 2, c: 2 }, s: { d: 0, c: 0 } },
-            { name: 'Other Specifics', ns: { d: 5, c: 8 }, s: { d: 0, c: 0 } }
+            { name: 'Design Complexity', ns: { d: 0, c: 10 }, s: { d: 0, c: 0 } },
+            { name: 'Degree of Innovation', ns: { d: 20, c: 17 }, s: { d: 0, c: 0 } },
+            { name: 'Environmental Impact', ns: { d: 9, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Other Specifics', ns: { d: 0, c: 0 }, s: { d: 0, c: 3 } }
           ],
           'client_specification': [
-            { name: 'Inadequacy of Business Case', ns: { d: 5, c: 6 }, s: { d: 5, c: 12 } },
-            { name: 'Large Number of Stakeholders', ns: { d: 4, c: 4 }, s: { d: 2, c: 2 } },
-            { name: 'Funding Availability', ns: { d: 5, c: 2 }, s: { d: 0, c: 0 } },
-            { name: 'Project Management Team', ns: { d: 2, c: 5 }, s: { d: 0, c: 15 } },
-            { name: 'Poor Project Intelligence', ns: { d: 2, c: 1 }, s: { d: 0, c: 0 } },
-            { name: 'Other Specs', ns: { d: 1, c: 4 }, s: { d: 0, c: 0 } }
+            { name: 'Inadequacy of Business Case', ns: { d: 20, c: 18 }, s: { d: 0, c: 52 } },
+            { name: 'Large Number of Stakeholders', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Funding Availability', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Project Management Team', ns: { d: 0, c: 5 }, s: { d: 0, c: 0 } },
+            { name: 'Poor Project Intelligence', ns: { d: 4, c: 4 }, s: { d: 0, c: 32 } },
+            { name: 'Other Specs', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } }
           ],
           'environment': [
-            { name: 'Public Relations', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
-            { name: 'Site Characteristics', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } },
-            { name: 'Permits / Consents / Approvals', ns: { d: 2, c: 2 }, s: { d: 0, c: 0 } },
+            { name: 'Public Relations', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Site Characteristics', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Permits / Consents / Approvals', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
             { name: 'Other Environmental', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } }
           ],
           'external_influences': [
-            { name: 'Political', ns: { d: 7, c: 2 }, s: { d: 1, c: 1 } },
-            { name: 'Economic', ns: { d: 2, c: 2 }, s: { d: 2, c: 5 } },
-            { name: 'Legislation / Regulations', ns: { d: 4, c: 7 }, s: { d: 2, c: 8 } },
-            { name: 'Technology', ns: { d: 2, c: 3 }, s: { d: 0, c: 0 } },
-            { name: 'Other External', ns: { d: 1, c: 1 }, s: { d: 1, c: 1 } }
+            { name: 'Political', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Economic', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } },
+            { name: 'Legislation / Regulations', ns: { d: 4, c: 5 }, s: { d: 0, c: 0 } },
+            { name: 'Technology', ns: { d: 19, c: 18 }, s: { d: 0, c: 9 } },
+            { name: 'Other External', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } }
           ]
         }
       }
@@ -302,20 +313,26 @@
       const [projectType, setProjectType] = useState(saved.projectType || 'combined');
       const [split, setSplit] = useState(saved.split !== undefined ? saved.split : 50);
       
+      // Initialize mitigations with 0 for all factors
       const [mitigations, setMitigations] = useState(() => {
         if (saved.mitigations) return saved.mitigations;
         const initial = {};
-        Object.entries(CATEGORIES[category].factors).forEach(([areaKey, factorList]) => {
-          factorList.forEach(f => { initial[`${areaKey}-${f.name}`] = 0; });
+        Object.entries(CATEGORIES).forEach(([catId, catData]) => {
+            Object.entries(catData.factors).forEach(([areaKey, factorList]) => {
+                factorList.forEach(f => { initial[`${catId}-${areaKey}-${f.name}`] = 0; });
+            });
         });
         return initial;
       });
 
+      // Initialize active factors (checkboxes)
       const [activeFactors, setActiveFactors] = useState(() => {
         if (saved.activeFactors) return saved.activeFactors;
         const initial = {};
-        Object.entries(CATEGORIES[category].factors).forEach(([areaKey, factorList]) => {
-          factorList.forEach(f => { initial[`${areaKey}-${f.name}`] = true; });
+        Object.entries(CATEGORIES).forEach(([catId, catData]) => {
+             Object.entries(catData.factors).forEach(([areaKey, factorList]) => {
+                factorList.forEach(f => { initial[`${catId}-${areaKey}-${f.name}`] = true; });
+            });
         });
         return initial;
       });
@@ -346,64 +363,59 @@
         const newCat = e.target.value;
         setCategory(newCat);
         setProjectType(newCat === 'equip' ? 'ns' : 'combined');
-        
-        const currentFactors = CATEGORIES[newCat].factors;
-        const newMit = {};
-        const newActive = {};
-        Object.entries(currentFactors).forEach(([areaKey, factorList]) => {
-          factorList.forEach(f => {
-            const uniqueId = `${areaKey}-${f.name}`;
-            newMit[uniqueId] = 0;
-            newActive[uniqueId] = true;
-          });
-        });
-        setMitigations(newMit);
-        setActiveFactors(newActive);
       };
 
       const results = useMemo(() => {
         let totalNsDurWeight = 0, totalNsCapWeight = 0;
         let totalSDurWeight = 0, totalSCapWeight = 0;
-        let maxNsDurWeight = 0, maxNsCapWeight = 0;
-        let maxSDurWeight = 0, maxSCapWeight = 0;
+        
+        // In the MMD spreadsheet, weights are percentages of the Upper Bound.
+        // e.g. If Political contributes 19%, that is 19% OF the Upper Bound (e.g. 25%).
+        // So effectively, we sum (1 - mit%) * Weight. The result is the % of the Upper Bound remaining.
 
         Object.entries(currentCategoryData.factors).forEach(([areaKey, factorList]) => {
           factorList.forEach(f => {
-            const uniqueId = `${areaKey}-${f.name}`;
+            const uniqueId = `${category}-${areaKey}-${f.name}`;
             const isApplicable = activeFactors[uniqueId] !== false; 
-            const mitigation = isApplicable ? (mitigations[uniqueId] || 0) : 100;
-            const riskFactor = 1 - (mitigation / 100);
-
-            totalNsDurWeight += f.ns.d * riskFactor;
-            totalNsCapWeight += f.ns.c * riskFactor;
-            totalSDurWeight += f.s.d * riskFactor;
-            totalSCapWeight += f.s.c * riskFactor;
+            // If active, use user value. If inactive (unticked), risk is fully removed (100% mitigated).
+            // Wait, per instructions: "Only if the risk area has been fully mitigated should the tick ever be removed".
+            // Spreadsheet logic: If unticked, risk is 0. If ticked, risk is (1 - mitigation).
+            // Actually, spreadsheet says: "At 100%, or if deselected, the OB has been fully Mitigated"
+            // So if !active, mitigation = 100.
             
-            maxNsDurWeight += f.ns.d;
-            maxNsCapWeight += f.ns.c;
-            maxSDurWeight += f.s.d;
-            maxSCapWeight += f.s.c;
+            const mitigation = isApplicable ? (mitigations[uniqueId] || 0) : 100;
+            const riskRemaining = 1 - (mitigation / 100);
+
+            totalNsDurWeight += f.ns.d * riskRemaining;
+            totalNsCapWeight += f.ns.c * riskRemaining;
+            totalSDurWeight += f.s.d * riskRemaining;
+            totalSCapWeight += f.s.c * riskRemaining;
           });
         });
 
-        const nsDurOB = maxNsDurWeight > 0 ? currentCategoryData.upper.ns.duration * (totalNsDurWeight / maxNsDurWeight) : 0;
-        const nsCapOB = maxNsCapWeight > 0 ? currentCategoryData.upper.ns.capex * (totalNsCapWeight / maxNsCapWeight) : 0;
-        const sDurOB = maxSDurWeight > 0 ? currentCategoryData.upper.s.duration * (totalSDurWeight / maxSDurWeight) : 0;
-        const sCapOB = maxSCapWeight > 0 ? currentCategoryData.upper.s.capex * (totalSCapWeight / maxSCapWeight) : 0;
+        // The weights in CSV sum to roughly 100. So we divide by 100 to get the multiplier.
+        // Formula: UpperBound * (SumOfWeightedRisks / 100)
+        
+        const nsDurOB = currentCategoryData.upper.ns.duration * (totalNsDurWeight / 100);
+        const nsCapOB = currentCategoryData.upper.ns.capex * (totalNsCapWeight / 100);
+        const sDurOB = currentCategoryData.upper.s.duration * (totalSDurWeight / 100);
+        const sCapOB = currentCategoryData.upper.s.capex * (totalSCapWeight / 100);
 
         let finalDurOB = 0, finalCapOB = 0;
+        
         if (projectType === 'ns') {
           finalDurOB = nsDurOB; finalCapOB = nsCapOB;
         } else if (projectType === 'standard') {
           finalDurOB = sDurOB; finalCapOB = sCapOB;
         } else {
+          // Combined
           const nsRatio = split / 100;
           finalDurOB = (nsDurOB * nsRatio) + (sDurOB * (1 - nsRatio));
           finalCapOB = (nsCapOB * nsRatio) + (sCapOB * (1 - nsRatio));
         }
 
         return { finalDurOB, finalCapOB };
-      }, [mitigations, activeFactors, projectType, split, currentCategoryData]);
+      }, [mitigations, activeFactors, projectType, split, category, currentCategoryData]);
 
       const reprofileResults = useMemo(() => {
         const timeOverrunPct = (linkTimeOB ? results.finalDurOB : manualTimeOB) / 100;
@@ -462,10 +474,16 @@
         <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
           <header className={`text-white p-4 shadow-md sticky top-0 z-50 transition-colors duration-500 no-print ${headerBg}`}>
             <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <Icons.Calculator className={`w-6 h-6 ${category === 'civil' ? 'text-amber-200' : category === 'equip' ? 'text-blue-200' : 'text-emerald-300'}`} />
+              <div className="flex items-center gap-4">
+                <div className="bg-white p-1.5 rounded-lg shadow-sm">
+                  <img 
+                    src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" 
+                    alt="HSE Logo" 
+                    className="h-8 w-auto"
+                  />
+                </div>
                 <div>
-                  <h1 className="text-xl font-bold tracking-tight">HSE Optimism Bias Estimator</h1>
+                  <h1 className="text-xl font-bold tracking-tight">Optimism Bias Estimator</h1>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${subHeaderBg}`}>{currentCategoryData.name}</span>
                 </div>
               </div>
@@ -494,12 +512,15 @@
           <main className="max-w-6xl mx-auto p-4 md:p-6 pb-24">
             {/* PRINT-ONLY REPORT HEADER */}
             <div className="hidden print-visible mb-8 border-b-2 border-slate-800 pb-4">
-               <h1 className="text-2xl font-bold text-slate-900">HSE Optimism Bias Report</h1>
+               <div className="flex justify-between items-start">
+                 <h1 className="text-2xl font-bold text-slate-900">Optimism Bias Report</h1>
+                 <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-12 w-auto" />
+               </div>
                <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
-                  <div><strong>Project Name:</strong> {projectName || 'Untitled'}</div>
-                  <div><strong>Date:</strong> {new Date().toLocaleDateString()}</div>
-                  <div><strong>Category:</strong> {currentCategoryData.name}</div>
-                  <div><strong>Type:</strong> {currentCategoryData.types.find(t => t.id === projectType)?.label}</div>
+                 <div><strong>Project Name:</strong> {projectName || 'Untitled'}</div>
+                 <div><strong>Date:</strong> {new Date().toLocaleDateString()}</div>
+                 <div><strong>Category:</strong> {currentCategoryData.name}</div>
+                 <div><strong>Type:</strong> {currentCategoryData.types.find(t => t.id === projectType)?.label}</div>
                </div>
                <div className="mt-6 p-4 bg-slate-100 rounded border-l-4 border-slate-600">
                   <div className="grid grid-cols-2 gap-4">
@@ -522,9 +543,12 @@
                   </div>
                   <div className="flex-1">
                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Project Category</label>
-                     <select value={category} onChange={handleCategoryChange} className="no-print w-full appearance-none bg-transparent font-semibold text-lg text-slate-800 focus:outline-none cursor-pointer">
-                        {Object.values(CATEGORIES).map(cat => (<option key={cat.id} value={cat.id}>{cat.name}</option>))}
-                     </select>
+                     <div className="relative">
+                       <select value={category} onChange={handleCategoryChange} className="no-print w-full appearance-none bg-transparent font-semibold text-lg text-slate-800 focus:outline-none cursor-pointer pr-8 z-10 relative">
+                          {Object.values(CATEGORIES).map(cat => (<option key={cat.id} value={cat.id}>{cat.name}</option>))}
+                       </select>
+                       <Icons.ChevronDown className="absolute right-0 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                     </div>
                      <div className="hidden print-visible font-bold text-lg">{currentCategoryData.name}</div>
                   </div>
                </Card>
@@ -556,22 +580,27 @@
                            <h3 className="font-bold text-slate-800">{RISK_AREAS_TITLES[areaKey]}</h3>
                            <div className="flex gap-2 no-print">
                              <button onClick={() => {
-                               Object.values(factors).forEach(f => {
-                                 setMitigations(prev => ({ ...prev, [`${areaKey}-${f.name}`]: 100 }));
+                               factors.forEach(f => {
+                                 setMitigations(prev => ({ ...prev, [`${category}-${areaKey}-${f.name}`]: 100 }));
                                });
-                             }} className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">Max All</button>
+                             }} className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded hover:bg-emerald-100">Max All</button>
                              <button onClick={() => {
-                               Object.values(factors).forEach(f => {
-                                 setMitigations(prev => ({ ...prev, [`${areaKey}-${f.name}`]: 0 }));
+                               factors.forEach(f => {
+                                 setMitigations(prev => ({ ...prev, [`${category}-${areaKey}-${f.name}`]: 0 }));
                                });
-                             }} className="text-[10px] uppercase font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">Reset</button>
+                             }} className="text-[10px] uppercase font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded hover:bg-slate-100">Reset</button>
                            </div>
                         </div>
                         <div className="space-y-6">
                           {factors.map((factor, idx) => {
-                            const id = `${areaKey}-${factor.name}`;
+                            const id = `${category}-${areaKey}-${factor.name}`;
                             const active = activeFactors[id] !== false;
                             const mit = mitigations[id] || 0;
+                            // Only show if there is ANY weight for this factor in ANY of the current types
+                            const hasWeight = (factor.ns.d + factor.ns.c + factor.s.d + factor.s.c) > 0;
+                            
+                            if (!hasWeight && active) return null; // Skip factors with 0 weight (like Gov Guidelines)
+
                             return (
                               <div key={idx} className={`${active ? 'opacity-100' : 'opacity-40'}`}>
                                 <div className="flex items-start gap-3">
@@ -657,9 +686,12 @@
                        <tbody>
                          <tr>
                            {originalCosts.map((val, i) => (
-                             <td key={i} className="p-1"><input type="number" value={val} onChange={(e) => {
+                             <td key={i} className="p-1">
+                               <input type="number" value={val} onChange={(e) => {
                                  const next = [...originalCosts]; next[i] = Number(e.target.value); setOriginalCosts(next);
-                               }} className="w-full border border-slate-100 rounded text-right p-1 no-print" /><span className="hidden print-visible text-right">{val}</span></td>
+                               }} className="w-full border border-slate-100 rounded text-right p-1 no-print" />
+                               <span className="hidden print-visible text-right">{val.toLocaleString()}</span>
+                             </td>
                            ))}
                            <td className="p-2 text-right font-bold">€{reprofileResults.totalOriginalCost.toLocaleString()}</td>
                          </tr>
@@ -669,32 +701,34 @@
                 </Card>
 
                 <div className="grid lg:grid-cols-3 gap-6 mt-6">
-                  <Card className="p-6 bg-slate-800 text-white border-none">
-                     <h3 className="font-bold text-slate-200 mb-6 flex items-center gap-2 tracking-widest text-[10px] uppercase">Revised Impact</h3>
-                     <div className="space-y-6">
-                       <div>
-                         <div className="text-[10px] text-slate-500 font-black uppercase mb-1">Modelled Duration</div>
-                         <div className="text-2xl font-black">{reprofileResults.revisedDuration} <span className="text-xs font-normal opacity-50">months</span></div>
-                       </div>
-                       <div className="w-full h-px bg-slate-700"></div>
-                       <div>
-                         <div className="text-[10px] text-slate-500 font-black uppercase mb-1">Total Revised Capex</div>
-                         <div className="text-2xl font-black text-green-400">€{reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-                       </div>
-                     </div>
+                  <Card className="p-6 lg:col-span-1 bg-white text-slate-900 shadow-sm border border-slate-200">
+                      <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 tracking-widest text-[11px] uppercase border-b border-slate-100 pb-2">
+                        <Icons.AlertCircle className="w-4 h-4 text-emerald-600" /> Modelled Impact
+                      </h3>
+                      <div className="space-y-6">
+                        <div>
+                          <div className="text-[10px] text-slate-500 font-black uppercase mb-1 tracking-tight">Modelled Duration</div>
+                          <div className="text-3xl font-black text-slate-900">{reprofileResults.revisedDuration} <span className="text-xs font-normal text-slate-400">months</span></div>
+                        </div>
+                        <div className="w-full h-px bg-slate-100"></div>
+                        <div>
+                          <div className="text-[10px] text-slate-500 font-black uppercase mb-1 tracking-tight">Total Revised Capex</div>
+                          <div className="text-3xl font-black text-emerald-600">€{reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                        </div>
+                      </div>
                   </Card>
                   <Card className="p-6 lg:col-span-2 overflow-x-auto">
                     <SectionHeader title="Reprofilled Expenditure Plan" icon={Icons.BarChart3} colorClass={colorClass} />
                     <table className="w-full text-sm">
                        <thead>
-                         <tr className="text-[10px] text-slate-400 uppercase">
+                         <tr className="text-[10px] text-slate-400 uppercase border-b border-slate-100">
                            {reprofileResults.revisedYearly.map((_, i) => <th key={i} className="p-2 text-right">Year {i}</th>)}
                          </tr>
                        </thead>
                        <tbody>
                          <tr className="font-mono">
                            {reprofileResults.revisedYearly.map((val, i) => (
-                             <td key={i} className="p-2 text-right">{val > 0 ? val.toLocaleString(undefined, { maximumFractionDigits: 1 }) : '-'}</td>
+                             <td key={i} className="p-2 text-right text-slate-600">{val > 0 ? val.toLocaleString(undefined, { maximumFractionDigits: 1 }) : '-'}</td>
                            ))}
                          </tr>
                        </tbody>
@@ -711,23 +745,23 @@
                </p>
             </footer>
 
-            {/* FIXED BOTTOM SUMMARY BAR - RESTORED PREMIUM DESIGN */}
+            {/* FIXED BOTTOM SUMMARY BAR */}
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-100 via-slate-100 to-transparent pointer-events-none z-40 no-print fixed-summary">
-               <Card noBg className={`max-w-6xl mx-auto ${summaryBg} text-white border-none shadow-xl p-4 md:p-6 pointer-events-auto`}>
+               <Card noBg className={`max-w-6xl mx-auto ${summaryBg} text-white border-none shadow-2xl p-4 md:p-6 pointer-events-auto`}>
                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                    <div>
-                     <h2 className="text-lg font-bold text-white">Calculated Optimism Bias</h2>
+                     <h2 className="text-lg font-bold text-white tracking-tight">Calculated Optimism Bias</h2>
                      <p className="text-[10px] uppercase font-black text-white/50 tracking-widest">{currentCategoryData.name}</p>
                    </div>
                    <div className="flex gap-12">
                      <div className="text-center">
                        <div className="text-3xl font-black">{results.finalDurOB.toFixed(1)}%</div>
-                       <div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">Duration OB</div>
+                       <div className="text-xs uppercase tracking-wider text-white/40 mt-1 font-bold">Duration OB</div>
                      </div>
                      <div className="w-px bg-white/20 self-stretch"></div>
                      <div className="text-center">
                        <div className="text-3xl font-black text-green-300">{results.finalCapOB.toFixed(1)}%</div>
-                       <div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">
+                       <div className="text-xs uppercase tracking-wider text-white/40 mt-1 font-bold">
                          {isOutsourcing ? 'OpEx OB' : 'CapEx OB'}
                        </div>
                      </div>
@@ -745,4 +779,5 @@
   </script>
 </body>
 </html>
+
 
