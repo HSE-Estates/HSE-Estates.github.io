@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -49,7 +49,7 @@
     @media print {
       @page { size: A4; margin: 1.5cm; }
       body { background-color: white; color: black; font-size: 12pt; }
-      header, .no-print { display: none !important; }
+      header, .no-print, .fixed-summary { display: none !important; }
       .print-break-inside-avoid { break-inside: avoid; }
       .print-shadow-none { box-shadow: none !important; border: 1px solid #ccc !important; }
       main { padding: 0 !important; max-width: 100% !important; }
@@ -162,8 +162,8 @@
           { id: 'combined', label: 'Combined' }
         ],
         upper: {
-          ns: { duration: 18.5, capex: 50 },  // Updated based on user request
-          s: { duration: 18.2, capex: 40.5 } // Updated based on user request
+          ns: { duration: 18.5, capex: 50 },
+          s: { duration: 18.2, capex: 40.5 }
         },
         factors: {
           'procurement': [
@@ -304,7 +304,6 @@
       const [projectType, setProjectType] = useState(saved.projectType || 'combined');
       const [split, setSplit] = useState(saved.split !== undefined ? saved.split : 50);
       
-      // Initialize factors: use saved if exists, otherwise generate defaults based on saved category (or default 'buildings')
       const [mitigations, setMitigations] = useState(() => {
         if (saved.mitigations) return saved.mitigations;
         const initial = {};
@@ -375,7 +374,6 @@
         let totalNsCapWeight = 0;
         let totalSDurWeight = 0;
         let totalSCapWeight = 0;
-        
         let maxNsDurWeight = 0;
         let maxNsCapWeight = 0;
         let maxSDurWeight = 0;
@@ -403,7 +401,6 @@
           });
         });
 
-        // Normalize using Max Weights to ensure Upper Bound is exact
         const nsDurOB = maxNsDurWeight > 0 ? catUpper.ns.duration * (totalNsDurWeight / maxNsDurWeight) : 0;
         const nsCapOB = maxNsCapWeight > 0 ? catUpper.ns.capex * (totalNsCapWeight / maxNsCapWeight) : 0;
         const sDurOB = maxSDurWeight > 0 ? catUpper.s.duration * (totalSDurWeight / maxSDurWeight) : 0;
@@ -510,7 +507,6 @@
 
         const jsonState = JSON.stringify(stateToSave);
         const html = document.documentElement.outerHTML;
-        
         const regex = /<script id="saved-state">.*?<\/script>/s;
         const scriptTag = '<script id="saved-state">window.SAVED_STATE = ' + jsonState + ';<' + '/script>';
         
@@ -532,7 +528,6 @@
       };
 
       const generateReport = () => {
-        // Trigger browser print to allow Save as PDF
         window.print();
       };
 
@@ -576,8 +571,7 @@
           </header>
 
           <main className="max-w-6xl mx-auto p-4 md:p-6 pb-24">
-            
-            {/* PRINT-ONLY HEADER FOR PDF */}
+            {/* PRINT HEADER */}
             <div className="hidden print-visible mb-8 border-b-2 border-slate-800 pb-4">
                <h1 className="text-2xl font-bold text-slate-900">HSE Optimism Bias Report</h1>
                <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
@@ -637,7 +631,7 @@
                </Card>
             </div>
 
-            {/* TAB CONTENT - Always show Adjustments for Print */}
+            {/* ADJUSTMENTS TAB */}
             <div className={`${activeTab === 'projects' ? 'block' : 'hidden'} print-visible`}>
                 <div className="grid lg:grid-cols-2 gap-6">
                   {Object.entries(currentCategoryData.factors).map(([areaKey, factors]) => {
@@ -658,22 +652,16 @@
                             return (
                               <div key={idx} className={`transition-opacity ${isActive ? 'opacity-100' : 'opacity-50'}`}>
                                 <div className="flex items-start gap-3 mb-2">
-                                  <button onClick={() => toggleFactor(uniqueId)} className={`mt-0.5 focus:outline-none hover:opacity-80 transition-colors no-print ${isActive ? colorClass : 'text-slate-400'}`} title={isActive ? "Untick to ignore this risk" : "Tick to apply this risk"}>
+                                  <button onClick={() => toggleFactor(uniqueId)} className={`mt-0.5 focus:outline-none hover:opacity-80 transition-colors no-print ${isActive ? colorClass : 'text-slate-400'}`}>
                                     {isActive ? <Icons.CheckSquare className="w-5 h-5" /> : <Icons.Square className="w-5 h-5" />}
                                   </button>
                                   <div className="flex-1">
                                     <div className="flex justify-between items-start">
                                       <label className={`text-sm font-medium leading-tight mb-1 cursor-pointer ${isActive ? 'text-slate-800' : 'text-slate-500'}`} onClick={() => toggleFactor(uniqueId)}>{factor.name}</label>
-                                      
-                                      {/* Screen Badge */}
                                       <span className={`no-print text-xs font-mono font-bold px-1.5 py-0.5 rounded whitespace-nowrap ml-2 ${!isActive ? 'bg-slate-100 text-slate-400' : mitVal === 100 ? 'bg-green-100 text-green-700' : mitVal === 0 ? 'bg-red-50 text-red-600' : lightBgClass + ' ' + textClass}`}>
                                         {!isActive ? 'N/A' : `${mitVal}% Mitigated`}
                                       </span>
-                                      
-                                      {/* Print Value */}
-                                      <span className="hidden mitigation-value ml-2 text-sm">
-                                        {!isActive ? 'N/A' : `${mitVal}%`}
-                                      </span>
+                                      <span className="hidden mitigation-value ml-2 text-sm">{!isActive ? 'N/A' : `${mitVal}%`}</span>
                                     </div>
                                     <Slider value={mitVal} onChange={(v) => handleMitigationChange(uniqueId, v)} disabled={!isActive} colorClass={sliderClass} />
                                   </div>
@@ -688,11 +676,10 @@
                 </div>
             </div>
 
-            {/* REPROFILER SECTION - Always show for Print if not Outsourcing */}
+            {/* REPROFILER TAB */}
             {(!isOutsourcing) && (
               <div className={`${activeTab === 'reprofiler' ? 'block' : 'hidden'} print-visible page-break`}>
                 <h2 className="hidden print-visible text-xl font-bold mb-4 mt-8 pt-4 border-t border-slate-300">Expenditure Reprofiling</h2>
-                
                 <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-md flex gap-2 no-print mb-6">
                   <Icons.Info className="w-5 h-5 flex-shrink-0" />
                   <p className="text-sm">This tool simulates a revised expenditure profile by converting annual spend to monthly, applying a duration stretch (based on Time OB), and rescaling costs (based on Cost OB).</p>
@@ -753,6 +740,7 @@
                     </div>
                   </Card>
                 </div>
+
                 <Card className="p-6 mt-6">
                   <SectionHeader title="Original Cost Profile (Annual)" icon={Icons.Euro} colorClass={colorClass} />
                   <div className="overflow-x-auto">
@@ -785,6 +773,7 @@
                     </table>
                   </div>
                 </Card>
+
                 <div className="grid lg:grid-cols-3 gap-6 mt-6">
                   <Card className="p-6 lg:col-span-1 bg-slate-800 text-white border-none print-shadow-none">
                      <h3 className="font-bold text-slate-200 mb-6 flex items-center gap-2"><Icons.AlertCircle className="w-5 h-5" /> Impact Summary</h3>
@@ -840,7 +829,18 @@
               </div>
             )}
 
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-100 via-slate-100 to-transparent pointer-events-none z-40 no-print">
+            {/* --- APP FOOTER --- */}
+            <footer className="mt-16 mb-12 border-t border-slate-200 pt-8 text-center print-visible">
+               <p className="text-sm font-semibold text-slate-600">
+                 Created by Dave Maher
+               </p>
+               <p className="text-xs text-slate-400 mt-2 max-w-lg mx-auto leading-relaxed">
+                 All intellectual property rights associated with this application, its calculation logic, and its interface design belong to Dave Maher. &copy; {new Date().getFullYear()}
+               </p>
+            </footer>
+
+            {/* FIXED SUMMARY BAR */}
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-100 via-slate-100 to-transparent pointer-events-none z-40 no-print fixed-summary">
                <Card noBg className={`max-w-6xl mx-auto ${category === 'civil' ? 'bg-amber-900' : category === 'equip' ? 'bg-blue-900' : 'bg-emerald-900'} text-white border-none shadow-xl p-4 md:p-6 pointer-events-auto`}>
                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                    {activeTab === 'projects' || isOutsourcing ? (
@@ -903,5 +903,4 @@
   </script>
 </body>
 </html>
-
 
