@@ -41,7 +41,7 @@
       background: #e2e8f0; border-radius: 3px;
     }
 
-    /* Print Excellence Styles - Forced 3-Page Layout */
+    /* Professional Print Logic - 4 Page Structure */
     @media print {
       @page { size: A4 portrait; margin: 1cm; }
       
@@ -49,28 +49,33 @@
       .bg-white { background-color: #ffffff !important; }
       .bg-slate-900 { background-color: #0f172a !important; color: white !important; }
       
-      /* Display sections on print regardless of tab state */
+      /* Force all sections to render for printing */
       .print-visible-section { display: block !important; opacity: 1 !important; visibility: visible !important; }
       
-      /* Page Splits */
+      /* Page 2 Break: External Influences */
       .external-influences-card { page-break-before: always !important; margin-top: 0 !important; }
-      .page-three-start { page-break-before: always !important; margin-top: 0 !important; }
+      
+      /* Page 3 Break: Modelled Impact */
+      .print-page-3-break { page-break-before: always !important; margin-top: 0 !important; }
+      
+      /* Page 4 Break: S-Curve Chart */
+      .print-page-4-break { page-break-before: always !important; margin-top: 0 !important; }
       
       /* UI Hiding */
       header, .no-print, .fixed-summary, input[type=range], button, .tab-navigation { display: none !important; }
       
-      /* Formatting */
+      /* Visual Formatting */
       .print-only { display: block !important; }
       .card-grid { display: grid !important; grid-template-columns: repeat(2, 1fr) !important; gap: 0.75rem !important; }
       .print-shadow { box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; border: 1px solid #e2e8f0 !important; }
       
-      /* S-Curve Print Height (Maximized) */
-      .chart-container { height: 400px !important; width: 100% !important; }
+      /* Chart Dimensions */
+      .chart-container { height: 420px !important; width: 100% !important; }
       canvas { max-width: 100% !important; }
       table { font-size: 8.5pt !important; }
       
-      /* Signature area gap and formatting */
-      .print-signature-block { margin-top: 2cm !important; padding-top: 0.5cm !important; border-top: 1px solid #e2e8f0 !important; page-break-inside: avoid !important; }
+      /* Footer Formatting */
+      .print-signature-block { margin-top: 2.5cm !important; border-top: 1px solid #e2e8f0 !important; padding-top: 0.5cm !important; page-break-inside: avoid !important; }
     }
     
     .print-only { display: none; }
@@ -96,7 +101,7 @@
       Euro: (props) => <Icon {...props} path={<><path d="M4 10h12"/><path d="M4 14h9"/><path d="M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2"/></>} />,
       BarChart3: (props) => <Icon {...props} path={<><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></>} />,
       ChevronDown: (props) => <Icon {...props} path={<><path d="m6 9 6 6 6-6"/></>} />,
-      CheckSquare: (props) => <Icon {...props} path={<><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>} />,
+      CheckSquare: (props) => <Icon {...props} path={<><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1 2-2h11"/></>} />,
       Square: (props) => <Icon {...props} path={<><rect width="18" height="18" x="3" y="3" rx="2"/></>} />,
       Briefcase: (props) => <Icon {...props} path={<><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></>} />,
       HardHat: (props) => <Icon {...props} path={<><path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v2z"/><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M4 15v-3a6 6 0 0 1 6-6h0"/><path d="M14 6h0a6 6 0 0 1 6 6v3"/></>} />,
@@ -378,7 +383,7 @@
       return (
         <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
           
-          {/* PREMIUM PRINT-ONLY ASSESSMENT SUMMARY */}
+          {/* PREMIUM PRINT assessment summary Bar */}
           <div className="print-only p-8 bg-white border-b-4 mb-6" style={{ borderBottomColor: hexColor }}>
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-6">
@@ -442,7 +447,7 @@
 
           <main className="max-w-6xl mx-auto p-4 md:p-6 pb-24">
             
-            {/* PAGE 1: ADJUSTMENTS SECTION (Procurement to Environment) */}
+            {/* PAGE 1: ADJUSTMENTS SECTION (Procurement, Project Spec, Client Spec, Environment) */}
             <div className={`page-one print-visible-section ${activeTab === 'projects' ? 'block' : 'hidden md:hidden'}`}>
                 <div className="grid md:grid-cols-2 gap-6 mb-6 no-print">
                    <Card className="p-4 flex items-center gap-4">
@@ -464,6 +469,7 @@
                           <button key={t.id} onClick={() => setProjectType(t.id)} className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${projectType === t.id ? `${lightBgClass} ${textClass} ${borderColorClass}` : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>{t.label}</button>
                         ))}
                       </div>
+                      
                       {projectType === 'combined' && (
                          <div className="mt-3 pt-3 border-t border-slate-100 no-print">
                             <div className="flex justify-between text-[10px] font-black text-slate-400 mb-1 uppercase tracking-tighter">
@@ -482,62 +488,133 @@
                 </div>
 
                 <div className="card-grid grid lg:grid-cols-2 gap-6">
-                  {Object.entries(currentCategoryData.factors).map(([areaKey, factors]) => (
-                    <Card key={areaKey} className={`p-5 print-shadow ${areaKey === 'external_influences' ? 'external-influences-card' : ''}`}>
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-4">
-                           <h3 className="font-bold text-slate-800">{RISK_AREAS_TITLES[areaKey]}</h3>
-                           <div className="flex gap-2 no-print">
-                             <button onClick={() => factors.forEach(f => setMitigations(p => ({ ...p, [`${areaKey}-${f.name}`]: 100 })))} className={`text-[10px] uppercase font-black px-2 py-0.5 rounded transition-colors bg-slate-100 text-slate-500 hover:${bgClass} hover:text-white`}>Max All</button>
-                             <button onClick={() => factors.forEach(f => setMitigations(p => ({ ...p, [`${areaKey}-${f.name}`]: 0 })))} className="text-[10px] uppercase font-black px-2 py-0.5 rounded transition-colors bg-slate-100 text-slate-500 hover:bg-slate-200">Reset</button>
-                           </div>
-                        </div>
-                        <div className="space-y-6">
-                          {factors.map((factor, idx) => {
-                            const id = `${areaKey}-${factor.name}`; 
-                            const active = activeFactors[id] !== false; 
-                            const mit = mitigations[id] || 0;
-                            return (
-                              <div key={idx} className={`${active ? 'opacity-100' : 'opacity-40'} print-visible-section`}>
-                                <div className="flex items-start gap-3">
-                                  <button 
-                                    onClick={() => setActiveFactors(p => ({ ...p, [id]: !p[id] }))} 
-                                    className={`mt-0.5 no-print transition-colors ${active ? colorClass : 'text-slate-300 hover:text-slate-400'}`}
-                                  >
-                                    {active ? <Icons.CheckSquare className="w-5 h-5" /> : <Icons.Square className="w-5 h-5" />}
-                                  </button>
-                                  <div className={`mt-0.5 hidden print-only ${active ? colorClass : 'text-slate-200'}`}>
-                                    {active ? <Icons.CheckSquare className="w-4 h-4" /> : <Icons.Square className="w-4 h-4" />}
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="flex justify-between items-start mb-1">
-                                      <label className="text-sm font-semibold text-slate-700 leading-tight">{factor.name}</label>
-                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${mit === 100 ? 'bg-green-100 text-green-700' : lightBgClass + ' ' + textClass}`}>
-                                        {mit}% Mitigated
-                                      </span>
+                  {Object.entries(currentCategoryData.factors).map(([areaKey, factors]) => {
+                    if (areaKey === 'external_influences') return null; // Save for Page 2
+                    return (
+                      <Card key={areaKey} className="p-5 print-shadow">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-4">
+                             <h3 className="font-bold text-slate-800">{RISK_AREAS_TITLES[areaKey]}</h3>
+                             <div className="flex gap-2 no-print">
+                               <button onClick={() => factors.forEach(f => setMitigations(p => ({ ...p, [`${areaKey}-${f.name}`]: 100 })))} className={`text-[10px] uppercase font-black px-2 py-0.5 rounded transition-colors bg-slate-100 text-slate-500 hover:${bgClass} hover:text-white`}>Max All</button>
+                               <button onClick={() => factors.forEach(f => setMitigations(p => ({ ...p, [`${areaKey}-${f.name}`]: 0 })))} className="text-[10px] uppercase font-black px-2 py-0.5 rounded transition-colors bg-slate-100 text-slate-500 hover:bg-slate-200">Reset</button>
+                             </div>
+                          </div>
+                          <div className="space-y-6">
+                            {factors.map((factor, idx) => {
+                              const id = `${areaKey}-${factor.name}`; 
+                              const active = activeFactors[id] !== false; 
+                              const mit = mitigations[id] || 0;
+                              return (
+                                <div key={idx} className={`${active ? 'opacity-100' : 'opacity-40'} print-visible-section`}>
+                                  <div className="flex items-start gap-3">
+                                    <button 
+                                      onClick={() => setActiveFactors(p => ({ ...p, [id]: !p[id] }))} 
+                                      className={`mt-0.5 no-print transition-colors ${active ? colorClass : 'text-slate-300 hover:text-slate-400'}`}
+                                    >
+                                      {active ? <Icons.CheckSquare className="w-5 h-5" /> : <Icons.Square className="w-5 h-5" />}
+                                    </button>
+                                    <div className={`mt-0.5 hidden print-only ${active ? colorClass : 'text-slate-200'}`}>
+                                      {active ? <Icons.CheckSquare className="w-4 h-4" /> : <Icons.Square className="w-4 h-4" />}
                                     </div>
-                                    <Slider value={mit} onChange={(v) => setMitigations(p => ({ ...p, [id]: v }))} disabled={!active} colorClass={sliderClass} />
+                                    <div className="flex-1">
+                                      <div className="flex justify-between items-start mb-1">
+                                        <label className="text-sm font-semibold text-slate-700 leading-tight">{factor.name}</label>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${mit === 100 ? 'bg-green-100 text-green-700' : lightBgClass + ' ' + textClass}`}>
+                                          {mit}% Mitigated
+                                        </span>
+                                      </div>
+                                      <Slider value={mit} onChange={(v) => setMitigations(p => ({ ...p, [id]: v }))} disabled={!active} colorClass={sliderClass} />
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                    </Card>
-                  ))}
+                              );
+                            })}
+                          </div>
+                      </Card>
+                    );
+                  })}
                 </div>
             </div>
 
-            {/* PAGE 2: EXTERNAL INFLUENCES + PROGRAMME PARAMETERS */}
-            <div className={`page-two print-visible-section ${(!isOutsourcing) ? 'block' : 'hidden md:hidden'}`}>
-                {/* External Influences will force a break here in print via CSS .external-influences-card */}
-                <div className="grid md:grid-cols-2 gap-6 mb-6 print-gap no-print">
+            {/* PAGE 2: EXTERNAL INFLUENCES (Break at start of page) */}
+            <div className={`page-two print-visible-section ${activeTab === 'projects' ? 'block' : 'hidden md:hidden'}`}>
+                <div className="card-grid grid lg:grid-cols-2 gap-6">
+                  {Object.entries(currentCategoryData.factors).map(([areaKey, factors]) => {
+                    if (areaKey !== 'external_influences') return null;
+                    return (
+                      <Card key={areaKey} className="p-5 print-shadow external-influences-card">
+                          <SectionHeader title={RISK_AREAS_TITLES[areaKey]} />
+                          <div className="space-y-6">
+                            {factors.map((factor, idx) => {
+                              const id = `${areaKey}-${factor.name}`; 
+                              const active = activeFactors[id] !== false; 
+                              const mit = mitigations[id] || 0;
+                              return (
+                                <div key={idx} className={`${active ? 'opacity-100' : 'opacity-40'} print-visible-section`}>
+                                  <div className="flex items-start gap-3">
+                                    <button 
+                                      onClick={() => setActiveFactors(p => ({ ...p, [id]: !p[id] }))} 
+                                      className={`mt-0.5 no-print transition-colors ${active ? colorClass : 'text-slate-300 hover:text-slate-400'}`}
+                                    >
+                                      {active ? <Icons.CheckSquare className="w-5 h-5" /> : <Icons.Square className="w-5 h-5" />}
+                                    </button>
+                                    <div className={`mt-0.5 hidden print-only ${active ? colorClass : 'text-slate-200'}`}>
+                                      {active ? <Icons.CheckSquare className="w-4 h-4" /> : <Icons.Square className="w-4 h-4" />}
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className="flex justify-between items-start mb-1">
+                                        <label className="text-sm font-semibold text-slate-700 leading-tight">{factor.name}</label>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${mit === 100 ? 'bg-green-100 text-green-700' : lightBgClass + ' ' + textClass}`}>
+                                          {mit}% Mitigated
+                                        </span>
+                                      </div>
+                                      <Slider value={mit} onChange={(v) => setMitigations(p => ({ ...p, [id]: v }))} disabled={!active} colorClass={sliderClass} />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+            </div>
+
+            {/* PAGE 3: MODELLED IMPACT + PARAMETERS SIDE-BY-SIDE + BUDGET + PLAN */}
+            <div className={`page-three-start print-visible-section ${(!isOutsourcing) ? 'block' : 'hidden md:hidden'} print-page-3-break`}>
+                
+                {/* Modelled Impact (Top of Page 3) */}
+                <Card noBg={true} className="p-6 bg-slate-900 text-white border-none shadow-lg print-shadow mb-6">
+                   <h3 className="font-bold text-white mb-6 uppercase tracking-widest text-[11px] border-b border-white/10 pb-2">Modelled Impact Summary</h3>
+                   <div className="grid grid-cols-2 gap-8">
+                     <div>
+                       <div className="text-[10px] text-slate-200 font-bold uppercase mb-1 tracking-tight">Modelled Duration</div>
+                       <div className="flex items-baseline gap-2">
+                         <span className="text-sm font-normal text-white/40 line-through tracking-tighter">{originalDuration}</span>
+                         <span className="text-3xl font-black text-white">{reprofileResults.revisedDuration}</span>
+                         <span className="text-xs font-normal text-slate-300 ml-1">months</span>
+                       </div>
+                     </div>
+                     <div>
+                       <div className="text-[10px] text-slate-200 font-bold uppercase mb-1 tracking-tight">Total Revised Capex</div>
+                       <div className="flex items-baseline gap-2">
+                         <span className="text-xs font-normal text-white/40 line-through tracking-tighter">€{reprofileResults.totalOriginalCost.toLocaleString()}</span>
+                         <span className="text-3xl font-black text-emerald-400">€{reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                       </div>
+                     </div>
+                   </div>
+                </Card>
+
+                {/* Parameters and Adjustments Side-by-Side (requested for Page 3) */}
+                <div className="grid md:grid-cols-2 gap-6 mb-6">
                   <Card className="p-5 print-shadow">
                     <SectionHeader title="Programme Parameters" icon={Icons.Calendar} colorClass={colorClass} />
                     <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Start Year</label><select value={startYear} onChange={(e) => setStartYear(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print">{[0,1,2,3,4,5].map(y => <option key={y} value={y}>Year {y}</option>)}</select></div>
-                      <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Start Month</label><select value={startMonth} onChange={(e) => setStartMonth(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print">{Array(12).fill(0).map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}</select></div>
+                      <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Start Year</label><select value={startYear} onChange={(e) => setStartYear(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print">{[0,1,2,3,4,5].map(y => <option key={y} value={y}>Year {y}</option>)}</select><span className="hidden print-only font-bold">Year {startYear}</span></div>
+                      <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Start Month</label><select value={startMonth} onChange={(e) => setStartMonth(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print">{Array(12).fill(0).map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}</select><span className="hidden print-only font-bold">Month {startMonth}</span></div>
                     </div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Original Duration (Months)</label><input type="number" value={originalDuration} onChange={(e) => setOriginalDuration(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print" />
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Original Duration (Months)</label><input type="number" value={originalDuration} onChange={(e) => setOriginalDuration(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print" /><span className="hidden print-only font-bold">{originalDuration} months</span>
                   </Card>
                   <Card className="p-5 print-shadow">
                     <SectionHeader title="Overrun Adjustments" icon={Icons.TrendingUp} colorClass={colorClass} />
@@ -547,58 +624,34 @@
                           <input type="checkbox" checked={linkTimeOB} onChange={(e) => setLinkTimeOB(e.target.checked)} className="no-print h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
                           Link Duration OB
                         </span>
-                        <div className="text-right"><span className="text-lg font-black">{linkTimeOB ? results.finalDurOB.toFixed(1) : manualTimeOB}%</span></div>
+                        <div className="text-right">
+                          <span className="text-xs font-bold text-slate-400 uppercase block leading-none mb-1">Calculated OB</span>
+                          <span className="text-lg font-black">{linkTimeOB ? results.finalDurOB.toFixed(1) : manualTimeOB}%</span>
+                        </div>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium flex items-center gap-2">
                           <input type="checkbox" checked={linkCostOB} onChange={(e) => setLinkCostOB(e.target.checked)} className="no-print h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
                           Link Capex OB
                         </span>
-                        <div className="text-right"><span className="text-lg font-black text-emerald-600">{linkCostOB ? results.finalCapOB.toFixed(1) : manualCostOB}%</span></div>
+                        <div className="text-right">
+                          <span className="text-xs font-bold text-slate-400 uppercase block leading-none mb-1">Calculated OB</span>
+                          <span className="text-lg font-black text-emerald-600">{linkCostOB ? results.finalCapOB.toFixed(1) : manualCostOB}%</span>
+                        </div>
                       </div>
                     </div>
                   </Card>
                 </div>
-            </div>
 
-            {/* PAGE 3: MODELLED IMPACT + BUDGET + REPROFILING + S-CURVE */}
-            <div className={`page-three-start print-visible-section ${(!isOutsourcing) ? 'block' : 'hidden md:hidden'}`}>
-                {/* Print Only Gap */}
-                <div className="hidden print-only mb-6"></div>
-                
-                <div className="grid lg:grid-cols-3 gap-6 mb-6">
-                  <Card noBg={true} className="p-6 lg:col-span-1 bg-slate-900 text-white border-none shadow-lg print-shadow">
-                     <h3 className="font-bold text-white mb-6 uppercase tracking-widest text-[11px] border-b border-white/10 pb-2">Modelled Impact</h3>
-                     <div className="space-y-6">
-                       <div>
-                         <div className="text-[10px] text-slate-200 font-bold uppercase mb-1 tracking-tight">Modelled Duration</div>
-                         <div className="flex items-baseline gap-2">
-                           <span className="text-sm font-normal text-white/40 line-through tracking-tighter">{originalDuration}</span>
-                           <span className="text-3xl font-black text-white">{reprofileResults.revisedDuration}</span>
-                           <span className="text-xs font-normal text-slate-300 ml-1">months</span>
-                         </div>
-                       </div>
-                       <div className="w-full h-px bg-white/10"></div>
-                       <div>
-                         <div className="text-[10px] text-slate-200 font-bold uppercase mb-1 tracking-tight">Total Revised Capex</div>
-                         <div className="flex items-baseline gap-2">
-                           <span className="text-xs font-normal text-white/40 line-through tracking-tighter">€{reprofileResults.totalOriginalCost.toLocaleString()}</span>
-                           <span className="text-3xl font-black text-emerald-400">€{reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                         </div>
-                       </div>
-                     </div>
-                  </Card>
-                  
-                  <Card className="p-6 lg:col-span-2 print-shadow">
-                    <SectionHeader title="Initial Budget Profile (Annual)" icon={Icons.Euro} colorClass={colorClass} />
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                         <thead><tr className="text-[10px] text-slate-400 uppercase">{originalCosts.map((_, i) => <th key={i} className="p-2 text-left">Year {i}</th>)}<th className="p-2 text-right">Total</th></tr></thead>
-                         <tbody><tr>{originalCosts.map((v, i) => (<td key={i} className="p-1"><input type="number" value={v} onChange={(e) => { const n = [...originalCosts]; n[i] = Number(e.target.value); setOriginalCosts(n); }} className="w-full border border-slate-100 rounded text-right p-1 no-print" /><span className="hidden print-only text-right font-bold block">{v > 0 ? v.toLocaleString() : '-'}</span></td>))}<td className="p-2 text-right font-bold text-slate-800">€{reprofileResults.totalOriginalCost.toLocaleString()}</td></tr></tbody>
-                      </table>
-                    </div>
-                  </Card>
-                </div>
+                <Card className="p-6 mb-6 print-shadow">
+                  <SectionHeader title="Initial Budget Profile (Annual)" icon={Icons.Euro} colorClass={colorClass} />
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                       <thead><tr className="text-[10px] text-slate-400 uppercase">{originalCosts.map((_, i) => <th key={i} className="p-2 text-left">Year {i}</th>)}<th className="p-2 text-right">Total</th></tr></thead>
+                       <tbody><tr>{originalCosts.map((v, i) => (<td key={i} className="p-1"><input type="number" value={v} onChange={(e) => { const n = [...originalCosts]; n[i] = Number(e.target.value); setOriginalCosts(n); }} className="w-full border border-slate-100 rounded text-right p-1 no-print" /><span className="hidden print-only text-right font-bold block">{v > 0 ? v.toLocaleString() : '-'}</span></td>))}<td className="p-2 text-right font-bold text-slate-800">€{reprofileResults.totalOriginalCost.toLocaleString()}</td></tr></tbody>
+                    </table>
+                  </div>
+                </Card>
 
                 <Card className="p-6 mb-6 overflow-x-auto print-shadow">
                   <SectionHeader title="Reprofiled Plan" icon={Icons.BarChart3} colorClass={colorClass} />
@@ -617,21 +670,24 @@
                      </tbody>
                   </table>
                 </Card>
+            </div>
 
+            {/* PAGE 4: S-CURVE ONLY */}
+            <div className={`print-page-4-break print-visible-section ${(!isOutsourcing) ? 'block' : 'hidden md:hidden'}`}>
                 <Card className="p-8 print-shadow">
                   <SectionHeader title="Cumulative Expenditure Profile (S-Curve)" icon={Icons.TrendingUp} colorClass={colorClass} />
                   <SCurveChart originalData={reprofileResults.originalMonthly} modelledData={reprofileResults.revisedMonthly} themeColor={hexColor} />
                 </Card>
 
-                {/* Print Signature Block Consolidated at end of Page 3 */}
+                {/* Print Signature Line at end of assessment on Page 4 */}
                 <div className="hidden print-only print-signature-block flex justify-between items-end">
                   <div>
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Assessor Signature</p>
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest leading-none">Assessor Signature</p>
                     <div className="h-10 border-b-2 border-slate-200 w-64 mt-2"></div>
                   </div>
                   <div className="text-right">
-                    <p className="text-[8px] text-slate-400 font-bold uppercase tracking-tight">Created by Dave Maher</p>
-                    <p className="text-[8px] text-slate-400 mt-0.5">HSE Optimism Bias Logic Controller &copy; 2026</p>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight leading-none mb-1">Created by Dave Maher</p>
+                    <p className="text-slate-700 font-black text-sm uppercase leading-none">HSE Optimism Bias Logic Controller &copy; 2026</p>
                   </div>
                 </div>
             </div>
