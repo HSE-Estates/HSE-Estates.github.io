@@ -120,7 +120,7 @@
             { name: 'Large Number of Stakeholders', ns: { d: 4, c: 3 }, s: { d: 6, c: 2 } },
             { name: 'Funding Availability', ns: { d: 3, c: 0 }, s: { d: 8, c: 0 } },
             { name: 'Project Management Team', ns: { d: 5, c: 2 }, s: { d: 0, c: 1 } },
-            { name: 'Poor Project Intelligence', ns: { d: 5, c: 6 }, s: { d: 6, c: 2 } }
+            { name: 'Poor Project Intelligence', ns: { d: 5, c: 11 }, s: { d: 6, c: 2 } }
           ],
           'environment': [
             { name: 'Public Relations', ns: { d: 3, c: 3 }, s: { d: 8, c: 2 } },
@@ -426,6 +426,10 @@
                     <Card key={areaKey} className="p-5">
                         <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-4">
                            <h3 className="font-bold text-slate-800">{RISK_AREAS_TITLES[areaKey]}</h3>
+                           <div className="flex gap-2 no-print">
+                             <button onClick={() => factors.forEach(f => setMitigations(p => ({ ...p, [`${areaKey}-${f.name}`]: 100 })))} className={`text-[10px] uppercase font-black px-2 py-0.5 rounded transition-colors bg-slate-100 text-slate-500 hover:${bgClass} hover:text-white`}>Max All</button>
+                             <button onClick={() => factors.forEach(f => setMitigations(p => ({ ...p, [`${areaKey}-${f.name}`]: 0 })))} className="text-[10px] uppercase font-black px-2 py-0.5 rounded transition-colors bg-slate-100 text-slate-500 hover:bg-slate-200">Reset</button>
+                           </div>
                         </div>
                         <div className="space-y-6">
                           {factors.map((factor, idx) => {
@@ -439,7 +443,7 @@
                                   <div className="flex-1">
                                     <div className="flex justify-between items-start mb-1">
                                       <label className="text-sm font-semibold text-slate-700 leading-tight">{factor.name}</label>
-                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${mit === 100 ? 'bg-green-100 text-green-700' : lightBgClass + ' ' + textClass}`}>{mit}%</span>
+                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${mit === 100 ? 'bg-green-100 text-green-700' : lightBgClass + ' ' + textClass}`}>{mit}% Mitigated</span>
                                     </div>
                                     <Slider value={mit} onChange={(v) => setMitigations(p => ({ ...p, [id]: v }))} disabled={!active} colorClass={sliderClass} />
                                   </div>
