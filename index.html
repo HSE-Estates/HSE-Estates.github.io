@@ -5,16 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HSE Optimism Bias Calculator</title>
   
+  <!-- Favicons -->
   <link rel="icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico">
   <link rel="mask-icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.svg" color="#006858">
 
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
+  <!-- Chart.js for S-Curve -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
+  <!-- React & ReactDOM -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   
+  <!-- Babel for JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
@@ -103,7 +108,6 @@
             { name: 'Complexity of Contract Structure', ns: { d: 3, c: 1 }, s: { d: 1, c: 0 } },
             { name: 'Late Contractor Involvement', ns: { d: 6, c: 2 }, s: { d: 3, c: 2 } },
             { name: 'Poor Contractor Capabilities', ns: { d: 5, c: 5 }, s: { d: 4, c: 9 } },
-            { name: 'Government Guidelines', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
             { name: 'Dispute & Claims Occurred', ns: { d: 5, c: 11 }, s: { d: 4, c: 29 } },
             { name: 'Information Management', ns: { d: 3, c: 2 }, s: { d: 2, c: 2 } },
             { name: 'Other Procurement Factors', ns: { d: 1, c: 1 }, s: { d: 1, c: 1 } }
@@ -119,8 +123,8 @@
             { name: 'Large Number of Stakeholders', ns: { d: 4, c: 3 }, s: { d: 6, c: 2 } },
             { name: 'Funding Availability', ns: { d: 3, c: 0 }, s: { d: 8, c: 0 } },
             { name: 'Project Management Team', ns: { d: 5, c: 2 }, s: { d: 0, c: 1 } },
-            { name: 'Poor Project Intelligence', ns: { d: 5, c: 6 }, s: { d: 6, c: 2 } },
-            { name: 'Other Specification Factors', ns: { d: 1, c: 2 }, s: { d: 0, c: 0 } }
+            { name: 'Poor Project Intelligence', ns: { d: 5, c: 6 }, s: { d: 6, c: 2 } }
+            // "Other Specification Factors" removed as values are 0 in S
           ],
           'environment': [
             { name: 'Public Relations', ns: { d: 3, c: 3 }, s: { d: 8, c: 2 } },
@@ -132,8 +136,8 @@
             { name: 'Political', ns: { d: 13, c: 2 }, s: { d: 2, c: 1 } },
             { name: 'Economic', ns: { d: 2, c: 13 }, s: { d: 1, c: 11 } },
             { name: 'Legislation / Regulations', ns: { d: 6, c: 7 }, s: { d: 9, c: 3 } },
-            { name: 'Technology', ns: { d: 4, c: 5 }, s: { d: 0, c: 0 } },
             { name: 'Other External Influences', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } }
+            // Technology removed (0 for S in standard template)
           ]
         }
       },
@@ -146,7 +150,6 @@
             { name: 'Complexity of Contract Structure', ns: { d: 4, c: 2 }, s: { d: 1, c: 1 } },
             { name: 'Late Contractor Involvement', ns: { d: 1, c: 1 }, s: { d: 0, c: 3 } },
             { name: 'Poor Contractor Capabilities', ns: { d: 2, c: 3 }, s: { d: 16, c: 5 } },
-            { name: 'Government Guidelines', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
             { name: 'Dispute & Claims Occurred', ns: { d: 4, c: 6 }, s: { d: 3, c: 14 } },
             { name: 'Information Management', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
             { name: 'Other Procurement', ns: { d: 1, c: 1 }, s: { d: 1, c: 1 } }
@@ -154,22 +157,19 @@
           'project_specific': [
             { name: 'Design Complexity', ns: { d: 5, c: 3 }, s: { d: 4, c: 2 } },
             { name: 'Degree of Innovation', ns: { d: 2, c: 4 }, s: { d: 0, c: 6 } },
-            { name: 'Environmental Impact', ns: { d: 8, c: 7 }, s: { d: 6, c: 4 } },
-            { name: 'Other Specifics', ns: { d: 2, c: 4 }, s: { d: 0, c: 0 } }
+            { name: 'Environmental Impact', ns: { d: 8, c: 7 }, s: { d: 6, c: 4 } }
           ],
           'client_specification': [
             { name: 'Inadequacy of Business Case', ns: { d: 12, c: 30 }, s: { d: 36, c: 49 } },
             { name: 'Large Number of Stakeholders', ns: { d: 4, c: 4 }, s: { d: 6, c: 3 } },
             { name: 'Funding Availability', ns: { d: 2, c: 1 }, s: { d: 8, c: 1 } },
             { name: 'Project Management Team', ns: { d: 5, c: 2 }, s: { d: 0, c: 2 } },
-            { name: 'Poor Project Intelligence', ns: { d: 5, c: 11 }, s: { d: 7, c: 5 } },
-            { name: 'Other Specs', ns: { d: 1, c: 2 }, s: { d: 0, c: 0 } }
+            { name: 'Poor Project Intelligence', ns: { d: 5, c: 11 }, s: { d: 7, c: 5 } }
           ],
           'environment': [
             { name: 'Public Relations', ns: { d: 4, c: 6 }, s: { d: 2, c: 9 } },
             { name: 'Site Characteristics', ns: { d: 5, c: 5 }, s: { d: 10, c: 3 } },
-            { name: 'Permits / Consents / Approvals', ns: { d: 7, c: 5 }, s: { d: 10, c: 4 } },
-            { name: 'Other Environmental', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } }
+            { name: 'Permits / Consents / Approvals', ns: { d: 7, c: 5 }, s: { d: 10, c: 4 } }
           ],
           'external_influences': [
             { name: 'Political', ns: { d: 19, c: 5 }, s: { d: 3, c: 2 } },
@@ -189,7 +189,6 @@
             { name: 'Complexity of Contract Structure', ns: { d: 13, c: 7 }, s: { d: 2, c: 2 } },
             { name: 'Late Contractor Involvement', ns: { d: 2, c: 7 }, s: { d: 0, c: 0 } },
             { name: 'Poor Contractor Capabilities', ns: { d: 11, c: 4 }, s: { d: 0, c: 0 } },
-            { name: 'Government Guidelines', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
             { name: 'Dispute & Claims Occurred', ns: { d: 24, c: 18 }, s: { d: 0, c: 0 } },
             { name: 'Information Management', ns: { d: 4, c: 8 }, s: { d: 5, c: 23 } },
             { name: 'Other Procurement', ns: { d: 1, c: 1 }, s: { d: 1, c: 1 } }
@@ -205,14 +204,12 @@
             { name: 'Large Number of Stakeholders', ns: { d: 4, c: 4 }, s: { d: 2, c: 2 } },
             { name: 'Funding Availability', ns: { d: 5, c: 2 }, s: { d: 0, c: 0 } },
             { name: 'Project Management Team', ns: { d: 2, c: 5 }, s: { d: 0, c: 15 } },
-            { name: 'Poor Project Intelligence', ns: { d: 2, c: 1 }, s: { d: 0, c: 0 } },
-            { name: 'Other Specs', ns: { d: 1, c: 4 }, s: { d: 0, c: 0 } }
+            { name: 'Poor Project Intelligence', ns: { d: 2, c: 1 }, s: { d: 0, c: 0 } }
           ],
           'environment': [
             { name: 'Public Relations', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
             { name: 'Site Characteristics', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } },
             { name: 'Permits / Consents / Approvals', ns: { d: 2, c: 2 }, s: { d: 0, c: 0 } }
-            // "Other Environmental" removed as values are 0 in spreadsheets
           ],
           'external_influences': [
             { name: 'Political', ns: { d: 7, c: 2 }, s: { d: 1, c: 1 } },
@@ -335,7 +332,7 @@
           fl.forEach(f => {
             const id = `${k}-${f.name}`; const mit = (activeFactors[id] !== false) ? (mitigations[id] || 0) : 100; const r = 1 - (mit / 100);
             nsd += f.ns.d * r; nsc += f.ns.c * r; sd += f.s.d * r; sc += f.s.c * r;
-            mnsd += f.ns.d; mnsc += f.ns.c; msd += f.s.d; msc += f.s.c;
+            mnsd += f.ns.d; mnsc += f.ns.c; msd += f.s.d; msc += f.s.d; // Spreadsheet uses D values for denominator
           });
         });
         const nDur = mnsd > 0 ? currentCategoryData.upper.ns.duration * (nsd / mnsd) : 0;
@@ -363,11 +360,7 @@
       }, [results, linkTimeOB, manualTimeOB, linkCostOB, manualCostOB, originalCosts, startMonth, originalDuration]);
 
       const saveProjectFile = () => {
-        const stateToSave = { 
-            projectName, category, projectType, split, mitigations, activeFactors, 
-            linkTimeOB, manualTimeOB, linkCostOB, manualCostOB, 
-            originalCosts, startYear, startMonth, originalDuration 
-        };
+        const stateToSave = { projectName, category, projectType, split, mitigations, activeFactors, linkTimeOB, manualTimeOB, linkCostOB, manualCostOB, originalCosts, startYear, startMonth, originalDuration };
         const clone = document.documentElement.cloneNode(true);
         const rootDiv = clone.querySelector('#root');
         if (rootDiv) rootDiv.innerHTML = '';
@@ -452,17 +445,16 @@
                             const id = `${areaKey}-${factor.name}`; 
                             const active = activeFactors[id] !== false; 
                             const mit = mitigations[id] || 0;
-                            // UK English: Ensuring sliders match spreadsheet bias logic
                             return (
                               <div key={idx} className={`${active ? 'opacity-100' : 'opacity-40'}`}>
                                 <div className="flex items-start gap-3">
-                                  <button onClick={() => setMitigations(p => ({ ...p, [id]: p[id] === 100 ? 0 : 100 }))} className={`mt-0.5 no-print ${active ? colorClass : 'text-slate-300'}`}>{active ? <Icons.CheckSquare className="w-5 h-5" /> : <Icons.Square className="w-5 h-5" />}</button>
+                                  <button onClick={() => setActiveFactors(p => ({ ...p, [id]: !p[id] }))} className={`mt-0.5 no-print ${active ? colorClass : 'text-slate-300'}`}>{active ? <Icons.CheckSquare className="w-5 h-5" /> : <Icons.Square className="w-5 h-5" />}</button>
                                   <div className="flex-1">
                                     <div className="flex justify-between items-start mb-1">
                                       <label className="text-sm font-semibold text-slate-700 leading-tight">{factor.name}</label>
                                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${mit === 100 ? 'bg-green-100 text-green-700' : lightBgClass + ' ' + textClass}`}>{mit}%</span>
                                     </div>
-                                    <Slider value={mit} onChange={(v) => setMitigations(p => ({ ...p, [id]: v }))} colorClass={sliderClass} />
+                                    <Slider value={mit} onChange={(v) => setMitigations(p => ({ ...p, [id]: v }))} disabled={!active} colorClass={sliderClass} />
                                   </div>
                                 </div>
                               </div>
@@ -553,3 +545,4 @@
   </script>
 </body>
 </html>
+
