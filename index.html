@@ -39,6 +39,7 @@
       background: #e2e8f0; border-radius: 2px;
     }
 
+    /* Print Enhancements */
     @media print {
       @page { size: A4; margin: 1.5cm; }
       body { 
@@ -48,7 +49,8 @@
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
-      header, .no-print, .fixed-summary, footer { display: none !important; }
+      header, .no-print, .fixed-summary { display: none !important; }
+      .print-only { display: block !important; }
       .print-break-inside-avoid { break-inside: avoid; }
       .print-shadow-none { box-shadow: none !important; border: 1px solid #ccc !important; }
       main { padding: 0 !important; max-width: 100% !important; }
@@ -56,7 +58,7 @@
       .page-break { page-break-before: always; }
       
       input[type=range] { display: none; }
-      .mitigation-value { display: block !important; font-weight: bold; }
+      .mitigation-value { display: inline-block !important; font-weight: bold; }
       
       .chart-container { 
         height: 350px !important; 
@@ -65,7 +67,9 @@
         display: block !important;
       }
       canvas { max-width: 100% !important; }
+      footer { display: block !important; position: relative; margin-top: 50px; page-break-inside: avoid; }
     }
+    .print-only { display: none; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -367,6 +371,27 @@
 
       return (
         <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+          {/* Print-Only Header Summary */}
+          <div className="print-only mb-8 p-6 bg-slate-100 rounded-lg border-2 border-slate-300">
+            <div className="flex justify-between items-center mb-4">
+              <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-10 w-auto" />
+              <div className="text-right">
+                <h1 className="text-2xl font-bold">Optimism Bias Assessment</h1>
+                <p className="text-sm text-slate-600">{projectName || 'Project Details'}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-8 text-center border-t pt-4">
+              <div>
+                <p className="text-xs uppercase font-bold text-slate-500">Calculated Duration OB</p>
+                <p className="text-3xl font-black">{results.finalDurOB.toFixed(1)}%</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase font-bold text-slate-500">Calculated Capex OB</p>
+                <p className="text-3xl font-black">{results.finalCapOB.toFixed(1)}%</p>
+              </div>
+            </div>
+          </div>
+
           <header className={`text-white p-4 shadow-md sticky top-0 z-50 transition-colors duration-500 no-print ${headerBg}`}>
             <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-4">
@@ -443,7 +468,9 @@
                                   <div className="flex-1">
                                     <div className="flex justify-between items-start mb-1">
                                       <label className="text-sm font-semibold text-slate-700 leading-tight">{factor.name}</label>
-                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${mit === 100 ? 'bg-green-100 text-green-700' : lightBgClass + ' ' + textClass}`}>{mit}% Mitigated</span>
+                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${mit === 100 ? 'bg-green-100 text-green-700' : lightBgClass + ' ' + textClass}`}>
+                                        {mit}% Mitigated
+                                      </span>
                                     </div>
                                     <Slider value={mit} onChange={(v) => setMitigations(p => ({ ...p, [id]: v }))} disabled={!active} colorClass={sliderClass} />
                                   </div>
