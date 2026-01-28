@@ -41,32 +41,24 @@
       background: #e2e8f0; border-radius: 3px;
     }
 
-    /* Professional Print Logic - 4 Page Structure */
     @media print {
       @page { size: A4 portrait; margin: 1cm; }
-      
       body { background-color: #f8fafc !important; }
       .bg-white { background-color: #ffffff !important; }
       .bg-slate-900 { background-color: #0f172a !important; color: white !important; }
-      
       .print-visible-section { display: block !important; opacity: 1 !important; visibility: visible !important; }
       .external-influences-card { page-break-before: always !important; margin-top: 0 !important; }
       .print-page-3-break { page-break-before: always !important; margin-top: 0 !important; }
       .print-page-4-break { page-break-before: always !important; margin-top: 0 !important; }
-      
       header, .no-print, .fixed-summary, input[type=range], button, .tab-navigation { display: none !important; }
-      
       .print-only { display: block !important; }
       .card-grid { display: grid !important; grid-template-columns: repeat(2, 1fr) !important; gap: 0.75rem !important; }
       .print-shadow { box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; border: 1px solid #e2e8f0 !important; }
-      
       .chart-container { height: 420px !important; width: 100% !important; }
       canvas { max-width: 100% !important; }
       table { font-size: 8.5pt !important; }
-      
       .print-signature-block { margin-top: 2cm !important; border-top: 1px solid #e2e8f0 !important; padding-top: 0.5cm !important; page-break-inside: avoid !important; }
     }
-    
     .print-only { display: none; }
   </style>
 </head>
@@ -339,15 +331,52 @@
       const reprofileResults = useMemo(() => {
         const tOver = (linkTimeOB ? results.finalDurOB : manualTimeOB) / 100;
         const cOver = (linkCostOB ? results.finalCapOB : manualCostOB) / 100;
-        const tOrig = originalCosts.reduce((a, b) => a + b, 0); const tRev = tOrig * (1 + cOver); const revD = Math.ceil(originalDuration * (1 + tOver));
-        let om = []; originalCosts.forEach((v, i) => { let mc = i === 0 ? (13 - startMonth) : 12; const mon = v / mc; for (let m = 0; m < mc; m++) om.push(mon); });
-        while (om.length < originalDuration) om.push(0); if (om.length > originalDuration) om = om.slice(0, originalDuration);
-        let rm = new Array(revD).fill(0); const scale = originalDuration / revD; 
-        for (let i = 0; i < revD; i++) rm[i] = om[Math.min(Math.floor(i * scale), om.length - 1)];
-        const cs = rm.reduce((a,b) => a+b, 0); const n = cs === 0 ? 0 : tRev / cs; rm = rm.map(v => v * n);
-        let ry = Array(11).fill(0); let ci = 0;
-        for (let y = 0; y < 11; y++) { let mc = y === 0 ? (13 - startMonth) : 12; for (let m = 0; m < mc && ci < rm.length; m++, ci++) ry[y] += rm[ci]; }
-        return { totalOriginalCost: tOrig, totalRevisedCost: tRev, revisedDuration: revD, revisedYearly: ry, originalMonthly: om, revisedMonthly: rm };
+        const tOrig = originalCosts.reduce((a, b) => a + b, 0); 
+        const tRev = tOrig * (1 + cOver); 
+        
+        // Convert yearly costs to monthly profile om
+        let om = []; 
+        originalCosts.forEach((v, i) => { 
+            let mc = i === 0 ? (13 - startMonth) : 12; 
+            const mon = v / mc; 
+            for (let m = 0; m < mc; m++) om.push(mon); 
+        });
+
+        // Determine Effective Envelope (Actual span of the budget profile)
+        // We find the last month with cost to avoid slicing data the user entered in Year 5, 6, etc.
+        let lastMonthWithCost = 0;
+        for (let i = om.length - 1; i >= 0; i--) { if (om[i] > 0) { lastMonthWithCost = i + 1; break; } }
+        const effectiveSpan = Math.max(originalDuration, lastMonthWithCost);
+        
+        // Revised Envelope based on Time Overrun Factor applied to the span
+        const revD = Math.ceil(effectiveSpan * (1 + tOver));
+        
+        let rm = new Array(revD).fill(0); 
+        const scale = effectiveSpan / revD; 
+        for (let i = 0; i < revD; i++) {
+          rm[i] = om[Math.min(Math.floor(i * scale), om.length - 1)];
+        }
+        
+        // Correct for revised cost total
+        const currentSum = rm.reduce((a,b) => a+b, 0); 
+        const correctionFactor = currentSum === 0 ? 0 : tRev / currentSum; 
+        rm = rm.map(v => v * correctionFactor);
+        
+        let ry = Array(11).fill(0); 
+        let ci = 0;
+        for (let y = 0; y < 11; y++) { 
+           let mc = y === 0 ? (13 - startMonth) : 12; 
+           for (let m = 0; m < mc && ci < rm.length; m++, ci++) ry[y] += rm[ci]; 
+        }
+
+        return { 
+          totalOriginalCost: tOrig, 
+          totalRevisedCost: tRev, 
+          revisedDuration: revD, 
+          revisedYearly: ry, 
+          originalMonthly: om.slice(0, effectiveSpan), 
+          revisedMonthly: rm 
+        };
       }, [results, linkTimeOB, manualTimeOB, linkCostOB, manualCostOB, originalCosts, startMonth, originalDuration]);
 
       const saveProjectFile = () => {
@@ -369,12 +398,10 @@
         URL.revokeObjectURL(url);
       };
 
-      const MethodologyText = "This assessment model strictly adheres to the HM Treasury Green Book (Supplementary Guidance) methodology. Upper bound values and mitigation factors are derived from the Mott MacDonald (2002) study, ensuring consistency with international best practice for major capital investment appraisal.";
+      const MethodologyText = "This assessment model strictly adheres to the HM Treasury Green Book (Supplementary Guidance) methodology, as prescribed by the Irish Infrastructure Guidelines (formerly the Public Spending Code). Upper bound values and mitigation factors are derived from the Mott MacDonald (2002) study, ensuring consistency with international best practice for major capital investment appraisal.";
 
       return (
         <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-          
-          {/* PREMIUM PRINT assessment summary Bar */}
           <div className="print-only p-8 bg-white border-b-4 mb-6" style={{ borderBottomColor: hexColor }}>
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-6">
@@ -391,7 +418,6 @@
                 <p className="text-lg font-bold">{new Date().toLocaleDateString('en-GB')}</p>
               </div>
             </div>
-            
             <div className="mt-8 grid grid-cols-2 gap-4">
               <div className={`p-6 rounded-2xl ${summaryBg} text-white flex justify-between items-center`}>
                 <div className="flex flex-col">
@@ -437,8 +463,6 @@
           </header>
 
           <main className="max-w-6xl mx-auto p-4 md:p-6 pb-24">
-            
-            {/* PAGE 1: ADJUSTMENTS SECTION */}
             <div className={`page-one print-visible-section ${activeTab === 'projects' ? 'block' : 'hidden md:hidden'}`}>
                 <div className="grid md:grid-cols-2 gap-6 mb-6 no-print">
                    <Card className="p-4 flex items-center gap-4">
@@ -460,7 +484,6 @@
                           <button key={t.id} onClick={() => setProjectType(t.id)} className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${projectType === t.id ? `${lightBgClass} ${textClass} ${borderColorClass}` : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>{t.label}</button>
                         ))}
                       </div>
-                      
                       {projectType === 'combined' && (
                          <div className="mt-3 pt-3 border-t border-slate-100 no-print">
                             <div className="flex justify-between text-[10px] font-black text-slate-400 mb-1 uppercase tracking-tighter">
@@ -472,7 +495,6 @@
                       )}
                    </Card>
                 </div>
-
                 <div className="card-grid grid lg:grid-cols-2 gap-6">
                   {Object.entries(currentCategoryData.factors).map(([areaKey, factors]) => {
                     if (areaKey === 'external_influences') return null;
@@ -519,7 +541,6 @@
                 </div>
             </div>
 
-            {/* PAGE 2: EXTERNAL INFLUENCES */}
             <div className={`page-two print-visible-section ${activeTab === 'projects' ? 'block' : 'hidden md:hidden'}`}>
                 <div className="card-grid grid lg:grid-cols-2 gap-6">
                   {Object.entries(currentCategoryData.factors).map(([areaKey, factors]) => {
@@ -561,7 +582,6 @@
                 </div>
             </div>
 
-            {/* PAGE 3: MODELLED IMPACT */}
             <div className={`page-three-start print-visible-section ${(!isOutsourcing) ? 'block' : 'hidden md:hidden'} print-page-3-break`}>
                 <Card noBg={true} className="p-6 bg-slate-900 text-white border-none shadow-lg print-shadow mb-6">
                    <h3 className="font-bold text-white mb-6 uppercase tracking-widest text-[11px] border-b border-white/10 pb-2">Modelled Impact Summary</h3>
@@ -583,7 +603,6 @@
                      </div>
                    </div>
                 </Card>
-
                 <div className="grid md:grid-cols-2 gap-6 mb-6">
                   <Card className="p-5 print-shadow">
                     <SectionHeader title="Programme Parameters" icon={Icons.Calendar} colorClass={colorClass} />
@@ -619,7 +638,6 @@
                     </div>
                   </Card>
                 </div>
-
                 <Card className="p-6 mb-6 print-shadow">
                   <SectionHeader title="Initial Budget Profile (Annual)" icon={Icons.Euro} colorClass={colorClass} />
                   <div className="overflow-x-auto">
@@ -629,7 +647,6 @@
                     </table>
                   </div>
                 </Card>
-
                 <Card className="p-6 mb-6 overflow-x-auto print-shadow">
                   <SectionHeader title="Reprofiled Plan" icon={Icons.BarChart3} colorClass={colorClass} />
                   <table className="w-full text-sm">
@@ -649,13 +666,11 @@
                 </Card>
             </div>
 
-            {/* PAGE 4: S-CURVE AND METHODOLOGY */}
             <div className={`print-page-4-break print-visible-section ${(!isOutsourcing) ? 'block' : 'hidden md:hidden'}`}>
                 <Card className="p-8 print-shadow">
                   <SectionHeader title="Cumulative Expenditure Profile (S-Curve)" icon={Icons.TrendingUp} colorClass={colorClass} />
                   <SCurveChart originalData={reprofileResults.originalMonthly} modelledData={reprofileResults.revisedMonthly} themeColor={hexColor} />
                 </Card>
-
                 <div className="hidden print-only print-signature-block">
                   <div className="flex justify-between items-end mb-8">
                     <div>
@@ -667,12 +682,9 @@
                       <p className="text-slate-700 font-black text-sm uppercase leading-none">HSE Optimism Bias Logic Assessment &copy; 2026</p>
                     </div>
                   </div>
-                  
                   <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Methodology Statement</p>
-                    <p className="text-[9pt] text-slate-700 leading-relaxed italic">
-                      {MethodologyText}
-                    </p>
+                    <p className="text-[9pt] text-slate-700 leading-relaxed italic">{MethodologyText}</p>
                   </div>
                 </div>
             </div>
@@ -681,7 +693,6 @@
                <Card noBg className={`max-w-6xl mx-auto ${summaryBg} text-white border-none shadow-2xl p-4 md:p-6 pointer-events-auto`}>
                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                    <div><h2 className="text-lg font-bold text-white tracking-tight">Calculated Optimism Bias</h2><p className="text-[10px] uppercase font-black text-white/50 tracking-widest">{currentCategoryData.name}</p></div>
-                   
                    {activeTab === 'projects' ? (
                      <div className="flex gap-12">
                        <div className="text-center"><div className="text-3xl font-black text-white">{results.finalDurOB.toFixed(1)}%</div><div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">Duration OB</div></div>
@@ -714,16 +725,13 @@
             <footer className="mt-20 pt-8 border-t border-slate-200 text-center no-print pb-32">
               <div className="max-w-2xl mx-auto px-4 mb-8">
                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2">Methodology Statement</p>
-                 <p className="text-[12px] text-slate-600 leading-relaxed italic border-l-4 border-slate-200 pl-4 py-1 text-left">
-                    {MethodologyText}
-                 </p>
+                 <p className="text-[12px] text-slate-600 leading-relaxed italic border-l-4 border-slate-200 pl-4 py-1 text-left">{MethodologyText}</p>
               </div>
               <p className="text-slate-600 font-bold text-sm">Dave Maher</p>
               <p className="text-[10px] text-slate-400 mt-2 max-w-lg mx-auto leading-relaxed">
                 All intellectual property rights associated with this application, its calculation logic, and its interface design belong to Dave Maher. &copy; 2026 HSE Optimism Bias Calculator
               </p>
             </footer>
-
           </main>
         </div>
       );
