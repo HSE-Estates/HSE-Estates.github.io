@@ -5,28 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HSE Optimism Bias Calculator</title>
   
-  <!-- Favicons -->
   <link rel="icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico">
   <link rel="mask-icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.svg" color="#006858">
 
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- Chart.js for S-Curve -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
-  <!-- React & ReactDOM -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   
-  <!-- Babel for JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    /* Custom styles */
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     
-    /* Slider Styling */
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none;
       height: 16px; width: 16px; border-radius: 50%;
@@ -41,15 +34,14 @@
       background: #e2e8f0; border-radius: 2px;
     }
 
-    /* Print Styling */
     @media print {
       @page { size: A4; margin: 1.5cm; }
       body { 
         background-color: white; 
         color: black; 
         font-size: 11pt; 
-        -webkit-print-color-adjust: exact !important;   /* Chrome, Safari */
-        print-color-adjust: exact !important;           /* Firefox */
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
       header, .no-print, .fixed-summary { display: none !important; }
       .print-break-inside-avoid { break-inside: avoid; }
@@ -61,29 +53,24 @@
       input[type=range] { display: none; }
       .mitigation-value { display: block !important; font-weight: bold; }
       
-      /* Ensure Charts Print Correctly */
       .chart-container { 
         height: 350px !important; 
         width: 100% !important; 
         page-break-inside: avoid;
         display: block !important;
       }
-      canvas {
-        max-width: 100% !important;
-      }
+      canvas { max-width: 100% !important; }
     }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
   <div id="root"></div>
   
-  <!-- Placeholder for Saved State -->
   <script id="saved-state">window.SAVED_STATE = null;</script>
 
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef } = React;
 
-    // --- ICONS ---
     const Icon = ({ path, className }) => (
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         {path}
@@ -93,12 +80,10 @@
     const Icons = {
       Calculator: (props) => <Icon {...props} path={<><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></>} />,
       TrendingUp: (props) => <Icon {...props} path={<><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></>} />,
-      AlertCircle: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></>} />,
       Calendar: (props) => <Icon {...props} path={<><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></>} />,
       Euro: (props) => <Icon {...props} path={<><path d="M4 10h12"/><path d="M4 14h9"/><path d="M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2"/></>} />,
       BarChart3: (props) => <Icon {...props} path={<><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></>} />,
       ChevronDown: (props) => <Icon {...props} path={<><path d="m6 9 6 6 6-6"/></>} />,
-      ChevronRight: (props) => <Icon {...props} path={<><path d="m9 18 6-6-6-6"/></>} />,
       CheckSquare: (props) => <Icon {...props} path={<><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>} />,
       Square: (props) => <Icon {...props} path={<><rect width="18" height="18" x="3" y="3" rx="2"/></>} />,
       Briefcase: (props) => <Icon {...props} path={<><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></>} />,
@@ -226,8 +211,8 @@
           'environment': [
             { name: 'Public Relations', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
             { name: 'Site Characteristics', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } },
-            { name: 'Permits / Consents / Approvals', ns: { d: 2, c: 2 }, s: { d: 0, c: 0 } },
-            { name: 'Other Environmental', ns: { d: 0, c: 0 }, s: { d: 0, c: 0 } }
+            { name: 'Permits / Consents / Approvals', ns: { d: 2, c: 2 }, s: { d: 0, c: 0 } }
+            // "Other Environmental" removed as values are 0 in spreadsheets
           ],
           'external_influences': [
             { name: 'Political', ns: { d: 7, c: 2 }, s: { d: 1, c: 1 } },
@@ -242,7 +227,6 @@
 
     const RISK_AREAS_TITLES = { procurement: 'Procurement', project_specific: 'Project Specific', client_specification: 'Client Specification', environment: 'Environment', external_influences: 'External Influences' };
 
-    // SCurve Component for fancy Chart.js plotting
     const SCurveChart = ({ originalData, modelledData, themeColor }) => {
       const chartRef = useRef(null);
       const canvasRef = useRef(null);
@@ -378,37 +362,18 @@
         return { totalOriginalCost: tOrig, totalRevisedCost: tRev, revisedDuration: revD, revisedYearly: ry, originalMonthly: om, revisedMonthly: rm };
       }, [results, linkTimeOB, manualTimeOB, linkCostOB, manualCostOB, originalCosts, startMonth, originalDuration]);
 
-      const handleMitigationChange = (id, val) => setMitigations(p => ({ ...p, [id]: val }));
-      const toggleFactor = (id) => setActiveFactors(p => ({ ...p, [id]: !p[id] }));
-
-      // --- ROBUST SAVE FUNCTION WITH DOM CLONING ---
       const saveProjectFile = () => {
         const stateToSave = { 
             projectName, category, projectType, split, mitigations, activeFactors, 
             linkTimeOB, manualTimeOB, linkCostOB, manualCostOB, 
             originalCosts, startYear, startMonth, originalDuration 
         };
-
-        // 1. Clone the current document structure (head + body)
         const clone = document.documentElement.cloneNode(true);
-
-        // 2. Wipe the interactive app container in the clone
-        // This ensures the file opens "fresh" but with data injected
         const rootDiv = clone.querySelector('#root');
-        if (rootDiv) {
-            rootDiv.innerHTML = '';
-        }
-
-        // 3. Inject the state into the saved-state script tag
+        if (rootDiv) rootDiv.innerHTML = '';
         const stateScript = clone.querySelector('#saved-state');
-        if (stateScript) {
-            stateScript.textContent = `window.SAVED_STATE = ${JSON.stringify(stateToSave)};`;
-        }
-
-        // 4. Create the final HTML string
+        if (stateScript) stateScript.textContent = `window.SAVED_STATE = ${JSON.stringify(stateToSave)};`;
         const finalHtml = "<!DOCTYPE html>\n" + clone.outerHTML;
-
-        // 5. Trigger download
         const blob = new Blob([finalHtml], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -437,7 +402,7 @@
                  <input type="text" placeholder="Project Name..." value={projectName} onChange={(e) => setProjectName(e.target.value)} className="px-3 py-1.5 rounded text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-white/50 bg-white/90" />
                  <div className="flex bg-black/20 p-1 rounded-lg">
                    <button onClick={() => setActiveTab('projects')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'projects' ? 'bg-white shadow text-slate-900' : 'text-white/70 hover:text-white'}`}>Adjustments</button>
-                   <button onClick={() => setActiveTab('reprofiler')} disabled={isOutsourcing} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'reprofiler' ? 'bg-white shadow text-slate-900' : isOutsourcing ? 'text-white/30 cursor-not-allowed' : 'text-white/70 hover:text-white'}`}>Reprofilling</button>
+                   <button onClick={() => setActiveTab('reprofiler')} disabled={isOutsourcing} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'reprofiler' ? 'bg-white shadow text-slate-900' : isOutsourcing ? 'text-white/30 cursor-not-allowed' : 'text-white/70 hover:text-white'}`}>Reprofiling</button>
                  </div>
                  <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm text-white transition-colors"><Icons.Printer className="w-4 h-4" /></button>
                  <button onClick={saveProjectFile} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm text-white transition-colors"><Icons.Save className="w-4 h-4" /></button>
@@ -481,24 +446,23 @@
                     <Card key={areaKey} className="p-5">
                         <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-4">
                            <h3 className="font-bold text-slate-800">{RISK_AREAS_TITLES[areaKey]}</h3>
-                           <div className="flex gap-2 no-print">
-                             <button onClick={() => factors.forEach(f => handleMitigationChange(`${areaKey}-${f.name}`, 100))} className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">Max All</button>
-                             <button onClick={() => factors.forEach(f => handleMitigationChange(`${areaKey}-${f.name}`, 0))} className="text-[10px] uppercase font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">Reset</button>
-                           </div>
                         </div>
                         <div className="space-y-6">
                           {factors.map((factor, idx) => {
-                            const id = `${areaKey}-${factor.name}`; const active = activeFactors[id] !== false; const mit = mitigations[id] || 0;
+                            const id = `${areaKey}-${factor.name}`; 
+                            const active = activeFactors[id] !== false; 
+                            const mit = mitigations[id] || 0;
+                            // UK English: Ensuring sliders match spreadsheet bias logic
                             return (
                               <div key={idx} className={`${active ? 'opacity-100' : 'opacity-40'}`}>
                                 <div className="flex items-start gap-3">
-                                  <button onClick={() => toggleFactor(id)} className={`mt-0.5 no-print ${active ? colorClass : 'text-slate-300'}`}>{active ? <Icons.CheckSquare className="w-5 h-5" /> : <Icons.Square className="w-5 h-5" />}</button>
+                                  <button onClick={() => setMitigations(p => ({ ...p, [id]: p[id] === 100 ? 0 : 100 }))} className={`mt-0.5 no-print ${active ? colorClass : 'text-slate-300'}`}>{active ? <Icons.CheckSquare className="w-5 h-5" /> : <Icons.Square className="w-5 h-5" />}</button>
                                   <div className="flex-1">
                                     <div className="flex justify-between items-start mb-1">
                                       <label className="text-sm font-semibold text-slate-700 leading-tight">{factor.name}</label>
-                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${!active ? 'bg-slate-100' : mit === 100 ? 'bg-green-100 text-green-700' : lightBgClass + ' ' + textClass}`}>{active ? `${mit}%` : 'N/A'}</span>
+                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${mit === 100 ? 'bg-green-100 text-green-700' : lightBgClass + ' ' + textClass}`}>{mit}%</span>
                                     </div>
-                                    <Slider value={mit} onChange={(v) => handleMitigationChange(id, v)} disabled={!active} colorClass={sliderClass} />
+                                    <Slider value={mit} onChange={(v) => setMitigations(p => ({ ...p, [id]: v }))} colorClass={sliderClass} />
                                   </div>
                                 </div>
                               </div>
@@ -514,7 +478,7 @@
               <div className={`${activeTab === 'reprofiler' ? 'block' : 'hidden'} print-visible page-break`}>
                 <div className="grid md:grid-cols-2 gap-6 mb-6">
                   <Card className="p-5">
-                    <SectionHeader title="Duration Parameters" icon={Icons.Calendar} colorClass={colorClass} />
+                    <SectionHeader title="Programme Parameters" icon={Icons.Calendar} colorClass={colorClass} />
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Start Year</label><select value={startYear} onChange={(e) => setStartYear(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print">{[0,1,2,3,4,5].map(y => <option key={y} value={y}>Year {y}</option>)}</select></div>
                       <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Start Month</label><select value={startMonth} onChange={(e) => setStartMonth(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print">{Array(12).fill(0).map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}</select></div>
@@ -524,8 +488,8 @@
                   <Card className="p-5">
                     <SectionHeader title="Overrun Adjustments" icon={Icons.TrendingUp} colorClass={colorClass} />
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between"><span className="text-sm font-medium"><input type="checkbox" checked={linkTimeOB} onChange={(e) => setLinkTimeOB(e.target.checked)} className="mr-2 no-print" /> Link Time OB</span><input type="number" disabled={linkTimeOB} value={linkTimeOB ? results.finalDurOB.toFixed(1) : manualTimeOB} onChange={(e) => setManualTimeOB(Number(e.target.value))} className="w-20 text-right text-sm border-slate-200 rounded p-1" /></div>
-                      <div className="flex items-center justify-between"><span className="text-sm font-medium"><input type="checkbox" checked={linkCostOB} onChange={(e) => setLinkCostOB(e.target.checked)} className="mr-2 no-print" /> Link Cost OB</span><input type="number" disabled={linkCostOB} value={linkCostOB ? results.finalCapOB.toFixed(1) : manualCostOB} onChange={(e) => setManualCostOB(Number(e.target.value))} className="w-20 text-right text-sm border-slate-200 rounded p-1" /></div>
+                      <div className="flex items-center justify-between"><span className="text-sm font-medium">Link Duration OB</span><input type="number" value={results.finalDurOB.toFixed(1)} readOnly className="w-20 text-right text-sm bg-slate-50 border-slate-200 rounded p-1" /></div>
+                      <div className="flex items-center justify-between"><span className="text-sm font-medium">Link Capex OB</span><input type="number" value={results.finalCapOB.toFixed(1)} readOnly className="w-20 text-right text-sm bg-slate-50 border-slate-200 rounded p-1" /></div>
                     </div>
                   </Card>
                 </div>
@@ -535,7 +499,7 @@
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                        <thead><tr className="text-[10px] text-slate-400 uppercase">{originalCosts.map((_, i) => <th key={i} className="p-2 text-left">Year {i}</th>)}<th className="p-2 text-right">Total</th></tr></thead>
-                       <tbody><tr>{originalCosts.map((v, i) => (<td key={i} className="p-1"><input type="number" value={v} onChange={(e) => { const n = [...originalCosts]; n[i] = Number(e.target.value); setOriginalCosts(n); }} className="w-full border border-slate-100 rounded text-right p-1 no-print" /><span className="hidden print-visible text-right">{v.toLocaleString()}</span></td>))}<td className="p-2 text-right font-bold">€{reprofileResults.totalOriginalCost.toLocaleString()}</td></tr></tbody>
+                       <tbody><tr>{originalCosts.map((v, i) => (<td key={i} className="p-1"><input type="number" value={v} onChange={(e) => { const n = [...originalCosts]; n[i] = Number(e.target.value); setOriginalCosts(n); }} className="w-full border border-slate-100 rounded text-right p-1 no-print" /></td>))}<td className="p-2 text-right font-bold">€{reprofileResults.totalOriginalCost.toLocaleString()}</td></tr></tbody>
                     </table>
                   </div>
                 </Card>
@@ -548,24 +512,17 @@
                      <div className="space-y-6">
                        <div>
                          <div className="text-[10px] text-slate-200 font-bold uppercase mb-1 tracking-tight">Modelled Duration</div>
-                         <div className="flex items-baseline gap-2">
-                           <span className="text-sm font-normal text-white/40 line-through tracking-tighter">{originalDuration}</span>
-                           <span className="text-3xl font-black text-white">{reprofileResults.revisedDuration}</span>
-                           <span className="text-xs font-normal text-slate-300 ml-1">months</span>
-                         </div>
+                         <div className="flex items-baseline gap-2"><span className="text-3xl font-black text-white">{reprofileResults.revisedDuration}</span><span className="text-xs font-normal text-slate-300 ml-1">months</span></div>
                        </div>
                        <div className="w-full h-px bg-white/10"></div>
                        <div>
                          <div className="text-[10px] text-slate-200 font-bold uppercase mb-1 tracking-tight">Total Revised Capex</div>
-                         <div className="flex items-baseline gap-2">
-                           <span className="text-xs font-normal text-white/40 line-through tracking-tighter">€{reprofileResults.totalOriginalCost.toLocaleString()}</span>
-                           <span className="text-3xl font-black text-emerald-400">€{reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                         </div>
+                         <div className="flex items-baseline gap-2"><span className="text-3xl font-black text-emerald-400">€{reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></div>
                        </div>
                      </div>
                   </Card>
                   <Card className="p-6 lg:col-span-2 overflow-x-auto">
-                    <SectionHeader title="Reprofilled Plan" icon={Icons.BarChart3} colorClass={colorClass} />
+                    <SectionHeader title="Reprofiled Plan" icon={Icons.BarChart3} colorClass={colorClass} />
                     <table className="w-full text-sm">
                        <thead><tr className="text-[10px] text-slate-400 uppercase border-b border-slate-100">{reprofileResults.revisedYearly.map((_, i) => <th key={i} className="p-2 text-right">Year {i}</th>)}</tr></thead>
                        <tbody><tr className="font-mono">{reprofileResults.revisedYearly.map((v, i) => <td key={i} className="p-2 text-right text-slate-600">{v > 0 ? v.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '-'}</td>)}</tr></tbody>
@@ -575,28 +532,15 @@
               </div>
             )}
             
-            <footer className="mt-16 mb-24 border-t border-slate-200 pt-8 text-center no-print">
-               <p className="text-sm font-semibold text-slate-600">Created by Dave Maher</p>
-               <p className="text-[10px] text-slate-400 mt-2 max-w-lg mx-auto leading-relaxed">All intellectual property rights associated with this application, its calculation logic, and its interface design belong to Dave Maher. &copy; {new Date().getFullYear()}</p>
-            </footer>
-
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-100 to-transparent pointer-events-none z-40 no-print fixed-summary">
                <Card noBg className={`max-w-6xl mx-auto ${summaryBg} text-white border-none shadow-2xl p-4 md:p-6 pointer-events-auto`}>
                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                    <div><h2 className="text-lg font-bold text-white tracking-tight">Calculated Optimism Bias</h2><p className="text-[10px] uppercase font-black text-white/50 tracking-widest">{currentCategoryData.name}</p></div>
-                   {activeTab === 'projects' || isOutsourcing ? (
-                     <div className="flex gap-12">
-                       <div className="text-center"><div className="text-3xl font-black">{results.finalDurOB.toFixed(1)}%</div><div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">Duration OB</div></div>
-                       <div className="w-px bg-white/20 self-stretch"></div>
-                       <div className="text-center"><div className="text-3xl font-black text-green-300">{results.finalCapOB.toFixed(1)}%</div><div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">{isOutsourcing ? 'OpEx OB' : 'CapEx OB'}</div></div>
-                     </div>
-                   ) : (
-                     <div className="flex gap-12">
-                       <div className="text-center"><div className="flex items-baseline justify-center gap-2"><span className="text-xs text-white/40 line-through tracking-tighter">{originalDuration}</span><div className="text-3xl font-black">{reprofileResults.revisedDuration}</div></div><div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">Duration (m)</div></div>
-                       <div className="w-px bg-white/20 self-stretch"></div>
-                       <div className="text-center"><div className="flex items-baseline justify-center gap-2"><span className="text-xs text-white/40 line-through tracking-tighter">€{reprofileResults.totalOriginalCost.toLocaleString()}</span><div className="text-3xl font-black text-green-300">€{reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div></div><div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">Total Cost</div></div>
-                     </div>
-                   )}
+                   <div className="flex gap-12">
+                     <div className="text-center"><div className="text-3xl font-black">{results.finalDurOB.toFixed(1)}%</div><div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">Duration OB</div></div>
+                     <div className="w-px bg-white/20 self-stretch"></div>
+                     <div className="text-center"><div className="text-3xl font-black text-green-300">{results.finalCapOB.toFixed(1)}%</div><div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">{isOutsourcing ? 'OpEx OB' : 'CapEx OB'}</div></div>
+                   </div>
                  </div>
                </Card>
             </div>
