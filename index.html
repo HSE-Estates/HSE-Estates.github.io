@@ -479,8 +479,32 @@
                   <Card className="p-5">
                     <SectionHeader title="Overrun Adjustments" icon={Icons.TrendingUp} colorClass={colorClass} />
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between"><span className="text-sm font-medium">Link Duration OB</span><input type="number" value={results.finalDurOB.toFixed(1)} readOnly className="w-20 text-right text-sm bg-slate-50 border-slate-200 rounded p-1" /></div>
-                      <div className="flex items-center justify-between"><span className="text-sm font-medium">Link Capex OB</span><input type="number" value={results.finalCapOB.toFixed(1)} readOnly className="w-20 text-right text-sm bg-slate-50 border-slate-200 rounded p-1" /></div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium flex items-center gap-2">
+                          <input type="checkbox" checked={linkTimeOB} onChange={(e) => setLinkTimeOB(e.target.checked)} className="no-print h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                          Link Duration OB
+                        </span>
+                        <input 
+                          type="number" 
+                          disabled={linkTimeOB} 
+                          value={linkTimeOB ? results.finalDurOB.toFixed(1) : manualTimeOB} 
+                          onChange={(e) => setManualTimeOB(Number(e.target.value))} 
+                          className={`w-20 text-right text-sm border-slate-200 rounded p-1 ${linkTimeOB ? 'bg-slate-50 text-slate-400' : 'bg-white text-slate-900'}`} 
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium flex items-center gap-2">
+                          <input type="checkbox" checked={linkCostOB} onChange={(e) => setLinkCostOB(e.target.checked)} className="no-print h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                          Link Capex OB
+                        </span>
+                        <input 
+                          type="number" 
+                          disabled={linkCostOB} 
+                          value={linkCostOB ? results.finalCapOB.toFixed(1) : manualCostOB} 
+                          onChange={(e) => setManualCostOB(Number(e.target.value))} 
+                          className={`w-20 text-right text-sm border-slate-200 rounded p-1 ${linkCostOB ? 'bg-slate-50 text-slate-400' : 'bg-white text-slate-900'}`} 
+                        />
+                      </div>
                     </div>
                   </Card>
                 </div>
@@ -536,9 +560,11 @@
                </Card>
             </div>
             
-            <footer className="mt-20 pt-8 border-t border-slate-200 text-center no-print pb-24">
+            <footer className="mt-20 pt-8 border-t border-slate-200 text-center no-print pb-32">
               <p className="text-slate-600 font-bold text-sm">Dave Maher</p>
-              <p className="text-[10px] text-slate-400 mt-1 tracking-widest uppercase font-black">&copy; {new Date().getFullYear()} HSE Optimism Bias Calculator</p>
+              <p className="text-[10px] text-slate-400 mt-2 max-w-lg mx-auto leading-relaxed">
+                All intellectual property rights associated with this application, its calculation logic, and its interface design belong to Dave Maher. &copy; {new Date().getFullYear()} HSE Optimism Bias Calculator
+              </p>
             </footer>
           </main>
         </div>
