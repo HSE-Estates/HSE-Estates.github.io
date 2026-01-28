@@ -404,15 +404,15 @@
             <div className="mt-8 grid grid-cols-2 gap-4">
               <div className={`p-6 rounded-2xl ${summaryBg} text-white flex justify-between items-center`}>
                 <div className="flex flex-col">
-                  <span className="text-[8px] uppercase font-black opacity-60 tracking-widest leading-none mb-1">Calculated</span>
-                  <span className="text-[8px] uppercase font-black opacity-60 tracking-widest leading-none">Duration OB</span>
+                  <span className="text-[16px] uppercase font-black opacity-60 tracking-widest leading-none mb-1">Calculated</span>
+                  <span className="text-[16px] uppercase font-black opacity-60 tracking-widest leading-none">Duration OB</span>
                 </div>
                 <span className="text-4xl font-black">{results.finalDurOB.toFixed(1)}%</span>
               </div>
               <div className={`p-6 rounded-2xl ${summaryBg} text-white flex justify-between items-center`}>
                 <div className="flex flex-col">
-                  <span className="text-[8px] uppercase font-black opacity-60 tracking-widest leading-none mb-1">Calculated</span>
-                  <span className="text-[8px] uppercase font-black opacity-60 tracking-widest leading-none">Capex OB</span>
+                  <span className="text-[16px] uppercase font-black opacity-60 tracking-widest leading-none mb-1">Calculated</span>
+                  <span className="text-[16px] uppercase font-black opacity-60 tracking-widest leading-none">Capex OB</span>
                 </div>
                 <span className="text-4xl font-black text-emerald-300">{results.finalCapOB.toFixed(1)}%</span>
               </div>
@@ -579,21 +579,9 @@
                     );
                   })}
                 </div>
-                
-                {/* Programme Parameters (Bottom of Page 2) */}
-                <div className="hidden print-only mt-6 grid grid-cols-1 gap-6">
-                  <Card className="p-5 print-shadow">
-                    <SectionHeader title="Programme Parameters" icon={Icons.Calendar} colorClass={colorClass} />
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><p className="text-xs text-slate-400 font-bold uppercase">Start Year</p><p className="font-bold text-slate-800">Year {startYear}</p></div>
-                      <div><p className="text-xs text-slate-400 font-bold uppercase">Start Month</p><p className="font-bold text-slate-800">Month {startMonth}</p></div>
-                    </div>
-                    <div className="mt-4"><p className="text-xs text-slate-400 font-bold uppercase">Original Duration</p><p className="font-bold text-slate-800">{originalDuration} Months</p></div>
-                  </Card>
-                </div>
             </div>
 
-            {/* PAGE 3: MODELLED IMPACT + BUDGET + PLAN */}
+            {/* PAGE 3: MODELLED IMPACT + PARAMETERS SIDE-BY-SIDE + BUDGET + PLAN */}
             <div className={`page-three-start print-visible-section ${(!isOutsourcing) ? 'block' : 'hidden md:hidden'} print-page-3-break`}>
                 
                 {/* Modelled Impact (Top of Page 3) */}
@@ -618,19 +606,34 @@
                    </div>
                 </Card>
 
-                <div className="grid md:grid-cols-1 gap-6 mb-6">
+                {/* Parameters and Adjustments Side-by-Side (requested for Page 3) */}
+                <div className="grid md:grid-cols-2 gap-6 mb-6">
+                  <Card className="p-5 print-shadow">
+                    <SectionHeader title="Programme Parameters" icon={Icons.Calendar} colorClass={colorClass} />
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Start Year</label><select value={startYear} onChange={(e) => setStartYear(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print">{[0,1,2,3,4,5].map(y => <option key={y} value={y}>Year {y}</option>)}</select><span className="hidden print-only font-bold">Year {startYear}</span></div>
+                      <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Start Month</label><select value={startMonth} onChange={(e) => setStartMonth(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print">{Array(12).fill(0).map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}</select><span className="hidden print-only font-bold">Month {startMonth}</span></div>
+                    </div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Original Duration (Months)</label><input type="number" value={originalDuration} onChange={(e) => setOriginalDuration(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print" /><span className="hidden print-only font-bold">{originalDuration} months</span>
+                  </Card>
                   <Card className="p-5 print-shadow">
                     <SectionHeader title="Overrun Adjustments" icon={Icons.TrendingUp} colorClass={colorClass} />
-                    <div className="grid grid-cols-2 gap-8">
-                      <div className="flex items-center justify-between border-r pr-8 border-slate-100">
-                        <span className="text-sm font-medium">Link Duration OB</span>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium flex items-center gap-2">
+                          <input type="checkbox" checked={linkTimeOB} onChange={(e) => setLinkTimeOB(e.target.checked)} className="no-print h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                          Link Duration OB
+                        </span>
                         <div className="text-right">
                           <span className="text-xs font-bold text-slate-400 uppercase block leading-none mb-1">Calculated OB</span>
                           <span className="text-lg font-black">{linkTimeOB ? results.finalDurOB.toFixed(1) : manualTimeOB}%</span>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between pl-8">
-                        <span className="text-sm font-medium">Link Capex OB</span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium flex items-center gap-2">
+                          <input type="checkbox" checked={linkCostOB} onChange={(e) => setLinkCostOB(e.target.checked)} className="no-print h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                          Link Capex OB
+                        </span>
                         <div className="text-right">
                           <span className="text-xs font-bold text-slate-400 uppercase block leading-none mb-1">Calculated OB</span>
                           <span className="text-lg font-black text-emerald-600">{linkCostOB ? results.finalCapOB.toFixed(1) : manualCostOB}%</span>
@@ -654,16 +657,16 @@
                   <SectionHeader title="Reprofiled Plan" icon={Icons.BarChart3} colorClass={colorClass} />
                   <table className="w-full text-sm">
                      <thead>
-                        <tr className="text-[10px] text-slate-400 uppercase border-b border-slate-100">
-                           {reprofileResults.revisedYearly.map((_, i) => <th key={i} className="p-2 text-right">Year {i}</th>)}
-                           <th className="p-2 text-right text-slate-800 font-bold">Total</th>
-                        </tr>
+                       <tr className="text-[10px] text-slate-400 uppercase border-b border-slate-100">
+                          {reprofileResults.revisedYearly.map((_, i) => <th key={i} className="p-2 text-right">Year {i}</th>)}
+                          <th className="p-2 text-right text-slate-800 font-bold">Total</th>
+                       </tr>
                      </thead>
                      <tbody>
-                        <tr className="font-mono">
-                           {reprofileResults.revisedYearly.map((v, i) => <td key={i} className="p-2 text-right text-slate-600 font-bold">{v > 0 ? v.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '-'}</td>)}
-                           <td className="p-2 text-right text-slate-900 font-black">€{reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
-                        </tr>
+                       <tr className="font-mono">
+                          {reprofileResults.revisedYearly.map((v, i) => <td key={i} className="p-2 text-right text-slate-600 font-bold">{v > 0 ? v.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '-'}</td>)}
+                          <td className="p-2 text-right text-slate-900 font-black">€{reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                       </tr>
                      </tbody>
                   </table>
                 </Card>
@@ -684,7 +687,7 @@
                   </div>
                   <div className="text-right">
                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight leading-none mb-1">Created by Dave Maher</p>
-                    <p className="text-slate-700 font-black text-sm uppercase leading-none">HSE Optimism Bias Logic Assessment &copy; 2026</p>
+                    <p className="text-slate-700 font-black text-sm uppercase leading-none">HSE Optimism Bias Logic Assesment &copy; 2026</p>
                   </div>
                 </div>
             </div>
