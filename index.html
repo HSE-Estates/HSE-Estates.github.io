@@ -49,32 +49,21 @@
       .bg-white { background-color: #ffffff !important; }
       .bg-slate-900 { background-color: #0f172a !important; color: white !important; }
       
-      /* Force all sections to render for printing */
       .print-visible-section { display: block !important; opacity: 1 !important; visibility: visible !important; }
-      
-      /* Page 2 Break: External Influences */
       .external-influences-card { page-break-before: always !important; margin-top: 0 !important; }
-      
-      /* Page 3 Break: Modelled Impact */
       .print-page-3-break { page-break-before: always !important; margin-top: 0 !important; }
-      
-      /* Page 4 Break: S-Curve Chart */
       .print-page-4-break { page-break-before: always !important; margin-top: 0 !important; }
       
-      /* UI Hiding */
       header, .no-print, .fixed-summary, input[type=range], button, .tab-navigation { display: none !important; }
       
-      /* Visual Formatting */
       .print-only { display: block !important; }
       .card-grid { display: grid !important; grid-template-columns: repeat(2, 1fr) !important; gap: 0.75rem !important; }
       .print-shadow { box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; border: 1px solid #e2e8f0 !important; }
       
-      /* Chart Dimensions */
       .chart-container { height: 420px !important; width: 100% !important; }
       canvas { max-width: 100% !important; }
       table { font-size: 8.5pt !important; }
       
-      /* Footer Formatting */
       .print-signature-block { margin-top: 2cm !important; border-top: 1px solid #e2e8f0 !important; padding-top: 0.5cm !important; page-break-inside: avoid !important; }
     }
     
@@ -150,11 +139,11 @@
       civil: {
         id: 'civil', name: 'Civil Engineering', icon: Icons.HardHat,
         types: [{ id: 'standard', label: 'Standard Civil Eng' }, { id: 'ns', label: 'Non-Standard Civil Eng' }, { id: 'combined', label: 'Combined' }],
-        upper: { ns: { duration: 18.5, capex: 50 }, s: { duration: 18.2, capex: 40.5 } },
+        upper: { ns: { duration: 25, capex: 66 }, s: { duration: 20, capex: 44 } },
         factors: {
           'procurement': [
-            { name: 'Complexity of Contract Structure', ns: { d: 4, c: 2 }, s: { d: 1, c: 1 } },
-            { name: 'Late Contractor Involvement', ns: { d: 1, c: 1 }, s: { d: 0, c: 3 } },
+            { name: 'Complexity of Contract Structure', ns: { d: 4, c: 2 }, s: { d: 0, c: 1 } },
+            { name: 'Late Contractor Involvement', ns: { d: 1, c: 1 }, s: { d: 3, c: 3 } },
             { name: 'Poor Contractor Capabilities', ns: { d: 2, c: 3 }, s: { d: 16, c: 5 } },
             { name: 'Dispute & Claims Occurred', ns: { d: 4, c: 6 }, s: { d: 3, c: 14 } },
             { name: 'Information Management', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } }
@@ -380,6 +369,8 @@
         URL.revokeObjectURL(url);
       };
 
+      const MethodologyText = "This assessment model strictly adheres to the HM Treasury Green Book (Supplementary Guidance) methodology. Upper bound values and mitigation factors are derived from the Mott MacDonald (2002) study, ensuring consistency with international best practice for major capital investment appraisal.";
+
       return (
         <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
           
@@ -447,7 +438,7 @@
 
           <main className="max-w-6xl mx-auto p-4 md:p-6 pb-24">
             
-            {/* PAGE 1: ADJUSTMENTS SECTION (Procurement, Project Spec, Client Spec, Environment) */}
+            {/* PAGE 1: ADJUSTMENTS SECTION */}
             <div className={`page-one print-visible-section ${activeTab === 'projects' ? 'block' : 'hidden md:hidden'}`}>
                 <div className="grid md:grid-cols-2 gap-6 mb-6 no-print">
                    <Card className="p-4 flex items-center gap-4">
@@ -479,17 +470,12 @@
                             <Slider value={split} onChange={setSplit} colorClass={sliderClass} />
                          </div>
                       )}
-                      {projectType === 'combined' && (
-                        <div className="hidden print-only mt-2 text-xs font-bold text-slate-600 uppercase tracking-widest">
-                          Split: {100-split}% Standard / {split}% Non-Standard
-                        </div>
-                      )}
                    </Card>
                 </div>
 
                 <div className="card-grid grid lg:grid-cols-2 gap-6">
                   {Object.entries(currentCategoryData.factors).map(([areaKey, factors]) => {
-                    if (areaKey === 'external_influences') return null; // Save for Page 2
+                    if (areaKey === 'external_influences') return null;
                     return (
                       <Card key={areaKey} className="p-5 print-shadow">
                           <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-4">
@@ -507,10 +493,7 @@
                               return (
                                 <div key={idx} className={`${active ? 'opacity-100' : 'opacity-40'} print-visible-section`}>
                                   <div className="flex items-start gap-3">
-                                    <button 
-                                      onClick={() => setActiveFactors(p => ({ ...p, [id]: !p[id] }))} 
-                                      className={`mt-0.5 no-print transition-colors ${active ? colorClass : 'text-slate-300 hover:text-slate-400'}`}
-                                    >
+                                    <button onClick={() => setActiveFactors(p => ({ ...p, [id]: !p[id] }))} className={`mt-0.5 no-print transition-colors ${active ? colorClass : 'text-slate-300 hover:text-slate-400'}`}>
                                       {active ? <Icons.CheckSquare className="w-5 h-5" /> : <Icons.Square className="w-5 h-5" />}
                                     </button>
                                     <div className={`mt-0.5 hidden print-only ${active ? colorClass : 'text-slate-200'}`}>
@@ -536,7 +519,7 @@
                 </div>
             </div>
 
-            {/* PAGE 2: EXTERNAL INFLUENCES (Break at start of page) */}
+            {/* PAGE 2: EXTERNAL INFLUENCES */}
             <div className={`page-two print-visible-section ${activeTab === 'projects' ? 'block' : 'hidden md:hidden'}`}>
                 <div className="card-grid grid lg:grid-cols-2 gap-6">
                   {Object.entries(currentCategoryData.factors).map(([areaKey, factors]) => {
@@ -552,10 +535,7 @@
                               return (
                                 <div key={idx} className={`${active ? 'opacity-100' : 'opacity-40'} print-visible-section`}>
                                   <div className="flex items-start gap-3">
-                                    <button 
-                                      onClick={() => setActiveFactors(p => ({ ...p, [id]: !p[id] }))} 
-                                      className={`mt-0.5 no-print transition-colors ${active ? colorClass : 'text-slate-300 hover:text-slate-400'}`}
-                                    >
+                                    <button onClick={() => setActiveFactors(p => ({ ...p, [id]: !p[id] }))} className={`mt-0.5 no-print transition-colors ${active ? colorClass : 'text-slate-300 hover:text-slate-400'}`}>
                                       {active ? <Icons.CheckSquare className="w-5 h-5" /> : <Icons.Square className="w-5 h-5" />}
                                     </button>
                                     <div className={`mt-0.5 hidden print-only ${active ? colorClass : 'text-slate-200'}`}>
@@ -581,10 +561,8 @@
                 </div>
             </div>
 
-            {/* PAGE 3: MODELLED IMPACT + PARAMETERS SIDE-BY-SIDE + BUDGET + PLAN */}
+            {/* PAGE 3: MODELLED IMPACT */}
             <div className={`page-three-start print-visible-section ${(!isOutsourcing) ? 'block' : 'hidden md:hidden'} print-page-3-break`}>
-                
-                {/* Modelled Impact (Top of Page 3) */}
                 <Card noBg={true} className="p-6 bg-slate-900 text-white border-none shadow-lg print-shadow mb-6">
                    <h3 className="font-bold text-white mb-6 uppercase tracking-widest text-[11px] border-b border-white/10 pb-2">Modelled Impact Summary</h3>
                    <div className="grid grid-cols-2 gap-8">
@@ -606,7 +584,6 @@
                    </div>
                 </Card>
 
-                {/* Parameters and Adjustments Side-by-Side (requested for Page 3) */}
                 <div className="grid md:grid-cols-2 gap-6 mb-6">
                   <Card className="p-5 print-shadow">
                     <SectionHeader title="Programme Parameters" icon={Icons.Calendar} colorClass={colorClass} />
@@ -672,22 +649,30 @@
                 </Card>
             </div>
 
-            {/* PAGE 4: S-CURVE ONLY */}
+            {/* PAGE 4: S-CURVE AND METHODOLOGY */}
             <div className={`print-page-4-break print-visible-section ${(!isOutsourcing) ? 'block' : 'hidden md:hidden'}`}>
                 <Card className="p-8 print-shadow">
                   <SectionHeader title="Cumulative Expenditure Profile (S-Curve)" icon={Icons.TrendingUp} colorClass={colorClass} />
                   <SCurveChart originalData={reprofileResults.originalMonthly} modelledData={reprofileResults.revisedMonthly} themeColor={hexColor} />
                 </Card>
 
-                {/* Print Signature Line at end of assessment on Page 4 */}
-                <div className="hidden print-only print-signature-block flex justify-between items-end">
-                  <div>
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest leading-none">Assessor Signature</p>
-                    <div className="h-10 border-b-2 border-slate-200 w-64 mt-2"></div>
+                <div className="hidden print-only print-signature-block">
+                  <div className="flex justify-between items-end mb-8">
+                    <div>
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest leading-none">Assessor Signature</p>
+                      <div className="h-10 border-b-2 border-slate-200 w-64 mt-2"></div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight leading-none mb-1">Created by Dave Maher</p>
+                      <p className="text-slate-700 font-black text-sm uppercase leading-none">HSE Optimism Bias Logic Assessment &copy; 2026</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight leading-none mb-1">Created by Dave Maher</p>
-                    <p className="text-slate-700 font-black text-sm uppercase leading-none">HSE Optimism Bias Logic Assesment &copy; 2026</p>
+                  
+                  <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Methodology Statement</p>
+                    <p className="text-[9pt] text-slate-700 leading-relaxed italic">
+                      {MethodologyText}
+                    </p>
                   </div>
                 </div>
             </div>
@@ -695,7 +680,7 @@
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-100 to-transparent pointer-events-none z-40 no-print fixed-summary">
                <Card noBg className={`max-w-6xl mx-auto ${summaryBg} text-white border-none shadow-2xl p-4 md:p-6 pointer-events-auto`}>
                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                   <div><h2 className="text-lg font-bold text-white tracking-tight text-white">Calculated Optimism Bias</h2><p className="text-[10px] uppercase font-black text-white/50 tracking-widest">{currentCategoryData.name}</p></div>
+                   <div><h2 className="text-lg font-bold text-white tracking-tight">Calculated Optimism Bias</h2><p className="text-[10px] uppercase font-black text-white/50 tracking-widest">{currentCategoryData.name}</p></div>
                    
                    {activeTab === 'projects' ? (
                      <div className="flex gap-12">
@@ -727,6 +712,12 @@
             </div>
             
             <footer className="mt-20 pt-8 border-t border-slate-200 text-center no-print pb-32">
+              <div className="max-w-2xl mx-auto px-4 mb-8">
+                 <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2">Methodology Statement</p>
+                 <p className="text-[12px] text-slate-600 leading-relaxed italic border-l-4 border-slate-200 pl-4 py-1 text-left">
+                    {MethodologyText}
+                 </p>
+              </div>
               <p className="text-slate-600 font-bold text-sm">Dave Maher</p>
               <p className="text-[10px] text-slate-400 mt-2 max-w-lg mx-auto leading-relaxed">
                 All intellectual property rights associated with this application, its calculation logic, and its interface design belong to Dave Maher. &copy; 2026 HSE Optimism Bias Calculator
