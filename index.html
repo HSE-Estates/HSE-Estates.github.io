@@ -123,8 +123,8 @@
             { name: 'Large Number of Stakeholders', ns: { d: 4, c: 3 }, s: { d: 6, c: 2 } },
             { name: 'Funding Availability', ns: { d: 3, c: 0 }, s: { d: 8, c: 0 } },
             { name: 'Project Management Team', ns: { d: 5, c: 2 }, s: { d: 0, c: 1 } },
-            { name: 'Poor Project Intelligence', ns: { d: 5, c: 6 }, s: { d: 6, c: 2 } }
-            // "Other Specification Factors" removed as values are 0 in S
+            { name: 'Poor Project Intelligence', ns: { d: 5, c: 6 }, s: { d: 6, c: 2 } },
+            { name: 'Other Specification Factors', ns: { d: 1, c: 2 }, s: { d: 0, c: 0 } }
           ],
           'environment': [
             { name: 'Public Relations', ns: { d: 3, c: 3 }, s: { d: 8, c: 2 } },
@@ -136,8 +136,8 @@
             { name: 'Political', ns: { d: 13, c: 2 }, s: { d: 2, c: 1 } },
             { name: 'Economic', ns: { d: 2, c: 13 }, s: { d: 1, c: 11 } },
             { name: 'Legislation / Regulations', ns: { d: 6, c: 7 }, s: { d: 9, c: 3 } },
+            { name: 'Technology', ns: { d: 4, c: 5 }, s: { d: 0, c: 0 } },
             { name: 'Other External Influences', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } }
-            // Technology removed (0 for S in standard template)
           ]
         }
       },
@@ -169,7 +169,8 @@
           'environment': [
             { name: 'Public Relations', ns: { d: 4, c: 6 }, s: { d: 2, c: 9 } },
             { name: 'Site Characteristics', ns: { d: 5, c: 5 }, s: { d: 10, c: 3 } },
-            { name: 'Permits / Consents / Approvals', ns: { d: 7, c: 5 }, s: { d: 10, c: 4 } }
+            { name: 'Permits / Consents / Approvals', ns: { d: 7, c: 5 }, s: { d: 10, c: 4 } },
+            { name: 'Other Environmental Factors', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } }
           ],
           'external_influences': [
             { name: 'Political', ns: { d: 19, c: 5 }, s: { d: 3, c: 2 } },
@@ -330,9 +331,17 @@
         let nsd = 0, nsc = 0, sd = 0, sc = 0, mnsd = 0, mnsc = 0, msd = 0, msc = 0;
         Object.entries(currentCategoryData.factors).forEach(([k, fl]) => {
           fl.forEach(f => {
-            const id = `${k}-${f.name}`; const mit = (activeFactors[id] !== false) ? (mitigations[id] || 0) : 100; const r = 1 - (mit / 100);
-            nsd += f.ns.d * r; nsc += f.ns.c * r; sd += f.s.d * r; sc += f.s.c * r;
-            mnsd += f.ns.d; mnsc += f.ns.c; msd += f.s.d; msc += f.s.d; // Spreadsheet uses D values for denominator
+            const id = `${k}-${f.name}`; 
+            const mit = (activeFactors[id] !== false) ? (mitigations[id] || 0) : 100; 
+            const r = 1 - (mit / 100);
+            nsd += f.ns.d * r; 
+            nsc += f.ns.c * r; 
+            sd += f.s.d * r; 
+            sc += f.s.c * r;
+            mnsd += f.ns.d; 
+            mnsc += f.ns.c; 
+            msd += f.s.d; 
+            msc += f.s.c;
           });
         });
         const nDur = mnsd > 0 ? currentCategoryData.upper.ns.duration * (nsd / mnsd) : 0;
