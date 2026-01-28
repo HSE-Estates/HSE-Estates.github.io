@@ -23,52 +23,56 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     
+    /* Premium Slider Styling */
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none;
-      height: 16px; width: 16px; border-radius: 50%;
-      background: currentColor; cursor: pointer; margin-top: -6px; 
+      height: 18px; width: 18px; border-radius: 50%;
+      background: currentColor; cursor: pointer; margin-top: -7px; 
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
     }
     input[type=range]::-moz-range-thumb {
-      height: 16px; width: 16px; border-radius: 50%;
+      height: 18px; width: 18px; border-radius: 50%;
       background: currentColor; cursor: pointer; border: none;
     }
     input[type=range]::-webkit-slider-runnable-track {
-      width: 100%; height: 4px; cursor: pointer;
-      background: #e2e8f0; border-radius: 2px;
+      width: 100%; height: 5px; cursor: pointer;
+      background: #e2e8f0; border-radius: 3px;
     }
 
-    /* Print Enhancements */
+    /* Print Excellence Styles - Forced 3-Page Layout */
     @media print {
-      @page { size: A4; margin: 1.5cm; }
-      body { 
-        background-color: white; 
-        color: black; 
-        font-size: 11pt; 
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-      header, .no-print, .fixed-summary { display: none !important; }
+      @page { size: A4 portrait; margin: 1cm; }
+      
+      body { background-color: #f8fafc !important; }
+      .bg-white { background-color: #ffffff !important; }
+      .bg-slate-900 { background-color: #0f172a !important; color: white !important; }
+      
+      /* Display sections on print regardless of tab state */
+      .print-visible-section { display: block !important; opacity: 1 !important; visibility: visible !important; }
+      
+      /* Page Splits */
+      .external-influences-card { page-break-before: always !important; margin-top: 0 !important; }
+      .page-three-start { page-break-before: always !important; margin-top: 0 !important; }
+      
+      /* UI Hiding */
+      header, .no-print, .fixed-summary, input[type=range], button, .tab-navigation { display: none !important; }
+      
+      /* Formatting */
       .print-only { display: block !important; }
-      .print-break-inside-avoid { break-inside: avoid; }
-      .print-shadow-none { box-shadow: none !important; border: 1px solid #ccc !important; }
-      main { padding: 0 !important; max-width: 100% !important; }
-      .print-visible { display: block !important; margin-bottom: 20px; }
-      .page-break { page-break-before: always; }
+      .card-grid { display: grid !important; grid-template-columns: repeat(2, 1fr) !important; gap: 0.75rem !important; }
+      .print-shadow { box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; border: 1px solid #e2e8f0 !important; }
       
-      input[type=range] { display: none; }
-      .mitigation-value { display: inline-block !important; font-weight: bold; }
-      
-      .chart-container { 
-        height: 350px !important; 
-        width: 100% !important; 
-        page-break-inside: avoid;
-        display: block !important;
-      }
+      /* S-Curve Print Height (Maximized) */
+      .chart-container { height: 400px !important; width: 100% !important; }
       canvas { max-width: 100% !important; }
-      footer { display: block !important; position: relative; margin-top: 50px; page-break-inside: avoid; }
+      table { font-size: 8.5pt !important; }
+      
+      /* Signature area gap and formatting */
+      .print-signature-block { margin-top: 2cm !important; padding-top: 0.5cm !important; border-top: 1px solid #e2e8f0 !important; page-break-inside: avoid !important; }
     }
+    
     .print-only { display: none; }
   </style>
 </head>
@@ -195,7 +199,8 @@
             { name: 'Inadequacy of Business Case', ns: { d: 5, c: 6 }, s: { d: 5, c: 12 } },
             { name: 'Large Number of Stakeholders', ns: { d: 4, c: 4 }, s: { d: 2, c: 2 } },
             { name: 'Funding Availability', ns: { d: 5, c: 2 }, s: { d: 0, c: 0 } },
-            { name: 'Project Management Team', ns: { d: 2, c: 5 }, s: { d: 0, c: 15 } }
+            { name: 'Project Management Team', ns: { d: 2, c: 5 }, s: { d: 0, c: 15 } },
+            { name: 'Poor Project Intelligence', ns: { d: 2, c: 1 }, s: { d: 0, c: 0 } }
           ],
           'environment': [
             { name: 'Public Relations', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
@@ -233,7 +238,8 @@
             ]
           },
           options: { 
-            responsive: true, maintainAspectRatio: false, interaction: { intersect: false, mode: 'index' }, 
+            responsive: true, maintainAspectRatio: false, animation: false,
+            interaction: { intersect: false, mode: 'index' }, 
             plugins: { 
               legend: { position: 'top', labels: { usePointStyle: true, font: { size: 11, weight: 'bold' } } }, 
               tooltip: { backgroundColor: 'rgba(0, 0, 0, 0.8)', callbacks: { label: (c) => `${c.dataset.label}: €${c.raw.toLocaleString(undefined, { maximumFractionDigits: 0 })}` } } 
@@ -243,11 +249,11 @@
         });
         return () => { if (chartRef.current) chartRef.current.destroy(); };
       }, [originalData, modelledData, themeColor]);
-      return <div className="h-[350px] w-full chart-container"><canvas ref={canvasRef}></canvas></div>;
+      return <div className="h-[460px] w-full chart-container"><canvas ref={canvasRef}></canvas></div>;
     };
     
     const Card = ({ children, className = '', noBg = false }) => (
-      <div className={`${noBg ? '' : 'bg-white'} rounded-lg shadow-sm border border-slate-200 print-break-inside-avoid print-shadow-none ${className}`}>
+      <div className={`${noBg ? '' : 'bg-white'} rounded-xl shadow-sm border border-slate-200 print-shadow ${className}`}>
         {children}
       </div>
     );
@@ -371,24 +377,43 @@
 
       return (
         <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-          {/* Print-Only Header Summary */}
-          <div className="print-only mb-8 p-6 bg-slate-100 rounded-lg border-2 border-slate-300">
-            <div className="flex justify-between items-center mb-4">
-              <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-10 w-auto" />
+          
+          {/* PREMIUM PRINT-ONLY ASSESSMENT SUMMARY */}
+          <div className="print-only p-8 bg-white border-b-4 mb-6" style={{ borderBottomColor: hexColor }}>
+            <div className="flex justify-between items-start">
+              <div className="flex items-center gap-6">
+                <div className="bg-white p-3 rounded-xl border border-slate-200">
+                  <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-12 w-auto" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-black tracking-tight text-slate-800 uppercase">Optimism Bias Assessment</h1>
+                  <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mt-1">Project Category: {currentCategoryData.name}</p>
+                </div>
+              </div>
               <div className="text-right">
-                <h1 className="text-2xl font-bold">Optimism Bias Assessment</h1>
-                <p className="text-sm text-slate-600">{projectName || 'Project Details'}</p>
+                <p className="text-xs font-black text-slate-400 uppercase">Assessment Date</p>
+                <p className="text-lg font-bold">{new Date().toLocaleDateString('en-GB')}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-8 text-center border-t pt-4">
-              <div>
-                <p className="text-xs uppercase font-bold text-slate-500">Calculated Duration OB</p>
-                <p className="text-3xl font-black">{results.finalDurOB.toFixed(1)}%</p>
+            
+            <div className="mt-8 grid grid-cols-2 gap-4">
+              <div className={`p-6 rounded-2xl ${summaryBg} text-white flex justify-between items-center`}>
+                <div className="flex flex-col">
+                  <span className="text-[8px] uppercase font-black opacity-60 tracking-widest leading-none mb-1">Calculated</span>
+                  <span className="text-[8px] uppercase font-black opacity-60 tracking-widest leading-none">Duration OB</span>
+                </div>
+                <span className="text-4xl font-black">{results.finalDurOB.toFixed(1)}%</span>
               </div>
-              <div>
-                <p className="text-xs uppercase font-bold text-slate-500">Calculated Capex OB</p>
-                <p className="text-3xl font-black">{results.finalCapOB.toFixed(1)}%</p>
+              <div className={`p-6 rounded-2xl ${summaryBg} text-white flex justify-between items-center`}>
+                <div className="flex flex-col">
+                  <span className="text-[8px] uppercase font-black opacity-60 tracking-widest leading-none mb-1">Calculated</span>
+                  <span className="text-[8px] uppercase font-black opacity-60 tracking-widest leading-none">Capex OB</span>
+                </div>
+                <span className="text-4xl font-black text-emerald-300">{results.finalCapOB.toFixed(1)}%</span>
               </div>
+            </div>
+            <div className="mt-4 p-4 bg-slate-100 rounded-xl border border-slate-200">
+              <p className="text-sm font-black text-slate-500 uppercase tracking-tighter">Project Name: <span className="text-slate-800">{projectName || 'N/A'}</span></p>
             </div>
           </div>
 
@@ -399,13 +424,13 @@
                   <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-8 w-auto" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold tracking-tight">Optimism Bias Estimator</h1>
+                  <h1 className="text-xl font-bold tracking-tight text-white">Optimism Bias Estimator</h1>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${subHeaderBg}`}>{currentCategoryData.name}</span>
                 </div>
               </div>
               <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
                  <input type="text" placeholder="Project Name..." value={projectName} onChange={(e) => setProjectName(e.target.value)} className="px-3 py-1.5 rounded text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-white/50 bg-white/90" />
-                 <div className="flex bg-black/20 p-1 rounded-lg">
+                 <div className="flex bg-black/20 p-1 rounded-lg tab-navigation">
                    <button onClick={() => setActiveTab('projects')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'projects' ? 'bg-white shadow text-slate-900' : 'text-white/70 hover:text-white'}`}>Adjustments</button>
                    <button onClick={() => setActiveTab('reprofiler')} disabled={isOutsourcing} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'reprofiler' ? 'bg-white shadow text-slate-900' : isOutsourcing ? 'text-white/30 cursor-not-allowed' : 'text-white/70 hover:text-white'}`}>Reprofiling</button>
                  </div>
@@ -416,39 +441,49 @@
           </header>
 
           <main className="max-w-6xl mx-auto p-4 md:p-6 pb-24">
-            <div className="grid md:grid-cols-2 gap-6 mb-6 no-print">
-               <Card className="p-4 flex items-center gap-4">
-                  <div className={`p-3 rounded-full ${lightBgClass}`}><currentCategoryData.icon className={`w-6 h-6 ${colorClass}`} /></div>
-                  <div className="flex-1 relative">
-                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Project Category</label>
-                     <div className="flex items-center group">
-                        <select value={category} onChange={handleCategoryChange} className="w-full appearance-none bg-transparent font-semibold text-lg text-slate-800 focus:outline-none cursor-pointer pr-8 z-10">
-                           {Object.values(CATEGORIES).map(cat => (<option key={cat.id} value={cat.id}>{cat.name}</option>))}
-                        </select>
-                        <Icons.ChevronDown className="w-4 h-4 absolute right-0 text-slate-400 pointer-events-none group-hover:text-slate-600 transition-colors" />
-                     </div>
-                  </div>
-               </Card>
-               <Card className="p-4">
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Project Type</label>
-                  <div className="flex flex-wrap gap-3">
-                    {currentCategoryData.types.map(t => (
-                      <button key={t.id} onClick={() => setProjectType(t.id)} className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${projectType === t.id ? `${lightBgClass} ${textClass} ${borderColorClass}` : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>{t.label}</button>
-                    ))}
-                  </div>
-                  {projectType === 'combined' && (
-                     <div className="mt-3 pt-3 border-t border-slate-100">
-                        <div className="flex justify-between text-[10px] font-black text-slate-400 mb-1 uppercase tracking-tighter"><span>Standard ({100-split}%)</span><span>Non-Standard ({split}%)</span></div>
-                        <Slider value={split} onChange={setSplit} colorClass={sliderClass} />
-                     </div>
-                  )}
-               </Card>
-            </div>
+            
+            {/* PAGE 1: ADJUSTMENTS SECTION (Procurement to Environment) */}
+            <div className={`page-one print-visible-section ${activeTab === 'projects' ? 'block' : 'hidden md:hidden'}`}>
+                <div className="grid md:grid-cols-2 gap-6 mb-6 no-print">
+                   <Card className="p-4 flex items-center gap-4">
+                      <div className={`p-3 rounded-full ${lightBgClass}`}><currentCategoryData.icon className={`w-6 h-6 ${colorClass}`} /></div>
+                      <div className="flex-1 relative">
+                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Project Category</label>
+                         <div className="flex items-center group">
+                            <select value={category} onChange={handleCategoryChange} className="w-full appearance-none bg-transparent font-semibold text-lg text-slate-800 focus:outline-none cursor-pointer pr-8 z-10">
+                               {Object.values(CATEGORIES).map(cat => (<option key={cat.id} value={cat.id}>{cat.name}</option>))}
+                            </select>
+                            <Icons.ChevronDown className="w-4 h-4 absolute right-0 text-slate-400 pointer-events-none group-hover:text-slate-600 transition-colors" />
+                         </div>
+                      </div>
+                   </Card>
+                   <Card className="p-4">
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Project Type</label>
+                      <div className="flex flex-wrap gap-3">
+                        {currentCategoryData.types.map(t => (
+                          <button key={t.id} onClick={() => setProjectType(t.id)} className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${projectType === t.id ? `${lightBgClass} ${textClass} ${borderColorClass}` : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>{t.label}</button>
+                        ))}
+                      </div>
+                      {projectType === 'combined' && (
+                         <div className="mt-3 pt-3 border-t border-slate-100 no-print">
+                            <div className="flex justify-between text-[10px] font-black text-slate-400 mb-1 uppercase tracking-tighter">
+                               <span>Standard ({100-split}%)</span>
+                               <span>Non-Standard ({split}%)</span>
+                            </div>
+                            <Slider value={split} onChange={setSplit} colorClass={sliderClass} />
+                         </div>
+                      )}
+                      {projectType === 'combined' && (
+                        <div className="hidden print-only mt-2 text-xs font-bold text-slate-600 uppercase tracking-widest">
+                          Split: {100-split}% Standard / {split}% Non-Standard
+                        </div>
+                      )}
+                   </Card>
+                </div>
 
-            <div className={`${activeTab === 'projects' ? 'block' : 'hidden'} print-visible`}>
-                <div className="grid lg:grid-cols-2 gap-6">
+                <div className="card-grid grid lg:grid-cols-2 gap-6">
                   {Object.entries(currentCategoryData.factors).map(([areaKey, factors]) => (
-                    <Card key={areaKey} className="p-5">
+                    <Card key={areaKey} className={`p-5 print-shadow ${areaKey === 'external_influences' ? 'external-influences-card' : ''}`}>
                         <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-4">
                            <h3 className="font-bold text-slate-800">{RISK_AREAS_TITLES[areaKey]}</h3>
                            <div className="flex gap-2 no-print">
@@ -462,13 +497,21 @@
                             const active = activeFactors[id] !== false; 
                             const mit = mitigations[id] || 0;
                             return (
-                              <div key={idx} className={`${active ? 'opacity-100' : 'opacity-40'}`}>
+                              <div key={idx} className={`${active ? 'opacity-100' : 'opacity-40'} print-visible-section`}>
                                 <div className="flex items-start gap-3">
-                                  <button onClick={() => setActiveFactors(p => ({ ...p, [id]: !p[id] }))} className={`mt-0.5 no-print ${active ? colorClass : 'text-slate-300'}`}>{active ? <Icons.CheckSquare className="w-5 h-5" /> : <Icons.Square className="w-5 h-5" />}</button>
+                                  <button 
+                                    onClick={() => setActiveFactors(p => ({ ...p, [id]: !p[id] }))} 
+                                    className={`mt-0.5 no-print transition-colors ${active ? colorClass : 'text-slate-300 hover:text-slate-400'}`}
+                                  >
+                                    {active ? <Icons.CheckSquare className="w-5 h-5" /> : <Icons.Square className="w-5 h-5" />}
+                                  </button>
+                                  <div className={`mt-0.5 hidden print-only ${active ? colorClass : 'text-slate-200'}`}>
+                                    {active ? <Icons.CheckSquare className="w-4 h-4" /> : <Icons.Square className="w-4 h-4" />}
+                                  </div>
                                   <div className="flex-1">
                                     <div className="flex justify-between items-start mb-1">
                                       <label className="text-sm font-semibold text-slate-700 leading-tight">{factor.name}</label>
-                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${mit === 100 ? 'bg-green-100 text-green-700' : lightBgClass + ' ' + textClass}`}>
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${mit === 100 ? 'bg-green-100 text-green-700' : lightBgClass + ' ' + textClass}`}>
                                         {mit}% Mitigated
                                       </span>
                                     </div>
@@ -484,10 +527,11 @@
                 </div>
             </div>
 
-            {(!isOutsourcing) && (
-              <div className={`${activeTab === 'reprofiler' ? 'block' : 'hidden'} print-visible page-break`}>
-                <div className="grid md:grid-cols-2 gap-6 mb-6">
-                  <Card className="p-5">
+            {/* PAGE 2: EXTERNAL INFLUENCES + PROGRAMME PARAMETERS */}
+            <div className={`page-two print-visible-section ${(!isOutsourcing) ? 'block' : 'hidden md:hidden'}`}>
+                {/* External Influences will force a break here in print via CSS .external-influences-card */}
+                <div className="grid md:grid-cols-2 gap-6 mb-6 print-gap no-print">
+                  <Card className="p-5 print-shadow">
                     <SectionHeader title="Programme Parameters" icon={Icons.Calendar} colorClass={colorClass} />
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Start Year</label><select value={startYear} onChange={(e) => setStartYear(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print">{[0,1,2,3,4,5].map(y => <option key={y} value={y}>Year {y}</option>)}</select></div>
@@ -495,41 +539,35 @@
                     </div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Original Duration (Months)</label><input type="number" value={originalDuration} onChange={(e) => setOriginalDuration(Number(e.target.value))} className="w-full border-slate-200 rounded p-1 text-sm no-print" />
                   </Card>
-                  <Card className="p-5">
+                  <Card className="p-5 print-shadow">
                     <SectionHeader title="Overrun Adjustments" icon={Icons.TrendingUp} colorClass={colorClass} />
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium flex items-center gap-2">
-                          <input type="checkbox" checked={linkTimeOB} onChange={(e) => setLinkTimeOB(e.target.checked)} className="no-print" />
+                          <input type="checkbox" checked={linkTimeOB} onChange={(e) => setLinkTimeOB(e.target.checked)} className="no-print h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
                           Link Duration OB
                         </span>
-                        <input type="number" disabled={linkTimeOB} value={linkTimeOB ? results.finalDurOB.toFixed(1) : manualTimeOB} onChange={(e) => setManualTimeOB(Number(e.target.value))} className="w-20 text-right text-sm border-slate-200 rounded p-1" />
+                        <div className="text-right"><span className="text-lg font-black">{linkTimeOB ? results.finalDurOB.toFixed(1) : manualTimeOB}%</span></div>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium flex items-center gap-2">
-                          <input type="checkbox" checked={linkCostOB} onChange={(e) => setLinkCostOB(e.target.checked)} className="no-print" />
+                          <input type="checkbox" checked={linkCostOB} onChange={(e) => setLinkCostOB(e.target.checked)} className="no-print h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
                           Link Capex OB
                         </span>
-                        <input type="number" disabled={linkCostOB} value={linkCostOB ? results.finalCapOB.toFixed(1) : manualCostOB} onChange={(e) => setManualCostOB(Number(e.target.value))} className="w-20 text-right text-sm border-slate-200 rounded p-1" />
+                        <div className="text-right"><span className="text-lg font-black text-emerald-600">{linkCostOB ? results.finalCapOB.toFixed(1) : manualCostOB}%</span></div>
                       </div>
                     </div>
                   </Card>
                 </div>
+            </div>
 
-                <Card className="p-6 mb-6">
-                  <SectionHeader title="Initial Budget Profile (Annual)" icon={Icons.Euro} colorClass={colorClass} />
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                       <thead><tr className="text-[10px] text-slate-400 uppercase">{originalCosts.map((_, i) => <th key={i} className="p-2 text-left">Year {i}</th>)}<th className="p-2 text-right">Total</th></tr></thead>
-                       <tbody><tr>{originalCosts.map((v, i) => (<td key={i} className="p-1"><input type="number" value={v} onChange={(e) => { const n = [...originalCosts]; n[i] = Number(e.target.value); setOriginalCosts(n); }} className="w-full border border-slate-100 rounded text-right p-1 no-print" /></td>))}<td className="p-2 text-right font-bold">€{reprofileResults.totalOriginalCost.toLocaleString()}</td></tr></tbody>
-                    </table>
-                  </div>
-                </Card>
-
-                <Card className="p-6 mt-6 overflow-x-auto"><SectionHeader title="Cumulative Expenditure Profile (S-Curve)" icon={Icons.TrendingUp} colorClass={colorClass} /><SCurveChart originalData={reprofileResults.originalMonthly} modelledData={reprofileResults.revisedMonthly} themeColor={hexColor} /></Card>
-
-                <div className="grid lg:grid-cols-3 gap-6 mt-6">
-                  <Card noBg={true} className="p-6 lg:col-span-1 bg-slate-900 text-white border-none shadow-lg">
+            {/* PAGE 3: MODELLED IMPACT + BUDGET + REPROFILING + S-CURVE */}
+            <div className={`page-three-start print-visible-section ${(!isOutsourcing) ? 'block' : 'hidden md:hidden'}`}>
+                {/* Print Only Gap */}
+                <div className="hidden print-only mb-6"></div>
+                
+                <div className="grid lg:grid-cols-3 gap-6 mb-6">
+                  <Card noBg={true} className="p-6 lg:col-span-1 bg-slate-900 text-white border-none shadow-lg print-shadow">
                      <h3 className="font-bold text-white mb-6 uppercase tracking-widest text-[11px] border-b border-white/10 pb-2">Modelled Impact</h3>
                      <div className="space-y-6">
                        <div>
@@ -550,34 +588,71 @@
                        </div>
                      </div>
                   </Card>
-                  <Card className="p-6 lg:col-span-2 overflow-x-auto">
-                    <SectionHeader title="Reprofiled Plan" icon={Icons.BarChart3} colorClass={colorClass} />
-                    <table className="w-full text-sm">
-                       <thead><tr className="text-[10px] text-slate-400 uppercase border-b border-slate-100">{reprofileResults.revisedYearly.map((_, i) => <th key={i} className="p-2 text-right">Year {i}</th>)}</tr></thead>
-                       <tbody><tr className="font-mono">{reprofileResults.revisedYearly.map((v, i) => <td key={i} className="p-2 text-right text-slate-600">{v > 0 ? v.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '-'}</td>)}</tr></tbody>
-                    </table>
+                  
+                  <Card className="p-6 lg:col-span-2 print-shadow">
+                    <SectionHeader title="Initial Budget Profile (Annual)" icon={Icons.Euro} colorClass={colorClass} />
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                         <thead><tr className="text-[10px] text-slate-400 uppercase">{originalCosts.map((_, i) => <th key={i} className="p-2 text-left">Year {i}</th>)}<th className="p-2 text-right">Total</th></tr></thead>
+                         <tbody><tr>{originalCosts.map((v, i) => (<td key={i} className="p-1"><input type="number" value={v} onChange={(e) => { const n = [...originalCosts]; n[i] = Number(e.target.value); setOriginalCosts(n); }} className="w-full border border-slate-100 rounded text-right p-1 no-print" /><span className="hidden print-only text-right font-bold block">{v > 0 ? v.toLocaleString() : '-'}</span></td>))}<td className="p-2 text-right font-bold text-slate-800">€{reprofileResults.totalOriginalCost.toLocaleString()}</td></tr></tbody>
+                      </table>
+                    </div>
                   </Card>
                 </div>
-              </div>
-            )}
+
+                <Card className="p-6 mb-6 overflow-x-auto print-shadow">
+                  <SectionHeader title="Reprofiled Plan" icon={Icons.BarChart3} colorClass={colorClass} />
+                  <table className="w-full text-sm">
+                     <thead>
+                        <tr className="text-[10px] text-slate-400 uppercase border-b border-slate-100">
+                           {reprofileResults.revisedYearly.map((_, i) => <th key={i} className="p-2 text-right">Year {i}</th>)}
+                           <th className="p-2 text-right text-slate-800 font-bold">Total</th>
+                        </tr>
+                     </thead>
+                     <tbody>
+                        <tr className="font-mono">
+                           {reprofileResults.revisedYearly.map((v, i) => <td key={i} className="p-2 text-right text-slate-600 font-bold">{v > 0 ? v.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '-'}</td>)}
+                           <td className="p-2 text-right text-slate-900 font-black">€{reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                        </tr>
+                     </tbody>
+                  </table>
+                </Card>
+
+                <Card className="p-8 print-shadow">
+                  <SectionHeader title="Cumulative Expenditure Profile (S-Curve)" icon={Icons.TrendingUp} colorClass={colorClass} />
+                  <SCurveChart originalData={reprofileResults.originalMonthly} modelledData={reprofileResults.revisedMonthly} themeColor={hexColor} />
+                </Card>
+
+                {/* Print Signature Block Consolidated at end of Page 3 */}
+                <div className="hidden print-only print-signature-block flex justify-between items-end">
+                  <div>
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Assessor Signature</p>
+                    <div className="h-10 border-b-2 border-slate-200 w-64 mt-2"></div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[8px] text-slate-400 font-bold uppercase tracking-tight">Created by Dave Maher</p>
+                    <p className="text-[8px] text-slate-400 mt-0.5">HSE Optimism Bias Logic Controller &copy; 2026</p>
+                  </div>
+                </div>
+            </div>
             
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-100 to-transparent pointer-events-none z-40 no-print fixed-summary">
                <Card noBg className={`max-w-6xl mx-auto ${summaryBg} text-white border-none shadow-2xl p-4 md:p-6 pointer-events-auto`}>
                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                   <div><h2 className="text-lg font-bold text-white tracking-tight">Calculated Optimism Bias</h2><p className="text-[10px] uppercase font-black text-white/50 tracking-widest">{currentCategoryData.name}</p></div>
+                   <div><h2 className="text-lg font-bold text-white tracking-tight text-white">Calculated Optimism Bias</h2><p className="text-[10px] uppercase font-black text-white/50 tracking-widest">{currentCategoryData.name}</p></div>
                    
                    {activeTab === 'projects' ? (
                      <div className="flex gap-12">
-                       <div className="text-center"><div className="text-3xl font-black">{results.finalDurOB.toFixed(1)}%</div><div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">Duration OB</div></div>
+                       <div className="text-center"><div className="text-3xl font-black text-white">{results.finalDurOB.toFixed(1)}%</div><div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">Duration OB</div></div>
                        <div className="w-px bg-white/20 self-stretch"></div>
-                       <div className="text-center"><div className="text-3xl font-black text-green-300">{results.finalCapOB.toFixed(1)}%</div><div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">{isOutsourcing ? 'OpEx OB' : 'CapEx OB'}</div></div>
+                       <div className="text-center"><div className="text-3xl font-black text-emerald-300">{results.finalCapOB.toFixed(1)}%</div><div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">{isOutsourcing ? 'OpEx OB' : 'CapEx OB'}</div></div>
                      </div>
                    ) : (
                      <div className="flex gap-12">
                        <div className="text-center">
                          <div className="flex items-baseline justify-center gap-2">
                            <span className="text-xs text-white/40 line-through tracking-tighter">{originalDuration}</span>
-                           <div className="text-3xl font-black">{reprofileResults.revisedDuration}</div>
+                           <div className="text-3xl font-black text-white">{reprofileResults.revisedDuration}</div>
                          </div>
                          <div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">Duration (m)</div>
                        </div>
@@ -585,7 +660,7 @@
                        <div className="text-center">
                          <div className="flex items-baseline justify-center gap-2">
                            <span className="text-xs text-white/40 line-through tracking-tighter">€{reprofileResults.totalOriginalCost.toLocaleString()}</span>
-                           <div className="text-3xl font-black text-green-300">€{reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                           <div className="text-3xl font-black text-emerald-300">€{reprofileResults.totalRevisedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
                          </div>
                          <div className="text-[10px] uppercase tracking-wider text-white/40 mt-1 font-black">Total Cost</div>
                        </div>
@@ -598,9 +673,10 @@
             <footer className="mt-20 pt-8 border-t border-slate-200 text-center no-print pb-32">
               <p className="text-slate-600 font-bold text-sm">Dave Maher</p>
               <p className="text-[10px] text-slate-400 mt-2 max-w-lg mx-auto leading-relaxed">
-                All intellectual property rights associated with this application, its calculation logic, and its interface design belong to Dave Maher. &copy; {new Date().getFullYear()} HSE Optimism Bias Calculator
+                All intellectual property rights associated with this application, its calculation logic, and its interface design belong to Dave Maher. &copy; 2026 HSE Optimism Bias Calculator
               </p>
             </footer>
+
           </main>
         </div>
       );
