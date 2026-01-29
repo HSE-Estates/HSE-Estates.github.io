@@ -48,8 +48,9 @@
       .bg-slate-900 { background-color: #0f172a !important; color: white !important; }
       .print-visible-section { display: block !important; opacity: 1 !important; visibility: visible !important; }
       .external-influences-card { page-break-before: always !important; margin-top: 0 !important; }
-      .print-page-3-break { page-break-before: always !important; margin-top: 0 !important; }
-      .print-page-4-break { page-break-before: always !important; margin-top: 0 !important; }
+      /* Added 2cm margin to top of page 3 and 4 breaks to prevent cutoff */
+      .print-page-3-break { page-break-before: always !important; margin-top: 2cm !important; }
+      .print-page-4-break { page-break-before: always !important; margin-top: 2cm !important; }
       header, .no-print, .fixed-summary, input[type=range], button, .tab-navigation { display: none !important; }
       .print-only { display: block !important; }
       .card-grid { display: grid !important; grid-template-columns: repeat(2, 1fr) !important; gap: 0.75rem !important; }
