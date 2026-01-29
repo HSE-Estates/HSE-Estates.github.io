@@ -1,1 +1,927 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HSE Capital & Estates Cash Flow</title>
+  
+  <link rel="icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Chart.js & Plugins -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+  
+  <!-- React & Babel -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
 
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+    
+    body { 
+      font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+      -webkit-font-smoothing: antialiased;
+      background-color: #f8fafc;
+    }
+    
+    /* HSE Brand Colours */
+    :root {
+      --hse-primary: #006858; /* HSE Green */
+      --hse-secondary: #00bfa5;
+    }
+
+    /* Custom Scrollbar */
+    .custom-scroll::-webkit-scrollbar { width: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
+    
+    /* Range Slider Styling */
+    input[type=range] { -webkit-appearance: none; background: transparent; }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%;
+      background: var(--hse-primary); margin-top: -8px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); cursor: grab;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px;
+    }
+
+    /* Print Styles - Enhanced for Report Quality */
+    @media print {
+      @page { size: landscape; margin: 1.25cm; } 
+      
+      body { 
+        background: white; 
+        -webkit-print-color-adjust: exact !important; 
+        print-color-adjust: exact !important;
+      }
+
+      /* Allow the green header to print */
+      nav { 
+        display: block !important; 
+        margin-bottom: 20px; 
+        border-radius: 8px; /* Rounds the corners since it no longer touches edges */
+      }
+
+      /* Hide interactive UI Elements */
+      .no-print, button, .modal-overlay { display: none !important; }
+      
+      /* Expand Containers */
+      .overflow-y-auto { overflow: visible !important; height: auto !important; max-height: none !important; }
+      .custom-scroll { overflow: visible !important; height: auto !important; max-height: none !important; }
+      
+      /* Styling Adjustments for Report */
+      .shadow-sm, .shadow-lg { box-shadow: none !important; border: 1px solid #cbd5e1 !important; }
+      .bg-slate-50 { background-color: #f8fafc !important; }
+      
+      /* Make Inputs look like text */
+      input { 
+        background: transparent !important; 
+        border: none !important; 
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        font-weight: 600 !important;
+      }
+      
+      /* Ensure Charts Resize */
+      canvas { max-width: 100% !important; max-height: 400px !important; }
+      
+      /* Force Page Breaks */
+      .print-break-avoid { break-inside: avoid; }
+      
+      /* Reset main padding since page margin handles it now */
+      main, footer { padding: 0 !important; width: 100% !important; max-width: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef, useLayoutEffect } = React;
+
+    // --- ICONS COMPONENT (Optimized) ---
+    const Icon = ({ name, size = 18, className = "" }) => {
+      return <i data-lucide={name} width={size} height={size} className={className}></i>;
+    };
+
+    // --- HELPER: FORMAT CURRENCY ---
+    const formatEuro = (amount) => {
+      return new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(amount);
+    };
+
+    // --- HELPER: S-CURVE GENERATOR ---
+    const generateSLine = (total, periods) => {
+      const data = [];
+      // Logistic function for S-Curve
+      for (let i = 1; i <= periods; i++) {
+        const x = (i / periods) * 10 - 5; 
+        const val = 1 / (1 + Math.exp(-x));
+        data.push(val);
+      }
+      const lastVal = data[data.length - 1];
+      const normalized = data.map(v => (v / lastVal) * total);
+      return { cumulative: normalized, periodic: normalized.map((v, i) => i === 0 ? v : v - normalized[i - 1]) };
+    };
+
+    // --- COMPONENT: MONEY INPUT (Handles Commas) ---
+    const MoneyInput = ({ value, onChange, className, placeholder }) => {
+      const [localValue, setLocalValue] = useState('');
+      const inputRef = useRef(null);
+
+      useEffect(() => {
+        if (document.activeElement !== inputRef.current) {
+            if (value === undefined || value === null || value === '') {
+                setLocalValue('');
+            } else {
+                setLocalValue(Number(value).toLocaleString('en-IE'));
+            }
+        }
+      }, [value]);
+
+      const handleChange = (e) => {
+        const raw = e.target.value;
+        setLocalValue(raw); 
+
+        const cleanVal = raw.replace(/,/g, '');
+        
+        if (cleanVal === '') {
+             onChange(0);
+        } else if (!isNaN(cleanVal)) {
+             onChange(parseFloat(cleanVal));
+        }
+      };
+
+      const handleBlur = () => {
+         const cleanVal = localValue.replace(/,/g, '');
+         if (!isNaN(cleanVal) && cleanVal !== '') {
+             setLocalValue(Number(cleanVal).toLocaleString('en-IE'));
+         } else {
+             setLocalValue('');
+         }
+      };
+
+      return (
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode="decimal"
+          value={localValue}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          className={className}
+          placeholder={placeholder}
+        />
+      );
+    };
+
+    // --- MODAL COMPONENT ---
+    const Modal = ({ isOpen, onClose, title, children }) => {
+      if (!isOpen) return null;
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 modal-overlay">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
+            <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
+              <h3 className="font-bold text-slate-800">{title}</h3>
+              <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-full transition"><Icon name="x" size={20} /></button>
+            </div>
+            <div className="p-6 max-h-[80vh] overflow-y-auto custom-scroll">
+              {children}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // --- TOOLTIP COMPONENT ---
+    const Tooltip = ({ text }) => (
+      <div className="group relative inline-block ml-2 cursor-help no-print">
+        <Icon name="info" size={14} className="text-slate-400 hover:text-[#006858]" />
+        <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-[10px] rounded w-48 text-center z-10 shadow-lg pointer-events-none">
+          {text}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+        </div>
+      </div>
+    );
+
+    function App() {
+      // --- STATE & DATA ---
+      const STORAGE_KEY = 'HSE_CASHFLOW_V4';
+      
+      const [config, setConfig] = useState(() => {
+        if (window.HSE_PRELOADED_DATA && window.HSE_PRELOADED_DATA.config) return window.HSE_PRELOADED_DATA.config;
+        const saved = localStorage.getItem(STORAGE_KEY);
+        return saved ? JSON.parse(saved) : {
+          projectName: 'Strategic Capital Project A',
+          budget: 2500000,
+          duration: 24,
+          fundingMonthly: 120000,
+          contingencyPercent: 10,
+          milestones: [{ month: 6, label: 'Planning Permission' }, { month: 12, label: 'Shell Complete' }],
+          eacMethod: 'plan_adherence'
+        };
+      });
+
+      // ACTUALS STATE
+      const [actuals, setActuals] = useState(() => {
+        if (window.HSE_PRELOADED_DATA && window.HSE_PRELOADED_DATA.actuals) return window.HSE_PRELOADED_DATA.actuals;
+        
+        const saved = localStorage.getItem(STORAGE_KEY + '_ACTUALS');
+        if (saved) {
+             const parsed = JSON.parse(saved);
+             if (parsed.length > 0 && typeof parsed[0] === 'number') {
+                 return parsed.map(val => ({ value: val, comment: '' }));
+             }
+             return parsed;
+        }
+
+        const oldSaved = localStorage.getItem('HSE_CASHFLOW_V3_ACTUALS');
+        if (oldSaved) {
+            const parsed = JSON.parse(oldSaved);
+            return parsed.map(val => ({ value: val, comment: '' }));
+        }
+
+        return [
+            { value: 85000, comment: 'Initial Mobilisation' },
+            { value: 92000, comment: '' },
+            { value: 105000, comment: '' },
+            { value: 110000, comment: '' }
+        ];
+      });
+
+      const [progress, setProgress] = useState(() => {
+        if (window.HSE_PRELOADED_DATA && window.HSE_PRELOADED_DATA.progress) return window.HSE_PRELOADED_DATA.progress;
+        const saved = localStorage.getItem(STORAGE_KEY + '_PROGRESS');
+        return saved ? Number(saved) : 20;
+      });
+
+      const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+      
+      const [activeTab, setActiveTab] = useState(() => {
+         if (window.HSE_PRELOADED_DATA && window.HSE_PRELOADED_DATA.activeTab) return window.HSE_PRELOADED_DATA.activeTab;
+         return 'logs';
+      });
+
+      // Persist Data
+      useEffect(() => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+        localStorage.setItem(STORAGE_KEY + '_ACTUALS', JSON.stringify(actuals));
+        localStorage.setItem(STORAGE_KEY + '_PROGRESS', progress);
+      }, [config, actuals, progress]);
+
+      // Optimized Icon Loading
+      useEffect(() => {
+        if (window.lucide) window.lucide.createIcons();
+      }, [activeTab, isSettingsOpen, actuals.length, config.milestones.length, config]);
+
+      // --- CALCULATIONS ---
+      const baseline = useMemo(() => generateSLine(config.budget, config.duration), [config.budget, config.duration]);
+      
+      const stats = useMemo(() => {
+        const ac = actuals.reduce((a, b) => a + (b.value || 0), 0); 
+        const monthIndex = actuals.length - 1;
+        const pv = monthIndex >= 0 ? baseline.cumulative[monthIndex] : 0; 
+        const ev = config.budget * (progress / 100); 
+        
+        const cpiRaw = ac > 0 ? ev / ac : 1; 
+        const cpi = Math.min(Math.max(cpiRaw, 0.1), 10);
+        const spi = pv > 0 ? ev / pv : 1; 
+        
+        let eac = 0;
+        let eacLabel = "";
+
+        if (config.eacMethod === 'linear_burn') {
+            const avgBurn = actuals.length > 0 ? ac / actuals.length : 0;
+            const remainingMonths = Math.max(config.duration - actuals.length, 0);
+            eac = ac + (avgBurn * remainingMonths);
+            eacLabel = "Linear Trend";
+        } else if (config.eacMethod === 'standard_cpi') {
+             eac = ac + (config.budget - ev) / cpi;
+             eacLabel = "Performance (CPI)";
+        } else {
+            eac = ac + (config.budget - ev);
+            eacLabel = "Plan Adherence";
+        }
+
+        const variance = eac - config.budget;
+        const variancePercent = (variance / config.budget) * 100;
+        
+        let statusColor = 'text-emerald-600';
+        let statusText = 'On Track';
+        
+        if (variancePercent > config.contingencyPercent) {
+          statusColor = 'text-red-600';
+          statusText = 'Breach Likely';
+        } else if (variancePercent > 0) {
+          statusColor = 'text-amber-500';
+          statusText = 'Over Budget';
+        } else if (variancePercent < -5) {
+          statusText = 'Under Spend';
+        }
+
+        return { ac, pv, ev, cpi, spi, eac, eacLabel, variance, variancePercent, statusColor, statusText };
+      }, [actuals, baseline, config, progress]);
+
+      // --- TIME FORECAST ALERT LOGIC ---
+      const timeAlert = useMemo(() => {
+        if (stats.spi >= 0.98 || stats.spi === 0) return null;
+
+        const projectedDuration = config.duration / stats.spi;
+        const delayMonths = projectedDuration - config.duration;
+
+        if (delayMonths < 1.0) return null;
+
+        return {
+            monthsLate: Math.round(delayMonths),
+            newDuration: Math.round(projectedDuration)
+        };
+      }, [stats.spi, config.duration]);
+
+      // --- CHART LOGIC ---
+      const chartRef = useRef(null);
+
+      useEffect(() => {
+        const ctx = document.getElementById('mainChart');
+        if (!ctx) return;
+        if (chartRef.current) chartRef.current.destroy();
+
+        const labels = Array.from({ length: config.duration }, (_, i) => `Month ${i + 1}`);
+        
+        const actualsPlot = new Array(config.duration).fill(null);
+        let runSum = 0;
+        actuals.forEach((item, i) => actualsPlot[i] = (runSum += item.value));
+
+        const forecastPlot = new Array(config.duration).fill(null);
+        const lastActualIndex = actuals.length - 1;
+        const remainingMonths = config.duration - actuals.length;
+
+        if (remainingMonths > 0) {
+            forecastPlot[lastActualIndex] = stats.ac; 
+            
+            const remainingCostToForecast = stats.eac - stats.ac;
+            const futureBaselinePeriodic = baseline.periodic.slice(actuals.length);
+            const sumFutureBaseline = futureBaselinePeriodic.reduce((a,b) => a+b, 0);
+
+            let accumulatedForecast = stats.ac;
+            
+            for(let i=0; i < remainingMonths; i++) {
+                const monthIndex = actuals.length + i;
+                const baselineShare = sumFutureBaseline > 0 ? (futureBaselinePeriodic[i] / sumFutureBaseline) : (1/remainingMonths);
+                accumulatedForecast += remainingCostToForecast * baselineShare;
+                forecastPlot[monthIndex] = accumulatedForecast;
+            }
+        }
+
+        const milestoneAnnotations = {};
+        config.milestones.forEach((m, i) => {
+            milestoneAnnotations[`m${i}`] = {
+                type: 'line', xMin: m.month - 1, xMax: m.month - 1,
+                borderColor: '#cbd5e1', borderDash: [4, 4], borderWidth: 2,
+                label: { display: true, content: m.label, position: 'start', backgroundColor: '#f1f5f9', color: '#64748b', font: {size: 10} }
+            };
+        });
+
+        chartRef.current = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              { label: 'Baseline (Planned)', data: baseline.cumulative, borderColor: '#94a3b8', borderDash: [5,5], borderWidth: 2, pointRadius: 0, tension: 0.4 },
+              { label: 'Actual Spend', data: actualsPlot, borderColor: '#006858', backgroundColor: '#006858', borderWidth: 3, pointRadius: 4, tension: 0.1 },
+              { label: `Forecast (${stats.eacLabel})`, data: forecastPlot, borderColor: '#f59e0b', borderDash: [2,2], borderWidth: 2, pointRadius: 0, tension: 0.4 }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { position: 'bottom' },
+              tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${formatEuro(c.raw)}` } },
+              annotation: { annotations: milestoneAnnotations }
+            },
+            scales: {
+              y: { ticks: { callback: (v) => '€' + (v/1000000).toFixed(1) + 'm' }, grid: { color: '#f1f5f9' } },
+              x: { grid: { display: false } }
+            }
+          }
+        });
+
+      }, [config, actuals, stats, baseline]);
+
+      // --- ACTIONS ---
+      const handleDownloadCSV = () => {
+        const headers = ["Month", "Planned Value", "Actual Cost", "Cumulative Actual", "Comment"];
+        let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n";
+        
+        let cumActual = 0;
+        baseline.cumulative.forEach((pv, idx) => {
+           const item = actuals[idx];
+           const ac = item ? item.value : 0;
+           if(item) cumActual += ac;
+           
+           const row = [
+             `Month ${idx+1}`, 
+             pv.toFixed(2), 
+             item !== undefined ? ac : "", 
+             item !== undefined ? cumActual : "",
+             item !== undefined ? (item.comment || "").replace(/,/g, ' ') : "" 
+           ];
+           csvContent += row.join(",") + "\n";
+        });
+        
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `${config.projectName.replace(/\s+/g, '_')}_Cashflow.csv`);
+        document.body.appendChild(link);
+        link.click();
+      };
+
+      const handleSaveHTML = () => {
+        // 1. Serialize Data Safely
+        const data = { config, actuals, progress, activeTab };
+        const safeJson = JSON.stringify(data).replace(/<\/script>/g, '<\\/script>');
+        
+        // 2. Clone the DOM
+        const clone = document.documentElement.cloneNode(true);
+        
+        // 3. Remove old script if exists in clone
+        const oldScript = clone.querySelector('script#hse-preloaded-data');
+        if (oldScript) oldScript.remove();
+        
+        // 4. Wipe the Root Div (This cleans the display so React can re-render fresh)
+        const root = clone.querySelector('#root');
+        if (root) root.innerHTML = '';
+        
+        // 5. Create New Script
+        const newScript = document.createElement('script');
+        newScript.id = 'hse-preloaded-data';
+        newScript.textContent = `window.HSE_PRELOADED_DATA = ${safeJson};`;
+        
+        // 6. Inject into Clone Head
+        const head = clone.querySelector('head');
+        if (head) {
+            head.appendChild(newScript);
+        } else {
+            clone.appendChild(newScript);
+        }
+        
+        // 7. Download
+        const finalHtml = '<!DOCTYPE html>\n' + clone.outerHTML;
+        
+        const blob = new Blob([finalHtml], {type: 'text/html'});
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${config.projectName.replace(/[^a-z0-9]/gi, '_')}_HSE_Project.html`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      };
+
+      const handleFactoryReset = () => {
+         if (!confirm("FULL WIPE: This will delete the Project Name, Budget, Duration, and ALL data. \n\nAre you sure you want to start completely fresh?")) return;
+
+         const emptyConfig = {
+            projectName: 'New Project',
+            budget: 0,
+            duration: 12,
+            fundingMonthly: 0,
+            contingencyPercent: 0,
+            milestones: [],
+            eacMethod: 'plan_adherence'
+         };
+         setConfig(emptyConfig);
+         setActuals([]);
+         setProgress(0);
+         setIsSettingsOpen(false);
+      };
+
+      const handleClearTracked = () => {
+         if(!confirm('Reset all actuals and progress? (Project settings will remain)')) return;
+         setActuals([]); 
+         setProgress(0); 
+         setIsSettingsOpen(false);
+      }
+
+      const updateActualValue = (index, val) => {
+        const newActuals = [...actuals];
+        newActuals[index] = { ...newActuals[index], value: Number(val) };
+        setActuals(newActuals);
+      };
+
+      const updateActualComment = (index, text) => {
+        const newActuals = [...actuals];
+        newActuals[index] = { ...newActuals[index], comment: text };
+        setActuals(newActuals);
+      };
+
+      const addMonth = () => {
+          if (actuals.length < config.duration) {
+              const nextMonthIndex = actuals.length;
+              const suggestedValue = baseline.periodic[nextMonthIndex];
+              setActuals([...actuals, { value: Math.round(suggestedValue), comment: '' }]);
+          }
+      };
+
+      return (
+        <div className="min-h-screen pb-20 print:pb-0">
+          
+          {/* TOP NAV */}
+          <nav className="bg-[#006858] text-white px-6 py-4 shadow-lg">
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+              {/* LEFT: Logo & Titles */}
+              <div className="flex items-center gap-4 w-full md:w-auto">
+                <div className="bg-white p-1.5 rounded-lg shrink-0">
+                   <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-8 md:h-10" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold leading-tight">HSE Capital & Estates</h1>
+                  <p className="text-xs text-emerald-100 opacity-80 uppercase tracking-widest">Cash Flow Analysis</p>
+                </div>
+              </div>
+              {/* RIGHT: Buttons - Hidden on Print */}
+              <div className="flex items-center gap-2 w-full md:w-auto justify-end print:hidden">
+                <button onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition border border-white/10">
+                  <Icon name="settings" size={16} /> <span className="hidden sm:inline">Settings</span>
+                </button>
+                <button onClick={handleSaveHTML} className="flex items-center gap-2 px-3 py-2 bg-emerald-700 hover:bg-emerald-600 rounded-lg text-sm font-medium transition border border-white/20 shadow-lg">
+                  <Icon name="save" size={16} /> <span className="hidden sm:inline">Save Project</span>
+                </button>
+                <button onClick={() => window.print()} className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition border border-white/10" title="Print Report">
+                  <Icon name="printer" size={18} />
+                </button>
+              </div>
+            </div>
+          </nav>
+
+          <main className="max-w-7xl mx-auto p-6 space-y-6">
+            
+            {/* PROJECT HEADER (Print Friendly) */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-slate-200 pb-4">
+               <div className="flex items-center gap-4">
+                  {/* Print-only Logo REMOVED - Using main nav now */}
+                  <div>
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Project Control</span>
+                      <h2 className="text-2xl font-black text-slate-800">{config.projectName}</h2>
+                  </div>
+               </div>
+               <div className="text-left mt-2 md:mt-0">
+                  <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">Report Date</div>
+                  <div className="font-bold text-slate-700">{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+               </div>
+            </div>
+
+            {/* KEY METRICS CARDS */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+               <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 print-shadow-none print-break-avoid">
+                  <div className="flex justify-between items-start mb-2">
+                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Budget (BAC)</span>
+                     <Icon name="briefcase" size={16} className="text-slate-300" />
+                  </div>
+                  <div className="text-2xl font-bold text-slate-800">{formatEuro(config.budget)}</div>
+                  <div className="text-xs text-slate-500 mt-1">Duration: {config.duration} Months</div>
+               </div>
+               
+               <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 print-shadow-none print-break-avoid relative">
+                  <div className={`absolute top-0 right-0 p-2 opacity-10 ${stats.variancePercent > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                      <Icon name="trending-up" size={48} />
+                  </div>
+                  <div className="flex justify-between items-start mb-2">
+                     <div className="flex items-center">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Forecast (EAC)</span>
+                        <Tooltip text="Estimated cost at completion based on chosen forecasting method." />
+                     </div>
+                  </div>
+                  <div className={`text-2xl font-bold ${stats.statusColor}`}>{formatEuro(stats.eac)}</div>
+                  <div className="text-xs font-bold mt-1 flex items-center gap-1">
+                      <span className={stats.variance > 0 ? 'text-red-600' : 'text-emerald-600'}>
+                         {stats.variance > 0 ? '+' : ''}{stats.variancePercent.toFixed(1)}%
+                      </span>
+                      <span className="text-slate-400 font-normal">Variance ({stats.eacLabel})</span>
+                  </div>
+               </div>
+
+               <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 print-shadow-none print-break-avoid">
+                  <div className="flex justify-between items-start mb-2">
+                     <div className="flex items-center">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Cost Efficiency (CPI)</span>
+                        <Tooltip text="Value received for every €1 spent. >1 is good. Low CPI may indicate billing lag or overspend." />
+                     </div>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                      <div className={`text-2xl font-bold ${stats.cpi < 0.95 ? 'text-red-500' : 'text-emerald-600'}`}>
+                        {stats.cpi.toFixed(2)}
+                      </div>
+                      <span className="text-xs text-slate-400">Target: 1.00</span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-1.5 mt-3 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${stats.cpi < 1 ? 'bg-red-400' : 'bg-emerald-500'}`} style={{width: `${Math.min(stats.cpi * 50, 100)}%`}}></div>
+                  </div>
+               </div>
+
+               <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 print-shadow-none print-break-avoid">
+                  <div className="flex justify-between items-start mb-2">
+                     <div className="flex items-center">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Schedule (SPI)</span>
+                        <Tooltip text="Progress achieved vs planned. Below 1.00 means behind schedule." />
+                     </div>
+                  </div>
+                  <div className="text-2xl font-bold text-blue-600">{stats.spi.toFixed(2)}</div>
+                  <div className="text-xs text-slate-500 mt-1">Based on {progress}% Physical Comp.</div>
+               </div>
+            </div>
+
+            {/* MAIN DASHBOARD CONTENT */}
+            <div className="grid lg:grid-cols-3 gap-6">
+               
+               {/* LEFT COL: CHART */}
+               <div className="lg:col-span-2 space-y-6">
+                  
+                  {/* CHART CARD */}
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print-shadow-none print-break-avoid">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                            <Icon name="bar-chart-2" size={18} className="text-[#006858]"/> 
+                            Performance S-Curve
+                        </h3>
+                        <div className="flex gap-2 text-xs font-medium bg-slate-100 p-1 rounded-lg">
+                            <div className="px-3 py-1 bg-white shadow-sm rounded text-[#006858]">Cumulative</div>
+                        </div>
+                    </div>
+                    <div className="h-[350px] w-full">
+                        <canvas id="mainChart"></canvas>
+                    </div>
+                    
+                    {/* Physical Progress Slider */}
+                    <div className="mt-8 bg-slate-50 p-4 rounded-lg border border-slate-100 no-print">
+                        <div className="flex justify-between mb-2">
+                            <label className="text-xs font-bold text-slate-600 uppercase">Reported Physical Progress (Site)</label>
+                            <span className="text-sm font-black text-[#006858]">{progress}%</span>
+                        </div>
+                        <input 
+                            type="range" min="0" max="100" step="1" 
+                            value={progress} 
+                            onChange={(e) => setProgress(Number(e.target.value))}
+                            className="w-full cursor-pointer"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-2 flex items-center gap-1">
+                            <Icon name="info" size={10} /> 
+                            Adjusting this recalculates Earned Value (EV) and SPI.
+                        </p>
+                    </div>
+                  </div>
+
+                  {/* TIME RISK ALERT - Moved here to prevent layout jumping */}
+                  {timeAlert && (
+                    <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg shadow-sm flex items-start gap-4 animate-fade-in-up">
+                        <div className="bg-orange-100 p-2 rounded-full text-orange-600 mt-1">
+                        <Icon name="clock" size={24} />
+                        </div>
+                        <div>
+                        <h4 className="text-sm font-black text-orange-800 uppercase tracking-wide">
+                            Schedule Delay Warning
+                        </h4>
+                        <p className="text-sm text-orange-800 mt-1">
+                            Current progress (SPI {stats.spi.toFixed(2)}) suggests this project will miss the 
+                            <strong> Month {config.duration}</strong> deadline.
+                        </p>
+                        <div className="mt-2 text-xs font-bold text-orange-700 bg-orange-100 inline-block px-2 py-1 rounded">
+                            Forecast Delay: +{timeAlert.monthsLate} Months (Total: {timeAlert.newDuration} Months)
+                        </div>
+                        </div>
+                    </div>
+                  )}
+
+               </div>
+
+               {/* RIGHT COL: INPUTS */}
+               <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-full print-shadow-none print-break-avoid">
+                  {/* Tabs */}
+                  <div className="flex border-b border-slate-100 no-print">
+                     <button 
+                        onClick={() => setActiveTab('logs')}
+                        className={`flex-1 py-3 text-xs font-bold uppercase tracking-wide transition-colors ${activeTab === 'logs' ? 'text-[#006858] border-b-2 border-[#006858]' : 'text-slate-400 hover:text-slate-600'}`}
+                     >
+                        Monthly Actuals
+                     </button>
+                     <button 
+                        onClick={() => setActiveTab('milestones')}
+                        className={`flex-1 py-3 text-xs font-bold uppercase tracking-wide transition-colors ${activeTab === 'milestones' ? 'text-[#006858] border-b-2 border-[#006858]' : 'text-slate-400 hover:text-slate-600'}`}
+                     >
+                        Milestones
+                     </button>
+                  </div>
+                  
+                  {/* Print Only Title for List */}
+                  <h3 className="hidden print:block text-sm font-bold text-slate-700 mb-2 px-2 pt-2 border-b">
+                     {activeTab === 'logs' ? 'Monthly Expenditure' : 'Milestone Schedule'}
+                  </h3>
+
+                  {/* Content Area */}
+                  <div className="p-4 flex-1 overflow-y-auto max-h-[500px] custom-scroll bg-slate-50/50">
+                     
+                     {activeTab === 'logs' && (
+                        <div className="space-y-3">
+                           {actuals.map((item, i) => {
+                              const milestone = config.milestones.find(m => m.month === i + 1);
+                              return (
+                                <div key={i} className="flex flex-col gap-1 bg-white p-2 rounded-lg border border-slate-100 shadow-sm animate-fade-in-up print-break-avoid" style={{animationDelay: `${i*50}ms`}}>
+                                   {/* Row 1: Amount */}
+                                   <div className="flex items-center gap-2">
+                                       <div className="w-16 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500 shrink-0 uppercase">
+                                          Month {i+1}
+                                       </div>
+                                       <div className="flex-1 relative">
+                                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs no-print">€</span>
+                                          <span className="hidden print:inline absolute left-1 top-1/2 -translate-y-1/2 text-slate-600 text-xs font-bold">€</span>
+                                          <MoneyInput 
+                                             value={item.value} 
+                                             onChange={(val) => updateActualValue(i, val)}
+                                             className="w-full pl-6 pr-3 py-1.5 text-sm border border-slate-200 rounded focus:outline-none focus:border-[#006858] font-medium print:pl-6"
+                                          />
+                                       </div>
+                                       {milestone && (
+                                          <div className="no-print hidden sm:flex items-center gap-1 bg-green-50 text-green-700 px-2 py-1 rounded text-[10px] font-bold border border-green-100" title={milestone.label}>
+                                             <Icon name="flag" size={10} className="text-green-600"/>
+                                             <span className="truncate max-w-[80px]">{milestone.label}</span>
+                                          </div>
+                                       )}
+                                       <button 
+                                          onClick={() => setActuals(actuals.filter((_, idx) => idx !== i))}
+                                          className="p-2 text-slate-300 hover:text-red-500 transition no-print"
+                                       >
+                                          <Icon name="trash-2" size={16} />
+                                       </button>
+                                   </div>
+                                   {/* Row 2: Milestone Display (Print Optimized) */}
+                                   {milestone && (
+                                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 px-1 py-0.5 sm:hidden print:flex">
+                                         <Icon name="flag" size={10} />
+                                         <span>MILESTONE: {milestone.label}</span>
+                                      </div>
+                                   )}
+                                   {/* Row 3: Comment */}
+                                   <input 
+                                      type="text"
+                                      placeholder="Add comment (e.g., Foundation Complete)"
+                                      value={item.comment || ''}
+                                      onChange={(e) => updateActualComment(i, e.target.value)}
+                                      className="w-full text-[11px] text-slate-600 bg-slate-50 px-2 py-1 rounded border-transparent focus:border-slate-300 focus:outline-none focus:bg-white transition"
+                                   />
+                                </div>
+                              );
+                           })}
+                           
+                           {actuals.length < config.duration ? (
+                              <button 
+                                onClick={addMonth}
+                                className="w-full py-3 mt-4 border-2 border-dashed border-slate-300 rounded-xl text-slate-400 text-xs font-bold uppercase hover:border-[#006858] hover:text-[#006858] transition flex items-center justify-center gap-2 no-print"
+                              >
+                                <Icon name="plus-circle" size={16} /> Log Month {actuals.length + 1}
+                              </button>
+                           ) : (
+                              <div className="p-4 text-center text-xs text-emerald-600 font-bold bg-emerald-50 rounded-lg mt-4 border border-emerald-100">
+                                 Project Duration Complete
+                              </div>
+                           )}
+                        </div>
+                     )}
+
+                     {activeTab === 'milestones' && (
+                        <div className="space-y-3">
+                           {config.milestones.map((m, i) => (
+                              <div key={i} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm print-break-avoid">
+                                 <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-[10px] font-black bg-slate-100 px-2 py-0.5 rounded text-slate-500">MONTH</span>
+                                    <input 
+                                       type="number" value={m.month}
+                                       onChange={(e) => {
+                                          const val = Math.min(Math.max(Number(e.target.value), 1), config.duration);
+                                          const newM = [...config.milestones];
+                                          newM[i].month = val;
+                                          setConfig({...config, milestones: newM});
+                                       }}
+                                       className="w-16 border-b border-slate-200 text-sm font-bold text-center focus:outline-none focus:border-[#006858]"
+                                    />
+                                 </div>
+                                 <input 
+                                    type="text" value={m.label}
+                                    onChange={(e) => {
+                                       const newM = [...config.milestones];
+                                       newM[i].label = e.target.value;
+                                       setConfig({...config, milestones: newM});
+                                    }}
+                                    className="w-full text-sm text-slate-700 font-medium focus:outline-none border-b border-transparent focus:border-slate-300 placeholder-slate-300"
+                                    placeholder="Milestone Name"
+                                 />
+                                 <div className="flex justify-end mt-2">
+                                     <button 
+                                       onClick={() => {
+                                          const newM = config.milestones.filter((_, idx) => idx !== i);
+                                          setConfig({...config, milestones: newM});
+                                       }}
+                                       className="text-[10px] text-red-400 hover:text-red-600 uppercase font-bold tracking-wider"
+                                     >Delete</button>
+                                 </div>
+                              </div>
+                           ))}
+                           <button 
+                              onClick={() => setConfig({...config, milestones: [...config.milestones, {month: 12, label: 'New Event'}]})}
+                              className="w-full py-2 text-xs font-bold text-[#006858] bg-[#006858]/10 rounded-lg hover:bg-[#006858]/20 transition"
+                           >
+                              + Add Milestone
+                           </button>
+                        </div>
+                     )}
+                  </div>
+
+                  {/* Export Bar */}
+                  <div className="p-4 border-t border-slate-200 bg-slate-50 rounded-b-xl no-print">
+                      <button onClick={handleDownloadCSV} className="w-full flex items-center justify-center gap-2 py-2 bg-white border border-slate-300 shadow-sm rounded-lg text-slate-700 text-sm font-bold hover:bg-slate-50 hover:text-[#006858] transition">
+                        <Icon name="download" size={16} /> Export CSV Data
+                      </button>
+                  </div>
+               </div>
+            </div>
+          </main>
+          
+          <footer className="max-w-7xl mx-auto px-6 py-10 text-center">
+              <p className="text-slate-600 font-bold text-sm">Created by Dave Maher</p>
+              <p className="text-[10px] text-slate-400 mt-2 max-w-lg mx-auto leading-relaxed">
+                  All intellectual property rights associated with this application, its calculation logic, and its interface design belong to Dave Maher. &copy; 2026
+              </p>
+          </footer>
+
+          {/* SETTINGS MODAL */}
+          <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="Project Configuration">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Project Name</label>
+                <input type="text" value={config.projectName} onChange={(e) => setConfig({...config, projectName: e.target.value})} className="w-full p-2 border border-slate-300 rounded font-medium focus:ring-2 focus:ring-[#006858] outline-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Total Budget (€)</label>
+                  <MoneyInput 
+                     value={config.budget} 
+                     onChange={(val) => setConfig({...config, budget: Number(val)})} 
+                     className="w-full p-2 border border-slate-300 rounded font-medium focus:ring-2 focus:ring-[#006858] outline-none" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Duration (Months)</label>
+                  <input type="number" value={config.duration} onChange={(e) => setConfig({...config, duration: Number(e.target.value)})} className="w-full p-2 border border-slate-300 rounded font-medium focus:ring-2 focus:ring-[#006858] outline-none" />
+                </div>
+              </div>
+              
+              <div>
+                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Forecast Method (EAC)</label>
+                 <select 
+                    value={config.eacMethod || 'plan_adherence'} 
+                    onChange={(e) => setConfig({...config, eacMethod: e.target.value})}
+                    className="w-full p-2 border border-slate-300 rounded font-medium focus:ring-2 focus:ring-[#006858] outline-none bg-white"
+                 >
+                    <option value="plan_adherence">Plan Adherence (Safe) - Decouples CPI</option>
+                    <option value="standard_cpi">Standard Performance (CPI) - Volatile</option>
+                    <option value="linear_burn">Linear Burn - Simple Extrapolation</option>
+                 </select>
+                 <p className="text-[10px] text-slate-400 mt-1">
+                    "Plan Adherence" assumes remaining work will cost what was originally budgeted, preventing instability when billing lags behind physical progress.
+                 </p>
+              </div>
+
+              <div className="bg-amber-50 p-4 rounded-lg border border-amber-100 space-y-3">
+                 <h4 className="text-sm font-bold text-amber-800 flex items-center gap-2"><Icon name="alert-triangle" size={14}/> Danger Zone</h4>
+                 
+                 <div className="flex flex-col gap-2">
+                    <button onClick={handleClearTracked} className="w-full py-2 bg-white border border-amber-200 text-amber-700 rounded font-semibold text-xs hover:bg-amber-50 transition">
+                       Clear Tracked Data (Keep Settings)
+                    </button>
+                    <button onClick={handleFactoryReset} className="w-full py-2 bg-red-600 text-white rounded font-semibold text-xs hover:bg-red-700 transition">
+                       Factory Reset (Wipe Everything)
+                    </button>
+                 </div>
+              </div>
+              <button onClick={() => setIsSettingsOpen(false)} className="w-full py-3 bg-[#006858] text-white rounded-lg font-bold shadow-lg hover:shadow-xl transition transform active:scale-95">
+                Save Changes
+              </button>
+            </div>
+          </Modal>
+
+        </div>
+      );
+    }
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
