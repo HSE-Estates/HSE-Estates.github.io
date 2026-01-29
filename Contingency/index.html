@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HSE Project Contingency Assessment Tool</title>
+  
+  <!-- Favicons -->
+  <link rel="icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico">
+  <link rel="mask-icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.svg" color="#006858">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* Slider Styling */
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 16px; width: 16px; border-radius: 50%;
+      background: #059669; cursor: pointer; margin-top: -6px; 
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%; height: 4px; cursor: pointer;
+      background: #e2e8f0; border-radius: 2px;
+    }
+
+    @media print {
+      @page { size: A4 landscape; margin: 1cm; }
+      body { background-color: #ffffff !important; }
+      .no-print, header button, .fixed-actions { display: none !important; }
+      .print-only { display: block !important; }
+      .card { box-shadow: none !important; border: 1px solid #e2e8f0 !important; break-inside: avoid; }
+      .page-break { page-break-before: always; }
+      canvas { max-height: 300px !important; width: 100% !important; }
+    }
+    .print-only { display: none; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div id="root"></div>
+  
+  <script id="saved-state">window.SAVED_STATE = null;</script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    /* ========================================================================================
+       CONSTANTS & CONFIGURATION
+       Derived from "Scoring.csv" and "RR Reference.csv"
+       ======================================================================================== */
+    
+    // Probability Ratings (1-5) mapping to Percentage Factors
+    // VHI(5)=0.85, HI(4)=0.60, MED(3)=0.40, LO(2)=0.15, VLO(1)=0.05
+    const PROBABILITY_FACTORS = {
+      1: { label: 'Very Low (VLO)', factor: 0.05, desc: '<10% Chance' },
+      2: { label: 'Low (LO)', factor: 0.15, desc: '11-30% Chance' },
+      3: { label: 'Medium (MED)', factor: 0.40, desc: '31-50% Chance' },
+      4: { label: 'High (HI)', factor: 0.60, desc: '51-70% Chance' },
+      5: { label: 'Very High (VHI)', factor: 0.85, desc: '>70% Chance' }
+    };
+
+    const CATEGORIES = [
+      'Clinical', 'Commissioning', 'Construction', 'Contracting', 
+      'Design', 'Equipping', 'HS&E', 'ICT', 'Operations', 'PMO', 'Other'
+    ];
+
+    const STAGES = [
+      'Stage 0 - Project Initiation', 'Stage 1 - Preliminary', 
+      'Stage 2a - Developed Sketch Design', 'Stage 2b - Detailed Design', 
+      'Stage 2c - Pre-Tender', 'Stage 3 - Tender Action', 
+      'Stage 4 - Construction', 'Stage 5 - Handover'
+    ];
+
+    const RESPONSES = ['Mitigate', 'Transfer', 'Avoid/Eliminate', 'Exploit', 'Do Nothing'];
+
+    // Icons
+    const Icon = ({ path, className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        {path}
+      </svg>
+    );
+
+    const Icons = {
+      Plus: (props) => <Icon {...props} path={<><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></>} />,
+      Trash: (props) => <Icon {...props} path={<><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></>} />,
+      Edit: (props) => <Icon {...props} path={<><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></>} />,
+      Save: (props) => <Icon {...props} path={<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>} />,
+      Printer: (props) => <Icon {...props} path={<><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></>} />,
+      AlertTriangle: (props) => <Icon {...props} path={<><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></>} />,
+      TrendingUp: (props) => <Icon {...props} path={<><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></>} />,
+      Euro: (props) => <Icon {...props} path={<><path d="M4 10h12"/><path d="M4 14h9"/><path d="M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2"/></>} />,
+      Briefcase: (props) => <Icon {...props} path={<><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></>} />,
+      Layout: (props) => <Icon {...props} path={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></>} />,
+      List: (props) => <Icon {...props} path={<><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></>} />,
+    };
+
+    const Card = ({ children, className = '', noPad = false }) => (
+      <div className={`bg-white rounded-xl border border-slate-200 shadow-sm card ${className}`}>
+        <div className={noPad ? '' : 'p-5'}>
+          {children}
+        </div>
+      </div>
+    );
+
+    // Initial Demo Data
+    const INITIAL_RISKS = [
+      { id: 1, name: 'Late Design Approvals', category: 'Design', stage: 'Stage 2b - Detailed Design', type: 'Threat', probRating: 4, costMin: 10000, costML: 25000, costMax: 50000, timeMin: 2, timeML: 4, timeMax: 8, response: 'Mitigate' },
+      { id: 2, name: 'Ground Conditions', category: 'Construction', stage: 'Stage 4 - Construction', type: 'Threat', probRating: 2, costMin: 50000, costML: 150000, costMax: 300000, timeMin: 2, timeML: 6, timeMax: 12, response: 'Transfer' },
+      { id: 3, name: 'Equipment Inflation', category: 'Equipping', stage: 'Stage 3 - Tender Action', type: 'Threat', probRating: 5, costMin: 20000, costML: 35000, costMax: 45000, timeMin: 0, timeML: 0, timeMax: 2, response: 'Avoid/Eliminate' },
+      { id: 4, name: 'Stakeholder Scope Change', category: 'Clinical', stage: 'Stage 1 - Preliminary', type: 'Threat', probRating: 3, costMin: 5000, costML: 15000, costMax: 30000, timeMin: 1, timeML: 2, timeMax: 4, response: 'Mitigate' }
+    ];
+
+    /* ========================================================================================
+       MAIN APP COMPONENT
+       ======================================================================================== */
+
+    function App() {
+      const saved = window.SAVED_STATE || {};
+      
+      // -- State --
+      const [view, setView] = useState('dashboard'); // dashboard, register
+      const [projectValue, setProjectValue] = useState(saved.projectValue || 5000000);
+      const [projectDuration, setProjectDuration] = useState(saved.projectDuration || 52); // Weeks
+      const [projectName, setProjectName] = useState(saved.projectName || 'New Capital Project');
+      const [risks, setRisks] = useState(saved.risks || INITIAL_RISKS);
+      
+      const [isModalOpen, setIsModalOpen] = useState(false);
+      const [editingRisk, setEditingRisk] = useState(null);
+
+      // -- Calculations --
+
+      // Helper: Calculate Expected Value (Weighted Average * Probability Factor)
+      // Logic from tool: ((Min + ML + Max) / 3) * ProbabilityFactor
+      const calculateEV = (min, ml, max, probRating) => {
+        const avg = (Number(min) + Number(ml) + Number(max)) / 3;
+        const factor = PROBABILITY_FACTORS[probRating].factor;
+        return avg * factor;
+      };
+
+      // Helper: Calculate Risk Score (Criticality)
+      // Scoring: 
+      // 1. Determine Cost Impact Rating based on % of Project Budget
+      //    >2% = 5, 1-2% = 4, 0.5-1% = 3, 0.1-0.5% = 2, <0.1% = 1
+      // 2. Multiply Cost Impact Rating * Probability Rating (1-5)
+      // 3. Score > 12 = High, 6-12 = Med, < 6 = Low
+      const getCriticality = (evCost, probRating) => {
+        const percentOfBudget = (evCost / projectValue) * 100;
+        let impactRating = 1;
+        if (percentOfBudget > 2) impactRating = 5;
+        else if (percentOfBudget > 1) impactRating = 4;
+        else if (percentOfBudget > 0.5) impactRating = 3;
+        else if (percentOfBudget > 0.1) impactRating = 2;
+        
+        const score = impactRating * probRating;
+        if (score >= 12) return { label: 'High', color: 'text-red-600 bg-red-50 border-red-200', score };
+        if (score >= 6) return { label: 'Medium', color: 'text-amber-600 bg-amber-50 border-amber-200', score };
+        return { label: 'Low', color: 'text-emerald-600 bg-emerald-50 border-emerald-200', score };
+      };
+
+      // Derived Statistics
+      const stats = useMemo(() => {
+        let totalCostEV = 0;
+        let totalTimeEV = 0;
+        let catBreakdown = {};
+        let critBreakdown = { High: 0, Medium: 0, Low: 0 };
+
+        risks.forEach(r => {
+          const costEV = calculateEV(r.costMin, r.costML, r.costMax, r.probRating);
+          const timeEV = calculateEV(r.timeMin, r.timeML, r.timeMax, r.probRating);
+          const crit = getCriticality(costEV, r.probRating).label;
+
+          totalCostEV += costEV;
+          totalTimeEV += timeEV;
+          
+          if (!catBreakdown[r.category]) catBreakdown[r.category] = 0;
+          catBreakdown[r.category] += costEV;
+
+          critBreakdown[crit]++;
+        });
+
+        return { totalCostEV, totalTimeEV, catBreakdown, critBreakdown };
+      }, [risks, projectValue]);
+
+      // -- Handlers --
+      
+      const handleSave = () => {
+        const stateToSave = { projectValue, projectDuration, projectName, risks };
+        const clone = document.documentElement.cloneNode(true);
+        const rootDiv = clone.querySelector('#root');
+        if (rootDiv) rootDiv.innerHTML = '';
+        const stateScript = clone.querySelector('#saved-state');
+        if (stateScript) stateScript.textContent = `window.SAVED_STATE = ${JSON.stringify(stateToSave)};`;
+        const blob = new Blob(["<!DOCTYPE html>\n" + clone.outerHTML], { type: 'text/html' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${projectName.replace(/\s+/g, '_')}_Contingency.html`;
+        a.click();
+      };
+
+      const handleAddRisk = (newRisk) => {
+        if (editingRisk) {
+          setRisks(risks.map(r => r.id === newRisk.id ? newRisk : r));
+        } else {
+          setRisks([...risks, { ...newRisk, id: Date.now() }]);
+        }
+        setIsModalOpen(false);
+        setEditingRisk(null);
+      };
+
+      const deleteRisk = (id) => {
+        if (confirm('Are you sure you want to remove this risk?')) {
+          setRisks(risks.filter(r => r.id !== id));
+        }
+      };
+
+      const openEdit = (risk) => {
+        setEditingRisk(risk);
+        setIsModalOpen(true);
+      };
+
+      // -- Charts --
+      
+      const BarChart = ({ data }) => {
+        const canvasRef = useRef(null);
+        useEffect(() => {
+          const ctx = canvasRef.current.getContext('2d');
+          const chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: Object.keys(data),
+              datasets: [{
+                label: 'Cost Contingency (€)',
+                data: Object.values(data),
+                backgroundColor: '#059669',
+                borderRadius: 4
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: { y: { beginAtZero: true, grid: { borderDash: [2, 2] } }, x: { grid: { display: false } } }
+            }
+          });
+          return () => chart.destroy();
+        }, [data]);
+        return <div className="h-64"><canvas ref={canvasRef} /></div>;
+      };
+
+      const DoughnutChart = ({ data }) => {
+        const canvasRef = useRef(null);
+        useEffect(() => {
+          const ctx = canvasRef.current.getContext('2d');
+          const chart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+              labels: Object.keys(data),
+              datasets: [{
+                data: Object.values(data),
+                backgroundColor: ['#ef4444', '#d97706', '#10b981'], // Red, Amber, Green
+                borderWidth: 0
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              cutout: '70%',
+              plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle' } } }
+            }
+          });
+          return () => chart.destroy();
+        }, [data]);
+        return <div className="h-64"><canvas ref={canvasRef} /></div>;
+      };
+
+      // -- Render --
+
+      return (
+        <div className="min-h-screen pb-20">
+          
+          {/* Header */}
+          <header className="bg-emerald-900 text-white p-4 shadow-lg sticky top-0 z-50 no-print">
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="bg-white p-1.5 rounded-lg">
+                  <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE" className="h-8 w-auto" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold tracking-tight">Project Contingency Tool</h1>
+                  <div className="text-[10px] uppercase font-bold tracking-widest opacity-70">Capital Projects Division</div>
+                </div>
+              </div>
+              
+              <div className="flex gap-2 w-full md:w-auto">
+                <nav className="flex bg-emerald-800 p-1 rounded-lg">
+                  <button onClick={() => setView('dashboard')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${view === 'dashboard' ? 'bg-white text-emerald-900 shadow-sm' : 'text-emerald-100 hover:text-white'}`}>
+                    <div className="flex items-center gap-2"><Icons.Layout className="w-4 h-4"/> Dashboard</div>
+                  </button>
+                  <button onClick={() => setView('register')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${view === 'register' ? 'bg-white text-emerald-900 shadow-sm' : 'text-emerald-100 hover:text-white'}`}>
+                    <div className="flex items-center gap-2"><Icons.List className="w-4 h-4"/> Risk Register</div>
+                  </button>
+                </nav>
+                <button onClick={handleSave} className="flex items-center gap-2 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 rounded-lg text-sm transition-colors">
+                  <Icons.Save className="w-4 h-4" /> <span className="hidden md:inline">Save</span>
+                </button>
+                <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 rounded-lg text-sm transition-colors">
+                  <Icons.Printer className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-7xl mx-auto p-6">
+            
+            {/* Top Stats Bar */}
+            <div className="grid md:grid-cols-4 gap-4 mb-8">
+               <Card className="bg-white border-l-4 border-emerald-600">
+                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Project Name</label>
+                 <input type="text" value={projectName} onChange={e => setProjectName(e.target.value)} className="w-full font-bold text-slate-800 border-b border-dashed border-slate-300 focus:outline-none focus:border-emerald-500 bg-transparent text-lg truncate" />
+               </Card>
+               <Card className="bg-white border-l-4 border-emerald-600">
+                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Project Value (€)</label>
+                 <input type="number" value={projectValue} onChange={e => setProjectValue(Number(e.target.value))} className="w-full font-bold text-slate-800 border-b border-dashed border-slate-300 focus:outline-none focus:border-emerald-500 bg-transparent text-lg" />
+               </Card>
+               <Card className="bg-emerald-50 border-l-4 border-emerald-600">
+                 <label className="text-xs font-bold text-emerald-600/70 uppercase tracking-wider block mb-1">Calculated Contingency</label>
+                 <div className="text-2xl font-black text-emerald-700">€{stats.totalCostEV.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                 <div className="text-xs text-emerald-600 font-medium">{((stats.totalCostEV / projectValue) * 100).toFixed(2)}% of Project Value</div>
+               </Card>
+               <Card className="bg-slate-50 border-l-4 border-slate-500">
+                 <label className="text-xs font-bold text-slate-500/70 uppercase tracking-wider block mb-1">Schedule Impact</label>
+                 <div className="text-2xl font-black text-slate-700">{stats.totalTimeEV.toFixed(1)} <span className="text-sm font-normal text-slate-500">weeks</span></div>
+               </Card>
+            </div>
+
+            {/* Dashboard View */}
+            <div className={view === 'dashboard' ? 'block' : 'hidden print-only'}>
+              <div className="grid md:grid-cols-3 gap-6 mb-6">
+                <Card className="md:col-span-2">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2"><Icons.Euro className="w-5 h-5 text-emerald-600"/> Contingency by Category</h3>
+                  </div>
+                  <BarChart data={stats.catBreakdown} />
+                </Card>
+                <Card>
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2"><Icons.AlertTriangle className="w-5 h-5 text-amber-500"/> Risk Criticality</h3>
+                  </div>
+                  <DoughnutChart data={stats.critBreakdown} />
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-red-50 p-2 rounded border border-red-100"><div className="text-lg font-bold text-red-600">{stats.critBreakdown.High}</div><div className="text-[10px] uppercase text-red-400 font-bold">High</div></div>
+                    <div className="bg-amber-50 p-2 rounded border border-amber-100"><div className="text-lg font-bold text-amber-600">{stats.critBreakdown.Medium}</div><div className="text-[10px] uppercase text-amber-400 font-bold">Med</div></div>
+                    <div className="bg-emerald-50 p-2 rounded border border-emerald-100"><div className="text-lg font-bold text-emerald-600">{stats.critBreakdown.Low}</div><div className="text-[10px] uppercase text-emerald-400 font-bold">Low</div></div>
+                  </div>
+                </Card>
+              </div>
+
+              <Card className="overflow-hidden">
+                <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Icons.List className="w-5 h-5 text-slate-400"/> Top Risks (By Cost Impact)</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-slate-400 uppercase bg-slate-50 font-bold">
+                      <tr>
+                        <th className="px-4 py-3">Risk Name</th>
+                        <th className="px-4 py-3">Category</th>
+                        <th className="px-4 py-3">Probability</th>
+                        <th className="px-4 py-3 text-right">Expected Cost (€)</th>
+                        <th className="px-4 py-3 text-center">Criticality</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {[...risks].sort((a,b) => calculateEV(b.costMin, b.costML, b.costMax, b.probRating) - calculateEV(a.costMin, a.costML, a.costMax, a.probRating)).slice(0, 5).map(r => {
+                         const ev = calculateEV(r.costMin, r.costML, r.costMax, r.probRating);
+                         const crit = getCriticality(ev, r.probRating);
+                         return (
+                          <tr key={r.id} className="hover:bg-slate-50">
+                            <td className="px-4 py-3 font-medium text-slate-700">{r.name}</td>
+                            <td className="px-4 py-3 text-slate-500">{r.category}</td>
+                            <td className="px-4 py-3 text-slate-500">{PROBABILITY_FACTORS[r.probRating].label}</td>
+                            <td className="px-4 py-3 text-right font-mono font-medium">€{ev.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${crit.color}`}>{crit.label}</span>
+                            </td>
+                          </tr>
+                         )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            </div>
+
+            {/* Risk Register View */}
+            <div className={view === 'register' ? 'block' : 'hidden print-only'}>
+              <div className="flex justify-between items-center mb-4 no-print">
+                <h2 className="text-lg font-bold text-slate-700">Detailed Risk Register</h2>
+                <button onClick={() => { setEditingRisk(null); setIsModalOpen(true); }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm transition-colors">
+                  <Icons.Plus className="w-4 h-4" /> Add New Risk
+                </button>
+              </div>
+
+              <Card className="overflow-hidden" noPad>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-slate-400 uppercase bg-slate-50 font-bold border-b border-slate-200">
+                      <tr>
+                        <th className="px-4 py-3">Risk Details</th>
+                        <th className="px-4 py-3">Category / Stage</th>
+                        <th className="px-4 py-3">Probability</th>
+                        <th className="px-4 py-3">Est. Cost Range (€)</th>
+                        <th className="px-4 py-3 text-right bg-emerald-50/50">W. Avg Cost (€)</th>
+                        <th className="px-4 py-3 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {risks.map(r => {
+                         const ev = calculateEV(r.costMin, r.costML, r.costMax, r.probRating);
+                         const crit = getCriticality(ev, r.probRating);
+                         return (
+                          <tr key={r.id} className="hover:bg-slate-50 group">
+                            <td className="px-4 py-3 max-w-xs">
+                              <div className="font-bold text-slate-700">{r.name}</div>
+                              <div className="flex gap-2 mt-1">
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded border uppercase font-bold ${r.type === 'Threat' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100'}`}>{r.type}</span>
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded border uppercase font-bold ${crit.color}`}>{crit.label} Risk</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="text-slate-600 font-medium">{r.category}</div>
+                              <div className="text-xs text-slate-400">{r.stage}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                  <div className="h-full bg-emerald-500" style={{ width: `${r.probRating * 20}%` }}></div>
+                                </div>
+                                <span className="text-xs font-bold text-slate-500">{PROBABILITY_FACTORS[r.probRating].factor * 100}%</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                              <div>Min: {Number(r.costMin).toLocaleString()}</div>
+                              <div className="font-bold text-slate-700">ML:  {Number(r.costML).toLocaleString()}</div>
+                              <div>Max: {Number(r.costMax).toLocaleString()}</div>
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700 bg-emerald-50/30 border-l border-emerald-100/50">
+                              €{ev.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            </td>
+                            <td className="px-4 py-3 text-center no-print">
+                              <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => openEdit(r)} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded"><Icons.Edit className="w-4 h-4"/></button>
+                                <button onClick={() => deleteRisk(r.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"><Icons.Trash className="w-4 h-4"/></button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {risks.length === 0 && (
+                        <tr><td colSpan="6" className="p-8 text-center text-slate-400 italic">No risks added yet. Click "Add New Risk" to begin.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            </div>
+
+            {/* Print Footer */}
+            <div className="hidden print-only mt-12 pt-8 border-t border-slate-200">
+               <div className="flex justify-between items-end">
+                 <div>
+                   <div className="h-px w-64 bg-slate-900 mb-2"></div>
+                   <p className="text-xs font-bold uppercase text-slate-500">Approved By</p>
+                 </div>
+                 <div className="text-right">
+                   <p className="text-xs text-slate-400">Generated on {new Date().toLocaleDateString()}</p>
+                   <p className="font-bold text-slate-700">HSE Capital Projects Contingency Tool</p>
+                 </div>
+               </div>
+            </div>
+
+          </main>
+
+          {/* ADD/EDIT MODAL */}
+          {isModalOpen && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm no-print">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                <RiskForm 
+                  initialData={editingRisk} 
+                  onClose={() => setIsModalOpen(false)} 
+                  onSave={handleAddRisk}
+                  projectValue={projectValue}
+                />
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    /* ========================================================================================
+       RISK FORM COMPONENT
+       ======================================================================================== */
+    
+    function RiskForm({ initialData, onClose, onSave, projectValue }) {
+      const [formData, setFormData] = useState(initialData || {
+        name: '', category: 'Construction', stage: 'Stage 2b - Detailed Design', 
+        type: 'Threat', probRating: 3, response: 'Mitigate',
+        costMin: 0, costML: 0, costMax: 0,
+        timeMin: 0, timeML: 0, timeMax: 0
+      });
+
+      const handleChange = (field, value) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+      };
+
+      const probFactor = PROBABILITY_FACTORS[formData.probRating].factor;
+      const avgCost = (Number(formData.costMin) + Number(formData.costML) + Number(formData.costMax)) / 3;
+      const weightedCost = avgCost * probFactor;
+      
+      const percentBudget = ((weightedCost / projectValue) * 100).toFixed(2);
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        onSave(formData);
+      };
+
+      return (
+        <form onSubmit={handleSubmit} className="p-6">
+          <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+            <h3 className="text-lg font-bold text-slate-800">{initialData ? 'Edit Risk' : 'Add New Risk'}</h3>
+            <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="col-span-2">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Risk Description</label>
+              <input required type="text" className="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" 
+                value={formData.name} onChange={e => handleChange('name', e.target.value)} placeholder="e.g., Delay in planning permission..." />
+            </div>
+            
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Category</label>
+              <select className="w-full border border-slate-300 rounded-lg p-2 outline-none" value={formData.category} onChange={e => handleChange('category', e.target.value)}>
+                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Project Stage</label>
+              <select className="w-full border border-slate-300 rounded-lg p-2 outline-none text-sm" value={formData.stage} onChange={e => handleChange('stage', e.target.value)}>
+                {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Risk Type</label>
+              <select className="w-full border border-slate-300 rounded-lg p-2 outline-none" value={formData.type} onChange={e => handleChange('type', e.target.value)}>
+                <option value="Threat">Threat</option>
+                <option value="Opportunity">Opportunity</option>
+              </select>
+            </div>
+
+             <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Response Strategy</label>
+              <select className="w-full border border-slate-300 rounded-lg p-2 outline-none" value={formData.response} onChange={e => handleChange('response', e.target.value)}>
+                {RESPONSES.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+
+            <div className="col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200">
+               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Probability Rating (1-5)</label>
+               <input type="range" min="1" max="5" step="1" value={formData.probRating} onChange={e => handleChange('probRating', Number(e.target.value))} className="w-full mb-2" />
+               <div className="flex justify-between text-xs font-medium text-slate-500">
+                 <span>VLO</span><span>LO</span><span>MED</span><span>HI</span><span>VHI</span>
+               </div>
+               <div className="mt-2 text-center font-bold text-emerald-700 bg-white border border-emerald-100 p-1 rounded">
+                 {PROBABILITY_FACTORS[formData.probRating].label} ({PROBABILITY_FACTORS[formData.probRating].factor * 100}%)
+               </div>
+            </div>
+
+            <div className="col-span-2 grid grid-cols-3 gap-4 mt-2">
+               <h4 className="col-span-3 text-xs font-black text-slate-400 uppercase border-b border-slate-100 pb-1">Cost Impact Estimates (€)</h4>
+               <div>
+                 <label className="text-[10px] uppercase font-bold text-slate-400">Minimum</label>
+                 <input type="number" className="w-full border border-slate-200 rounded p-1.5 text-sm" value={formData.costMin} onChange={e => handleChange('costMin', e.target.value)} />
+               </div>
+               <div>
+                 <label className="text-[10px] uppercase font-bold text-slate-400">Most Likely</label>
+                 <input type="number" className="w-full border border-emerald-500 ring-1 ring-emerald-500 rounded p-1.5 text-sm font-bold" value={formData.costML} onChange={e => handleChange('costML', e.target.value)} />
+               </div>
+               <div>
+                 <label className="text-[10px] uppercase font-bold text-slate-400">Maximum</label>
+                 <input type="number" className="w-full border border-slate-200 rounded p-1.5 text-sm" value={formData.costMax} onChange={e => handleChange('costMax', e.target.value)} />
+               </div>
+            </div>
+
+            <div className="col-span-2 grid grid-cols-3 gap-4">
+               <h4 className="col-span-3 text-xs font-black text-slate-400 uppercase border-b border-slate-100 pb-1">Schedule Impact Estimates (Weeks)</h4>
+               <div>
+                 <label className="text-[10px] uppercase font-bold text-slate-400">Minimum</label>
+                 <input type="number" className="w-full border border-slate-200 rounded p-1.5 text-sm" value={formData.timeMin} onChange={e => handleChange('timeMin', e.target.value)} />
+               </div>
+               <div>
+                 <label className="text-[10px] uppercase font-bold text-slate-400">Most Likely</label>
+                 <input type="number" className="w-full border border-emerald-500 ring-1 ring-emerald-500 rounded p-1.5 text-sm font-bold" value={formData.timeML} onChange={e => handleChange('timeML', e.target.value)} />
+               </div>
+               <div>
+                 <label className="text-[10px] uppercase font-bold text-slate-400">Maximum</label>
+                 <input type="number" className="w-full border border-slate-200 rounded p-1.5 text-sm" value={formData.timeMax} onChange={e => handleChange('timeMax', e.target.value)} />
+               </div>
+            </div>
+          </div>
+
+          <div className="bg-emerald-900 text-white p-4 rounded-lg flex justify-between items-center mb-6">
+            <div>
+              <div className="text-[10px] uppercase tracking-wider opacity-70 font-bold">Calculated Weighted Cost</div>
+              <div className="text-xl font-black">€{weightedCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] uppercase tracking-wider opacity-70 font-bold">Budget Impact</div>
+              <div className="text-xl font-bold text-emerald-300">{percentBudget}%</div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
+            <button type="submit" className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-md transition-colors">Save Risk</button>
+          </div>
+        </form>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
