@@ -73,28 +73,28 @@
             return <i data-lucide={name} width={size} height={size} className={className}></i>;
         };
 
-        const AppCard = ({ repo }) => {
-            // Logic to determine if it's a tool or a project based on name
-            const isProject = repo.name.toLowerCase().includes('cashflow') || repo.name.toLowerCase().includes('bias');
+        const AppCard = ({ app }) => {
+            // Logic to determine icon style based on app type
+            const isFinance = app.category === 'Financial';
             
             return (
                 <div className="app-card bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col h-full animate-fade-in">
                     <div className="p-6 flex-1">
                         <div className="flex justify-between items-start mb-4">
-                            <div className={`p-3 rounded-xl ${isProject ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
-                                <Icon name={isProject ? "line-chart" : "layers"} size={24} />
+                            <div className={`p-3 rounded-xl ${isFinance ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                                <Icon name={app.icon} size={24} />
                             </div>
                             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-50 px-2 py-1 rounded">
-                                {repo.language || 'Web App'}
+                                {app.tag}
                             </span>
                         </div>
                         
-                        <h3 className="text-xl font-bold text-slate-800 mb-2 capitalize">
-                            {repo.name.replace(/-/g, ' ')}
+                        <h3 className="text-xl font-bold text-slate-800 mb-2">
+                            {app.title}
                         </h3>
                         
-                        <p className="text-slate-600 text-sm leading-relaxed mb-4 line-clamp-3">
-                            {repo.description || "Digital tool developed for HSE Capital & Estates to streamline operations and reporting."}
+                        <p className="text-slate-600 text-sm leading-relaxed mb-4">
+                            {app.description}
                         </p>
                     </div>
                     
@@ -104,7 +104,7 @@
                              <span className="text-[10px] font-bold text-slate-500 uppercase">Live System</span>
                         </div>
                         <a 
-                            href={`https://hse-estates.github.io/${repo.name}/`}
+                            href={app.url}
                             target="_blank"
                             className="flex items-center gap-2 text-sm font-bold text-[#006858] hover:text-[#00bfa5] transition-colors"
                         >
@@ -116,37 +116,32 @@
         };
 
         function App() {
-            const [repos, setRepos] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [error, setError] = useState(null);
-
-            useEffect(() => {
-                const fetchRepos = async () => {
-                    try {
-                        // Fetching repos for hse-estates
-                        const response = await fetch('https://api.github.com/users/hse-estates/repos?sort=updated');
-                        if (!response.ok) throw new Error('Failed to load apps');
-                        const data = await response.json();
-                        
-                        // Filter out the 'hse-estates.github.io' repo itself if you don't want it in the list
-                        const filteredData = data.filter(repo => 
-                            repo.has_pages && repo.name !== 'hse-estates.github.io'
-                        );
-                        
-                        setRepos(filteredData);
-                    } catch (err) {
-                        setError(err.message);
-                    } finally {
-                        setLoading(false);
-                    }
-                };
-
-                fetchRepos();
-            }, []);
+            // --- EDIT YOUR APPS HERE ---
+            const myApps = [
+                {
+                    id: 1,
+                    title: "Cash Flow Analysis",
+                    url: "https://hse-estates.github.io/cashflow/",
+                    description: "Capital project financial tracking tool. Monitors budget performance, actuals, and forecasts using S-Curve methodology.",
+                    category: "Financial",
+                    tag: "Project Controls",
+                    icon: "line-chart"
+                },
+                {
+                    id: 2,
+                    title: "Optimism Bias Calculator",
+                    url: "https://hse-estates.github.io/OptimismBias/",
+                    description: "Risk assessment utility based on the Public Spending Code. Calculates bias adjustments for project appraisals.",
+                    category: "Risk",
+                    tag: "Appraisal Tool",
+                    icon: "scale"
+                }
+                // To add a new app, copy one of the blocks above, paste it here, and change the details.
+            ];
 
             useEffect(() => {
                 if (window.lucide) window.lucide.createIcons();
-            }, [repos, loading]);
+            }, []);
 
             return (
                 <div className="min-h-screen flex flex-col">
@@ -187,45 +182,26 @@
 
                     {/* Main Content */}
                     <main className="max-w-6xl mx-auto px-6 -mt-8 flex-1 w-full">
-                        {loading ? (
-                            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-slate-200 shadow-xl">
-                                <div className="w-12 h-12 border-4 border-slate-200 border-t-[#006858] rounded-full animate-spin mb-4"></div>
-                                <p className="text-slate-500 font-medium italic">Synchronising with App Repository...</p>
-                            </div>
-                        ) : error ? (
-                            <div className="bg-red-50 border border-red-200 p-8 rounded-3xl text-center">
-                                <Icon name="alert-circle" size={48} className="text-red-500 mx-auto mb-4" />
-                                <h3 className="text-red-800 font-bold text-xl mb-2">Service Connection Issue</h3>
-                                <p className="text-red-600 mb-6">We couldn't reach the app directory. You can access the main tools directly:</p>
-                                <div className="flex flex-wrap justify-center gap-4">
-                                    <a href="/cashflow" className="px-6 py-2 bg-white border border-red-200 rounded-full font-bold text-red-700 hover:bg-red-100 transition">Cash Flow Tool</a>
-                                    <a href="/OptimismBias" className="px-6 py-2 bg-white border border-red-200 rounded-full font-bold text-red-700 hover:bg-red-100 transition">Optimism Bias Tool</a>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {repos.map(repo => (
-                                    <AppCard key={repo.id} repo={repo} />
-                                ))}
-                            </div>
-                        )}
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {myApps.map(app => (
+                                <AppCard key={app.id} app={app} />
+                            ))}
+                        </div>
 
                         {/* Additional Info Section */}
-                        {!loading && !error && (
-                            <div className="mt-16 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center gap-8">
-                                <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl">
-                                    <Icon name="shield-check" size={40} />
-                                </div>
-                                <div>
-                                    <h4 className="text-xl font-bold text-slate-800 mb-2">Governance & Reliability</h4>
-                                    <p className="text-slate-600 leading-relaxed text-sm">
-                                        These tools use client-side logic for maximum security and performance. 
-                                        Data is stored locally on your device or via project file exports, ensuring no 
-                                        sensitive financial data is transmitted to external servers.
-                                    </p>
-                                </div>
+                        <div className="mt-16 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center gap-8">
+                            <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl">
+                                <Icon name="shield-check" size={40} />
                             </div>
-                        )}
+                            <div>
+                                <h4 className="text-xl font-bold text-slate-800 mb-2">Governance & Reliability</h4>
+                                <p className="text-slate-600 leading-relaxed text-sm">
+                                    These tools use client-side logic for maximum security and performance. 
+                                    Data is stored locally on your device or via project file exports, ensuring no 
+                                    sensitive financial data is transmitted to external servers.
+                                </p>
+                            </div>
+                        </div>
                     </main>
 
                     {/* Footer */}
