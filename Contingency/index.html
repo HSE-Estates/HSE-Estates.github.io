@@ -497,14 +497,14 @@
             
             {/* Dashboard View */}
             <div className={view === 'dashboard' ? 'block' : 'hidden print-only'}>
-              <div className="grid md:grid-cols-3 gap-6 mb-8">
-                <Card className="md:col-span-2">
+              <div className="grid md:grid-cols-3 gap-6 mb-8 print:grid print:grid-cols-3 print:gap-6 print:break-inside-avoid">
+                <Card className="md:col-span-2 print:col-span-2">
                   <div className="flex justify-between items-center mb-6">
                     <h3 className="font-bold text-slate-700 flex items-center gap-2"><Icons.Euro className="w-5 h-5 text-emerald-600"/> Contingency by Category</h3>
                   </div>
                   <BarChart data={stats.catBreakdown} />
                 </Card>
-                <Card>
+                <Card className="print:col-span-1">
                   <div className="flex justify-between items-center mb-6">
                     <h3 className="font-bold text-slate-700 flex items-center gap-2"><Icons.AlertTriangle className="w-5 h-5 text-amber-500"/> Risk Criticality</h3>
                   </div>
@@ -518,7 +518,7 @@
               </div>
 
               {/* Added Margin Top for Print Separation as requested */}
-              <div className="mt-8">
+              <div className="mt-8 print:mt-12">
                 <Card className="overflow-hidden">
                   <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Icons.List className="w-5 h-5 text-slate-400"/> Top Risks (By Cost Impact)</h3>
                   <div className="overflow-x-auto">
