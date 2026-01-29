@@ -68,6 +68,127 @@
   <script id="saved-state">window.SAVED_STATE = null;</script>
 
   <script type="text/babel">
+    /* ========================================================================================
+      DATA CONFIGURATION TABLE
+      ========================================================================================
+      Instructions:
+      1. To update values, simply edit the numbers in the table below.
+      2. 'ns_d' = Non-Standard Duration, 'ns_c' = Non-Standard Capex
+      3. 's_d'  = Standard Duration,     's_c'  = Standard Capex
+      4. Do not change the 'section' IDs (e.g., 'procurement') as logic depends on them.
+      ========================================================================================
+    */
+
+    const PROJECT_DATA_LOOKUP = {
+      buildings: {
+        id: 'buildings',
+        name: 'Buildings Projects',
+        // Upper Bound Optimism Bias (The 'starting point' percentages)
+        upperBound: { 
+          ns: { duration: 39, capex: 51 }, 
+          s:  { duration: 4,  capex: 24 } 
+        },
+        // Risk Factors Table
+        data: [
+          // PROCUREMENT
+          { section: 'procurement', name: 'Complexity of Contract Structure',      ns_d: 3,  ns_c: 1,  s_d: 1,  s_c: 0  },
+          { section: 'procurement', name: 'Late Contractor Involvement in Design', ns_d: 6,  ns_c: 2,  s_d: 3,  s_c: 2  },
+          { section: 'procurement', name: 'Poor Contractor Capabilities',          ns_d: 5,  ns_c: 5,  s_d: 4,  s_c: 9  },
+          { section: 'procurement', name: 'Government Guidelines',                 ns_d: 0,  ns_c: 0,  s_d: 0,  s_c: 0  },
+          { section: 'procurement', name: 'Dispute & Claims Occurred',             ns_d: 5,  ns_c: 11, s_d: 4,  s_c: 29 },
+          { section: 'procurement', name: 'Information Management',                ns_d: 0,  ns_c: 0,  s_d: 0,  s_c: 0  },
+          { section: 'procurement', name: 'Other',                                 ns_d: 0,  ns_c: 0,  s_d: 0,  s_c: 0  },
+          
+          // PROJECT SPECIFIC
+          { section: 'project_specific', name: 'Design Complexity',                ns_d: 2,  ns_c: 3,  s_d: 3,  s_c: 1  },
+          { section: 'project_specific', name: 'Degree of Innovation',             ns_d: 8,  ns_c: 9,  s_d: 1,  s_c: 4  },
+          { section: 'project_specific', name: 'Environmental Impact',             ns_d: 0,  ns_c: 0,  s_d: 0,  s_c: 0  },
+          { section: 'project_specific', name: 'Other',                            ns_d: 5,  ns_c: 5,  s_d: 0,  s_c: 0  },
+
+          // CLIENT SPECIFICATION
+          { section: 'client_specification', name: 'Inadequacy of the Business Case', ns_d: 22, ns_c: 23, s_d: 31, s_c: 34 },
+          { section: 'client_specification', name: 'Large No. of Stakeholders',       ns_d: 0,  ns_c: 0,  s_d: 6,  s_c: 0  },
+          { section: 'client_specification', name: 'Funding Availability',            ns_d: 3,  ns_c: 0,  s_d: 8,  s_c: 0  },
+          { section: 'client_specification', name: 'Project Management Team',         ns_d: 5,  ns_c: 2,  s_d: 0,  s_c: 1  },
+          { section: 'client_specification', name: 'Poor Project Intelligence',       ns_d: 5,  ns_c: 6,  s_d: 6,  s_c: 2  },
+          { section: 'client_specification', name: 'Other',                           ns_d: 1,  ns_c: 2,  s_d: 0,  s_c: 0  },
+
+          // ENVIRONMENT
+          { section: 'environment', name: 'Public Relations',              ns_d: 0,  ns_c: 0,  s_d: 8,  s_c: 2  },
+          { section: 'environment', name: 'Site Characteristics',          ns_d: 3,  ns_c: 1,  s_d: 5,  s_c: 2  },
+          { section: 'environment', name: 'Permits / Consents / Approvals',ns_d: 3,  ns_c: 0,  s_d: 9,  s_c: 0  },
+          { section: 'environment', name: 'Other',                         ns_d: 1,  ns_c: 3,  s_d: 0,  s_c: 0  },
+
+          // EXTERNAL INFLUENCES
+          { section: 'external_influences', name: 'Political',                 ns_d: 13, ns_c: 0,  s_d: 0,  s_c: 0  },
+          { section: 'external_influences', name: 'Economic',                  ns_d: 0,  ns_c: 13, s_d: 0,  s_c: 11 },
+          { section: 'external_influences', name: 'Legislation / Regulations', ns_d: 6,  ns_c: 7,  s_d: 9,  s_c: 3  },
+          { section: 'external_influences', name: 'Technology',                ns_d: 4,  ns_c: 5,  s_d: 0,  s_c: 0  },
+          { section: 'external_influences', name: 'Other',                     ns_d: 0,  ns_c: 2,  s_d: 0,  s_c: 0  }
+        ]
+      },
+      civil: {
+        id: 'civil',
+        name: 'Civil Engineering',
+        upperBound: { 
+          ns: { duration: 25, capex: 66 }, 
+          s:  { duration: 20, capex: 44 } 
+        },
+        data: [
+          { section: 'procurement', name: 'Complexity of Contract Structure', ns_d: 4, ns_c: 2, s_d: 0, s_c: 1 },
+          { section: 'procurement', name: 'Late Contractor Involvement', ns_d: 1, ns_c: 1, s_d: 3, s_c: 3 },
+          { section: 'procurement', name: 'Poor Contractor Capabilities', ns_d: 2, ns_c: 3, s_d: 16, s_c: 5 },
+          { section: 'procurement', name: 'Dispute & Claims Occurred', ns_d: 4, ns_c: 6, s_d: 3, s_c: 14 },
+          { section: 'procurement', name: 'Information Management', ns_d: 2, ns_c: 2, s_d: 1, s_c: 1 },
+          { section: 'project_specific', name: 'Design Complexity', ns_d: 5, ns_c: 3, s_d: 4, s_c: 2 },
+          { section: 'project_specific', name: 'Degree of Innovation', ns_d: 2, ns_c: 4, s_d: 0, s_c: 6 },
+          { section: 'project_specific', name: 'Environmental Impact', ns_d: 8, ns_c: 7, s_d: 6, s_c: 4 },
+          { section: 'client_specification', name: 'Inadequacy of Business Case', ns_d: 12, ns_c: 30, s_d: 36, s_c: 49 },
+          { section: 'client_specification', name: 'Large Number of Stakeholders', ns_d: 4, ns_c: 4, s_d: 6, s_c: 3 },
+          { section: 'client_specification', name: 'Funding Availability', ns_d: 2, ns_c: 1, s_d: 8, s_c: 1 },
+          { section: 'client_specification', name: 'Project Management Team', ns_d: 5, ns_c: 2, s_d: 0, s_c: 2 },
+          { section: 'client_specification', name: 'Poor Project Intelligence', ns_d: 5, ns_c: 11, s_d: 7, s_c: 5 },
+          { section: 'environment', name: 'Public Relations', ns_d: 4, ns_c: 6, s_d: 2, s_c: 9 },
+          { section: 'environment', name: 'Site Characteristics', ns_d: 5, ns_c: 5, s_d: 10, s_c: 3 },
+          { section: 'environment', name: 'Permits / Consents / Approvals', ns_d: 7, ns_c: 5, s_d: 10, s_c: 4 },
+          { section: 'external_influences', name: 'Political', ns_d: 19, ns_c: 5, s_d: 3, s_c: 2 },
+          { section: 'external_influences', name: 'Economic', ns_d: 24, ns_c: 20, s_d: 4, s_c: 7 },
+          { section: 'external_influences', name: 'Legislation / Regulations', ns_d: 6, ns_c: 12, s_d: 3, s_c: 3 }
+        ]
+      },
+      equip: {
+        id: 'equip',
+        name: 'Equip/Dev & Outsource',
+        upperBound: { 
+          ns: { duration: 54, capex: 200 }, 
+          s:  { duration: 0, capex: 41 } 
+        },
+        data: [
+          { section: 'procurement', name: 'Complexity of Contract Structure', ns_d: 13, ns_c: 7, s_d: 2, s_c: 2 },
+          { section: 'procurement', name: 'Late Contractor Involvement', ns_d: 2, ns_c: 7, s_d: 0, s_c: 0 },
+          { section: 'procurement', name: 'Poor Contractor Capabilities', ns_d: 11, ns_c: 4, s_d: 0, s_c: 0 },
+          { section: 'procurement', name: 'Dispute & Claims Occurred', ns_d: 24, ns_c: 18, s_d: 0, s_c: 0 },
+          { section: 'procurement', name: 'Information Management', ns_d: 4, ns_c: 8, s_d: 5, s_c: 23 },
+          { section: 'project_specific', name: 'Design Complexity', ns_d: 12, ns_c: 13, s_d: 0, s_c: 0 },
+          { section: 'project_specific', name: 'Degree of Innovation', ns_d: 15, ns_c: 23, s_d: 0, s_c: 37 },
+          { section: 'project_specific', name: 'Environmental Impact', ns_d: 2, ns_c: 2, s_d: 0, s_c: 0 },
+          { section: 'client_specification', name: 'Inadequacy of Business Case', ns_d: 5, ns_c: 6, s_d: 5, s_c: 12 },
+          { section: 'client_specification', name: 'Large Number of Stakeholders', ns_d: 4, ns_c: 4, s_d: 2, s_c: 2 },
+          { section: 'client_specification', name: 'Funding Availability', ns_d: 5, ns_c: 2, s_d: 0, s_c: 0 },
+          { section: 'client_specification', name: 'Project Management Team', ns_d: 2, ns_c: 5, s_d: 0, s_c: 15 },
+          { section: 'client_specification', name: 'Poor Project Intelligence', ns_d: 2, ns_c: 1, s_d: 0, s_c: 0 },
+          { section: 'environment', name: 'Public Relations', ns_d: 2, ns_c: 2, s_d: 1, s_c: 1 },
+          { section: 'environment', name: 'Site Characteristics', ns_d: 1, ns_c: 1, s_d: 0, s_c: 0 },
+          { section: 'environment', name: 'Permits / Consents / Approvals', ns_d: 2, ns_c: 2, s_d: 0, s_c: 0 },
+          { section: 'external_influences', name: 'Political', ns_d: 7, ns_c: 2, s_d: 1, s_c: 1 },
+          { section: 'external_influences', name: 'Economic', ns_d: 2, ns_c: 2, s_d: 2, s_c: 5 },
+          { section: 'external_influences', name: 'Legislation / Regulations', ns_d: 4, ns_c: 7, s_d: 2, s_c: 8 }
+        ]
+      }
+    };
+
+    /* End of Data Configuration */
+
     const { useState, useEffect, useMemo, useRef } = React;
 
     const Icon = ({ path, className }) => (
@@ -91,117 +212,38 @@
       Printer: (props) => <Icon {...props} path={<><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></>} />,
     };
 
-    const CATEGORIES = {
-      buildings: {
-        id: 'buildings', name: 'Buildings Projects', icon: Icons.Briefcase,
-        types: [{ id: 'standard', label: 'Standard Buildings' }, { id: 'ns', label: 'Non-Standard Buildings' }, { id: 'combined', label: 'Combined' }],
-        upper: { ns: { duration: 39, capex: 51 }, s: { duration: 4, capex: 24 } },
-        factors: {
-          'procurement': [
-            { name: 'Complexity of Contract Structure', ns: { d: 3, c: 1 }, s: { d: 1, c: 0 } },
-            { name: 'Late Contractor Involvement', ns: { d: 6, c: 2 }, s: { d: 3, c: 2 } },
-            { name: 'Poor Contractor Capabilities', ns: { d: 5, c: 5 }, s: { d: 4, c: 9 } },
-            { name: 'Dispute & Claims Occurred', ns: { d: 5, c: 11 }, s: { d: 4, c: 29 } },
-            { name: 'Information Management', ns: { d: 3, c: 2 }, s: { d: 2, c: 2 } }
-          ],
-          'project_specific': [
-            { name: 'Design Complexity', ns: { d: 2, c: 3 }, s: { d: 3, c: 1 } },
-            { name: 'Degree of Innovation', ns: { d: 8, c: 9 }, s: { d: 1, c: 4 } },
-            { name: 'Environmental Impact', ns: { d: 4, c: 4 }, s: { d: 2, c: 2 } }
-          ],
-          'client_specification': [
-            { name: 'Inadequacy of Business Case', ns: { d: 22, c: 23 }, s: { d: 31, c: 34 } },
-            { name: 'Large Number of Stakeholders', ns: { d: 4, c: 3 }, s: { d: 6, c: 2 } },
-            { name: 'Funding Availability', ns: { d: 3, c: 0 }, s: { d: 8, c: 0 } },
-            { name: 'Project Management Team', ns: { d: 5, c: 2 }, s: { d: 0, c: 1 } },
-            { name: 'Poor Project Intelligence', ns: { d: 5, c: 11 }, s: { d: 6, c: 2 } }
-          ],
-          'environment': [
-            { name: 'Public Relations', ns: { d: 3, c: 3 }, s: { d: 8, c: 2 } },
-            { name: 'Site Characteristics', ns: { d: 3, c: 1 }, s: { d: 5, c: 2 } },
-            { name: 'Permits / Consents / Approvals', ns: { d: 5, c: 3 }, s: { d: 9, c: 4 } }
-          ],
-          'external_influences': [
-            { name: 'Political', ns: { d: 13, c: 2 }, s: { d: 2, c: 1 } },
-            { name: 'Economic', ns: { d: 2, c: 13 }, s: { d: 1, c: 11 } },
-            { name: 'Legislation / Regulations', ns: { d: 6, c: 7 }, s: { d: 9, c: 3 } }
-          ]
-        }
-      },
-      civil: {
-        id: 'civil', name: 'Civil Engineering', icon: Icons.HardHat,
-        types: [{ id: 'standard', label: 'Standard Civil Eng' }, { id: 'ns', label: 'Non-Standard Civil Eng' }, { id: 'combined', label: 'Combined' }],
-        upper: { ns: { duration: 25, capex: 66 }, s: { duration: 20, capex: 44 } },
-        factors: {
-          'procurement': [
-            { name: 'Complexity of Contract Structure', ns: { d: 4, c: 2 }, s: { d: 0, c: 1 } },
-            { name: 'Late Contractor Involvement', ns: { d: 1, c: 1 }, s: { d: 3, c: 3 } },
-            { name: 'Poor Contractor Capabilities', ns: { d: 2, c: 3 }, s: { d: 16, c: 5 } },
-            { name: 'Dispute & Claims Occurred', ns: { d: 4, c: 6 }, s: { d: 3, c: 14 } },
-            { name: 'Information Management', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } }
-          ],
-          'project_specific': [
-            { name: 'Design Complexity', ns: { d: 5, c: 3 }, s: { d: 4, c: 2 } },
-            { name: 'Degree of Innovation', ns: { d: 2, c: 4 }, s: { d: 0, c: 6 } },
-            { name: 'Environmental Impact', ns: { d: 8, c: 7 }, s: { d: 6, c: 4 } }
-          ],
-          'client_specification': [
-            { name: 'Inadequacy of Business Case', ns: { d: 12, c: 30 }, s: { d: 36, c: 49 } },
-            { name: 'Large Number of Stakeholders', ns: { d: 4, c: 4 }, s: { d: 6, c: 3 } },
-            { name: 'Funding Availability', ns: { d: 2, c: 1 }, s: { d: 8, c: 1 } },
-            { name: 'Project Management Team', ns: { d: 5, c: 2 }, s: { d: 0, c: 2 } },
-            { name: 'Poor Project Intelligence', ns: { d: 5, c: 11 }, s: { d: 7, c: 5 } }
-          ],
-          'environment': [
-            { name: 'Public Relations', ns: { d: 4, c: 6 }, s: { d: 2, c: 9 } },
-            { name: 'Site Characteristics', ns: { d: 5, c: 5 }, s: { d: 10, c: 3 } },
-            { name: 'Permits / Consents / Approvals', ns: { d: 7, c: 5 }, s: { d: 10, c: 4 } }
-          ],
-          'external_influences': [
-            { name: 'Political', ns: { d: 19, c: 5 }, s: { d: 3, c: 2 } },
-            { name: 'Economic', ns: { d: 24, c: 20 }, s: { d: 4, c: 7 } },
-            { name: 'Legislation / Regulations', ns: { d: 6, c: 12 }, s: { d: 3, c: 3 } }
-          ]
-        }
-      },
-      equip: {
-        id: 'equip', name: 'Equip/Dev & Outsource', icon: Icons.Monitor,
-        types: [{ id: 'ns', label: 'Equipment / Development' }, { id: 'standard', label: 'Outsourcing' }],
-        upper: { ns: { duration: 54, capex: 200 }, s: { duration: 0, capex: 41 } },
-        factors: {
-          'procurement': [
-            { name: 'Complexity of Contract Structure', ns: { d: 13, c: 7 }, s: { d: 2, c: 2 } },
-            { name: 'Late Contractor Involvement', ns: { d: 2, c: 7 }, s: { d: 0, c: 0 } },
-            { name: 'Poor Contractor Capabilities', ns: { d: 11, c: 4 }, s: { d: 0, c: 0 } },
-            { name: 'Dispute & Claims Occurred', ns: { d: 24, c: 18 }, s: { d: 0, c: 0 } },
-            { name: 'Information Management', ns: { d: 4, c: 8 }, s: { d: 5, c: 23 } }
-          ],
-          'project_specific': [
-            { name: 'Design Complexity', ns: { d: 12, c: 13 }, s: { d: 0, c: 0 } },
-            { name: 'Degree of Innovation', ns: { d: 15, c: 23 }, s: { d: 0, c: 37 } },
-            { name: 'Environmental Impact', ns: { d: 2, c: 2 }, s: { d: 0, c: 0 } }
-          ],
-          'client_specification': [
-            { name: 'Inadequacy of Business Case', ns: { d: 5, c: 6 }, s: { d: 5, c: 12 } },
-            { name: 'Large Number of Stakeholders', ns: { d: 4, c: 4 }, s: { d: 2, c: 2 } },
-            { name: 'Funding Availability', ns: { d: 5, c: 2 }, s: { d: 0, c: 0 } },
-            { name: 'Project Management Team', ns: { d: 2, c: 5 }, s: { d: 0, c: 15 } },
-            { name: 'Poor Project Intelligence', ns: { d: 2, c: 1 }, s: { d: 0, c: 0 } }
-          ],
-          'environment': [
-            { name: 'Public Relations', ns: { d: 2, c: 2 }, s: { d: 1, c: 1 } },
-            { name: 'Site Characteristics', ns: { d: 1, c: 1 }, s: { d: 0, c: 0 } },
-            { name: 'Permits / Consents / Approvals', ns: { d: 2, c: 2 }, s: { d: 0, c: 0 } }
-          ],
-          'external_influences': [
-            { name: 'Political', ns: { d: 7, c: 2 }, s: { d: 1, c: 1 } },
-            { name: 'Economic', ns: { d: 2, c: 2 }, s: { d: 2, c: 5 } },
-            { name: 'Legislation / Regulations', ns: { d: 4, c: 7 }, s: { d: 2, c: 8 } }
-          ]
-        }
-      }
+    // Helper to process the flat data lookup into the structure required by the app
+    const processDataLookup = () => {
+      const cats = {};
+      Object.keys(PROJECT_DATA_LOOKUP).forEach(key => {
+        const source = PROJECT_DATA_LOOKUP[key];
+        const factors = {};
+        
+        // Group by section
+        source.data.forEach(item => {
+          if (!factors[item.section]) factors[item.section] = [];
+          factors[item.section].push({
+            name: item.name,
+            ns: { d: item.ns_d, c: item.ns_c },
+            s: { d: item.s_d, c: item.s_c }
+          });
+        });
+
+        cats[key] = {
+          id: source.id,
+          name: source.name,
+          icon: key === 'buildings' ? Icons.Briefcase : key === 'civil' ? Icons.HardHat : Icons.Monitor,
+          upper: source.upperBound,
+          factors: factors,
+          types: key === 'equip' 
+            ? [{ id: 'ns', label: 'Equipment / Development' }, { id: 'standard', label: 'Outsourcing' }]
+            : [{ id: 'standard', label: `Standard ${source.name.split(' ')[0]}` }, { id: 'ns', label: `Non-Standard ${source.name.split(' ')[0]}` }, { id: 'combined', label: 'Combined' }]
+        };
+      });
+      return cats;
     };
 
+    const CATEGORIES = processDataLookup();
     const RISK_AREAS_TITLES = { procurement: 'Procurement', project_specific: 'Project Specific', client_specification: 'Client Specification', environment: 'Environment', external_influences: 'External Influences' };
 
     const SCurveChart = ({ originalData, modelledData, themeColor }) => {
@@ -237,7 +279,7 @@
       }, [originalData, modelledData, themeColor]);
       return <div className="h-[460px] w-full chart-container"><canvas ref={canvasRef}></canvas></div>;
     };
-    
+
     const Card = ({ children, className = '', noBg = false }) => (
       <div className={`${noBg ? '' : 'bg-white'} rounded-xl shadow-sm border border-slate-200 print-shadow ${className}`}>
         {children}
@@ -264,18 +306,44 @@
       const [category, setCategory] = useState(saved.category || 'buildings'); 
       const [projectType, setProjectType] = useState(saved.projectType || 'combined');
       const [split, setSplit] = useState(saved.split !== undefined ? saved.split : 50);
+      
       const [mitigations, setMitigations] = useState(() => {
         if (saved.mitigations) return saved.mitigations;
         const initial = {};
         Object.entries(CATEGORIES[category].factors).forEach(([k, fl]) => { fl.forEach(f => { initial[`${k}-${f.name}`] = 0; }); });
         return initial;
       });
+      
+      // Effect to reset mitigations when switching categories if they don't match
+      useEffect(() => {
+        setMitigations(prev => {
+           const newMits = { ...prev };
+           Object.entries(CATEGORIES[category].factors).forEach(([k, fl]) => { 
+             fl.forEach(f => { 
+               if (newMits[`${k}-${f.name}`] === undefined) newMits[`${k}-${f.name}`] = 0; 
+             }); 
+           });
+           return newMits;
+        });
+        
+        setActiveFactors(prev => {
+           const newActive = { ...prev };
+           Object.entries(CATEGORIES[category].factors).forEach(([k, fl]) => { 
+             fl.forEach(f => { 
+               if (newActive[`${k}-${f.name}`] === undefined) newActive[`${k}-${f.name}`] = true; 
+             }); 
+           });
+           return newActive;
+        });
+      }, [category]);
+
       const [activeFactors, setActiveFactors] = useState(() => {
         if (saved.activeFactors) return saved.activeFactors;
         const initial = {};
         Object.entries(CATEGORIES[category].factors).forEach(([k, fl]) => { fl.forEach(f => { initial[`${k}-${f.name}`] = true; }); });
         return initial;
       });
+      
       const [linkTimeOB, setLinkTimeOB] = useState(saved.linkTimeOB !== undefined ? saved.linkTimeOB : true);
       const [manualTimeOB, setManualTimeOB] = useState(saved.manualTimeOB || 10);
       const [linkCostOB, setLinkCostOB] = useState(saved.linkCostOB !== undefined ? saved.linkCostOB : true);
@@ -301,14 +369,14 @@
       const sliderClass = `accent-${themeBase}`;
 
       const handleCategoryChange = (e) => {
-        const newCat = e.target.value; setCategory(newCat); setProjectType(newCat === 'equip' ? 'ns' : 'combined');
-        const cf = CATEGORIES[newCat].factors; const nm = {}; const na = {};
-        Object.entries(cf).forEach(([k, fl]) => { fl.forEach(f => { nm[`${k}-${f.name}`] = 0; na[`${k}-${f.name}`] = true; }); });
-        setMitigations(nm); setActiveFactors(na);
+        const newCat = e.target.value; 
+        setCategory(newCat); 
+        setProjectType(newCat === 'equip' ? 'ns' : 'combined');
       };
 
       const results = useMemo(() => {
         let nsd = 0, nsc = 0, sd = 0, sc = 0, mnsd = 0, mnsc = 0, msd = 0, msc = 0;
+        
         Object.entries(currentCategoryData.factors).forEach(([k, fl]) => {
           fl.forEach(f => {
             const id = `${k}-${f.name}`; 
@@ -318,11 +386,17 @@
             mnsd += f.ns.d; mnsc += f.ns.c; msd += f.s.d; msc += f.s.c;
           });
         });
-        const nDur = mnsd > 0 ? currentCategoryData.upper.ns.duration * (nsd / mnsd) : 0;
-        const nCap = mnsc > 0 ? currentCategoryData.upper.ns.capex * (nsc / mnsc) : 0;
-        const sDur = msd > 0 ? currentCategoryData.upper.s.duration * (sd / msd) : 0;
-        const sCap = msc > 0 ? currentCategoryData.upper.s.capex * (sc / msc) : 0;
+
+        // Safe division check
+        const safeDiv = (num, den) => den === 0 ? 0 : num / den;
+
+        const nDur = currentCategoryData.upper.ns.duration * safeDiv(nsd, mnsd);
+        const nCap = currentCategoryData.upper.ns.capex * safeDiv(nsc, mnsc);
+        const sDur = currentCategoryData.upper.s.duration * safeDiv(sd, msd);
+        const sCap = currentCategoryData.upper.s.capex * safeDiv(sc, msc);
+        
         const ratio = split / 100;
+        
         if (projectType === 'ns') return { finalDurOB: nDur, finalCapOB: nCap };
         if (projectType === 'standard') return { finalDurOB: sDur, finalCapOB: sCap };
         return { finalDurOB: (nDur * ratio) + (sDur * (1 - ratio)), finalCapOB: (nCap * ratio) + (sCap * (1 - ratio)) };
@@ -332,7 +406,7 @@
         const tOver = (linkTimeOB ? results.finalDurOB : manualTimeOB) / 100;
         const cOver = (linkCostOB ? results.finalCapOB : manualCostOB) / 100;
         const tOrig = originalCosts.reduce((a, b) => a + b, 0); 
-        const tRev = tOrig * (1 + cOver); 
+        const tRev = tOrig * (1 + cOver);
         
         // Convert yearly costs to monthly profile om
         let om = []; 
@@ -343,7 +417,6 @@
         });
 
         // Determine Effective Envelope (Actual span of the budget profile)
-        // We find the last month with cost to avoid slicing data the user entered in Year 5, 6, etc.
         let lastMonthWithCost = 0;
         for (let i = om.length - 1; i >= 0; i--) { if (om[i] > 0) { lastMonthWithCost = i + 1; break; } }
         const effectiveSpan = Math.max(originalDuration, lastMonthWithCost);
@@ -364,9 +437,9 @@
         
         let ry = Array(11).fill(0); 
         let ci = 0;
-        for (let y = 0; y < 11; y++) { 
-           let mc = y === 0 ? (13 - startMonth) : 12; 
-           for (let m = 0; m < mc && ci < rm.length; m++, ci++) ry[y] += rm[ci]; 
+        for (let y = 0; y < 11; y++) {
+            let mc = y === 0 ? (13 - startMonth) : 12;
+            for (let m = 0; m < mc && ci < rm.length; m++, ci++) ry[y] += rm[ci]; 
         }
 
         return { 
@@ -450,34 +523,34 @@
                   <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${subHeaderBg}`}>{currentCategoryData.name}</span>
                 </div>
               </div>
-              <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-                 <input type="text" placeholder="Project Name..." value={projectName} onChange={(e) => setProjectName(e.target.value)} className="px-3 py-1.5 rounded text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-white/50 bg-white/90" />
-                 <div className="flex bg-black/20 p-1 rounded-lg tab-navigation">
-                   <button onClick={() => setActiveTab('projects')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'projects' ? 'bg-white shadow text-slate-900' : 'text-white/70 hover:text-white'}`}>Adjustments</button>
-                   <button onClick={() => setActiveTab('reprofiler')} disabled={isOutsourcing} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'reprofiler' ? 'bg-white shadow text-slate-900' : isOutsourcing ? 'text-white/30 cursor-not-allowed' : 'text-white/70 hover:text-white'}`}>Reprofiling</button>
-                 </div>
-                 <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm text-white transition-colors"><Icons.Printer className="w-4 h-4" /></button>
-                 <button onClick={saveProjectFile} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm text-white transition-colors"><Icons.Save className="w-4 h-4" /></button>
+              <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto"> 
+                <input type="text" placeholder="Project Name..." value={projectName} onChange={(e) => setProjectName(e.target.value)} className="px-3 py-1.5 rounded text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-white/50 bg-white/90" />
+                <div className="flex bg-black/20 p-1 rounded-lg tab-navigation">
+                  <button onClick={() => setActiveTab('projects')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'projects' ? 'bg-white shadow text-slate-900' : 'text-white/70 hover:text-white'}`}>Adjustments</button>
+                  <button onClick={() => setActiveTab('reprofiler')} disabled={isOutsourcing} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'reprofiler' ? 'bg-white shadow text-slate-900' : isOutsourcing ? 'text-white/30 cursor-not-allowed' : 'text-white/70 hover:text-white'}`}>Reprofiling</button>
+                </div>
+                <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm text-white transition-colors"><Icons.Printer className="w-4 h-4" /></button>
+                <button onClick={saveProjectFile} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm text-white transition-colors"><Icons.Save className="w-4 h-4" /></button>
               </div>
             </div>
           </header>
 
           <main className="max-w-6xl mx-auto p-4 md:p-6 pb-24">
             <div className={`page-one print-visible-section ${activeTab === 'projects' ? 'block' : 'hidden md:hidden'}`}>
-                <div className="grid md:grid-cols-2 gap-6 mb-6 no-print">
-                   <Card className="p-4 flex items-center gap-4">
+                <div className="grid md:grid-cols-2 gap-6 mb-6 no-print"> 
+                  <Card className="p-4 flex items-center gap-4">
                       <div className={`p-3 rounded-full ${lightBgClass}`}><currentCategoryData.icon className={`w-6 h-6 ${colorClass}`} /></div>
                       <div className="flex-1 relative">
-                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Project Category</label>
-                         <div className="flex items-center group">
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Project Category</label>
+                        <div className="flex items-center group">
                             <select value={category} onChange={handleCategoryChange} className="w-full appearance-none bg-transparent font-semibold text-lg text-slate-800 focus:outline-none cursor-pointer pr-8 z-10">
-                               {Object.values(CATEGORIES).map(cat => (<option key={cat.id} value={cat.id}>{cat.name}</option>))}
+                              {Object.values(CATEGORIES).map(cat => (<option key={cat.id} value={cat.id}>{cat.name}</option>))}
                             </select>
                             <Icons.ChevronDown className="w-4 h-4 absolute right-0 text-slate-400 pointer-events-none group-hover:text-slate-600 transition-colors" />
-                         </div>
+                        </div>
                       </div>
-                   </Card>
-                   <Card className="p-4">
+                  </Card>
+                  <Card className="p-4">
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Project Type</label>
                       <div className="flex flex-wrap gap-3">
                         {currentCategoryData.types.map(t => (
@@ -485,30 +558,34 @@
                         ))}
                       </div>
                       {projectType === 'combined' && (
-                         <div className="mt-3 pt-3 border-t border-slate-100 no-print">
+                        <div className="mt-3 pt-3 border-t border-slate-100 no-print">
                             <div className="flex justify-between text-[10px] font-black text-slate-400 mb-1 uppercase tracking-tighter">
-                               <span>Standard ({100-split}%)</span>
-                               <span>Non-Standard ({split}%)</span>
+                              <span>Standard ({100-split}%)</span>
+                              <span>Non-Standard ({split}%)</span>
                             </div>
                             <Slider value={split} onChange={setSplit} colorClass={sliderClass} />
-                         </div>
+                        </div>
                       )}
-                   </Card>
+                  </Card>
                 </div>
+
                 <div className="card-grid grid lg:grid-cols-2 gap-6">
                   {Object.entries(currentCategoryData.factors).map(([areaKey, factors]) => {
                     if (areaKey === 'external_influences') return null;
                     return (
                       <Card key={areaKey} className="p-5 print-shadow">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-4">
-                             <h3 className="font-bold text-slate-800">{RISK_AREAS_TITLES[areaKey]}</h3>
-                             <div className="flex gap-2 no-print">
-                               <button onClick={() => factors.forEach(f => setMitigations(p => ({ ...p, [`${areaKey}-${f.name}`]: 100 })))} className={`text-[10px] uppercase font-black px-2 py-0.5 rounded transition-colors bg-slate-100 text-slate-500 hover:${bgClass} hover:text-white`}>Max All</button>
-                               <button onClick={() => factors.forEach(f => setMitigations(p => ({ ...p, [`${areaKey}-${f.name}`]: 0 })))} className="text-[10px] uppercase font-black px-2 py-0.5 rounded transition-colors bg-slate-100 text-slate-500 hover:bg-slate-200">Reset</button>
-                             </div>
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-4"> 
+                            <h3 className="font-bold text-slate-800">{RISK_AREAS_TITLES[areaKey]}</h3>
+                            <div className="flex gap-2 no-print">
+                              <button onClick={() => factors.forEach(f => setMitigations(p => ({ ...p, [`${areaKey}-${f.name}`]: 100 })))} className={`text-[10px] uppercase font-black px-2 py-0.5 rounded transition-colors bg-slate-100 text-slate-500 hover:${bgClass} hover:text-white`}>Max All</button>
+                              <button onClick={() => factors.forEach(f => setMitigations(p => ({ ...p, [`${areaKey}-${f.name}`]: 0 })))} className="text-[10px] uppercase font-black px-2 py-0.5 rounded transition-colors bg-slate-100 text-slate-500 hover:bg-slate-200">Reset</button>
+                            </div>
                           </div>
                           <div className="space-y-6">
                             {factors.map((factor, idx) => {
+                              // Filter out rows where all values are zero
+                              if (factor.ns.d === 0 && factor.ns.c === 0 && factor.s.d === 0 && factor.s.c === 0) return null;
+
                               const id = `${areaKey}-${factor.name}`; 
                               const active = activeFactors[id] !== false; 
                               const mit = mitigations[id] || 0;
@@ -541,15 +618,24 @@
                 </div>
             </div>
 
-            <div className={`page-two print-visible-section ${activeTab === 'projects' ? 'block' : 'hidden md:hidden'}`}>
+            <div className={`page-two print-visible-section mt-6 ${activeTab === 'projects' ? 'block' : 'hidden md:hidden'}`}>
                 <div className="card-grid grid lg:grid-cols-2 gap-6">
                   {Object.entries(currentCategoryData.factors).map(([areaKey, factors]) => {
                     if (areaKey !== 'external_influences') return null;
                     return (
                       <Card key={areaKey} className="p-5 print-shadow external-influences-card">
-                          <SectionHeader title={RISK_AREAS_TITLES[areaKey]} />
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-4"> 
+                            <h3 className="font-bold text-slate-800">{RISK_AREAS_TITLES[areaKey]}</h3>
+                            <div className="flex gap-2 no-print">
+                              <button onClick={() => factors.forEach(f => setMitigations(p => ({ ...p, [`${areaKey}-${f.name}`]: 100 })))} className={`text-[10px] uppercase font-black px-2 py-0.5 rounded transition-colors bg-slate-100 text-slate-500 hover:${bgClass} hover:text-white`}>Max All</button>
+                              <button onClick={() => factors.forEach(f => setMitigations(p => ({ ...p, [`${areaKey}-${f.name}`]: 0 })))} className="text-[10px] uppercase font-black px-2 py-0.5 rounded transition-colors bg-slate-100 text-slate-500 hover:bg-slate-200">Reset</button>
+                            </div>
+                          </div>
                           <div className="space-y-6">
                             {factors.map((factor, idx) => {
+                              // Filter out rows where all values are zero
+                              if (factor.ns.d === 0 && factor.ns.c === 0 && factor.s.d === 0 && factor.s.c === 0) return null;
+
                               const id = `${areaKey}-${factor.name}`; 
                               const active = activeFactors[id] !== false; 
                               const mit = mitigations[id] || 0;
@@ -603,6 +689,7 @@
                      </div>
                    </div>
                 </Card>
+
                 <div className="grid md:grid-cols-2 gap-6 mb-6">
                   <Card className="p-5 print-shadow">
                     <SectionHeader title="Programme Parameters" icon={Icons.Calendar} colorClass={colorClass} />
@@ -638,18 +725,20 @@
                     </div>
                   </Card>
                 </div>
+
                 <Card className="p-6 mb-6 print-shadow">
                   <SectionHeader title="Initial Budget Profile (Annual)" icon={Icons.Euro} colorClass={colorClass} />
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm"> 
                        <thead><tr className="text-[10px] text-slate-400 uppercase">{originalCosts.map((_, i) => <th key={i} className="p-2 text-left">Year {i}</th>)}<th className="p-2 text-right">Total</th></tr></thead>
                        <tbody><tr>{originalCosts.map((v, i) => (<td key={i} className="p-1"><input type="number" value={v} onChange={(e) => { const n = [...originalCosts]; n[i] = Number(e.target.value); setOriginalCosts(n); }} className="w-full border border-slate-100 rounded text-right p-1 no-print" /><span className="hidden print-only text-right font-bold block">{v > 0 ? v.toLocaleString() : '-'}</span></td>))}<td className="p-2 text-right font-bold text-slate-800">€{reprofileResults.totalOriginalCost.toLocaleString()}</td></tr></tbody>
                     </table>
                   </div>
                 </Card>
+
                 <Card className="p-6 mb-6 overflow-x-auto print-shadow">
                   <SectionHeader title="Reprofiled Plan" icon={Icons.BarChart3} colorClass={colorClass} />
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm"> 
                      <thead>
                        <tr className="text-[10px] text-slate-400 uppercase border-b border-slate-100">
                           {reprofileResults.revisedYearly.map((_, i) => <th key={i} className="p-2 text-right">Year {i}</th>)}
@@ -671,6 +760,7 @@
                   <SectionHeader title="Cumulative Expenditure Profile (S-Curve)" icon={Icons.TrendingUp} colorClass={colorClass} />
                   <SCurveChart originalData={reprofileResults.originalMonthly} modelledData={reprofileResults.revisedMonthly} themeColor={hexColor} />
                 </Card>
+
                 <div className="hidden print-only print-signature-block">
                   <div className="flex justify-between items-end mb-8">
                     <div>
@@ -689,7 +779,7 @@
                 </div>
             </div>
             
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-100 to-transparent pointer-events-none z-40 no-print fixed-summary">
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-100 to-transparent pointer-events-none z-40 no-print fixed-summary"> 
                <Card noBg className={`max-w-6xl mx-auto ${summaryBg} text-white border-none shadow-2xl p-4 md:p-6 pointer-events-auto`}>
                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                    <div><h2 className="text-lg font-bold text-white tracking-tight">Calculated Optimism Bias</h2><p className="text-[10px] uppercase font-black text-white/50 tracking-widest">{currentCategoryData.name}</p></div>
@@ -723,7 +813,7 @@
             </div>
             
             <footer className="mt-20 pt-8 border-t border-slate-200 text-center no-print pb-32">
-              <div className="max-w-2xl mx-auto px-4 mb-8">
+              <div className="max-w-2xl mx-auto px-4 mb-8"> 
                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2">Methodology Statement</p>
                  <p className="text-[12px] text-slate-600 leading-relaxed italic border-l-4 border-slate-200 pl-4 py-1 text-left">{MethodologyText}</p>
               </div>
@@ -736,6 +826,7 @@
         </div>
       );
     }
+
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
