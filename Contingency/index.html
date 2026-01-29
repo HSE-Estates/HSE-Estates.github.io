@@ -48,7 +48,7 @@
     @media print {
       @page { 
         size: A4 landscape; 
-        margin: 1.5cm; /* Standard print margins */
+        margin: 1.0cm; /* Slightly reduced margin to help 5 tiles fit comfortably */
       }
       
       body { 
@@ -426,39 +426,41 @@
 
           <main className="max-w-7xl mx-auto p-6 flex-grow w-full">
             
-            {/* Top Stats Bar */}
-            <div className="grid md:grid-cols-3 gap-4 mb-4">
+            {/* Top Stats Bar - 5 Tiles Across on Large Screens */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 print:grid-cols-5 gap-4 mb-8">
+               {/* Tile 1: Project Name */}
                <Card className="bg-white border-l-4 border-emerald-600">
                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Project Name</label>
                  <input type="text" value={projectName} onChange={e => setProjectName(e.target.value)} className="w-full font-bold text-slate-800 border-b border-dashed border-slate-300 focus:outline-none focus:border-emerald-500 bg-transparent text-lg truncate" />
                </Card>
+
+               {/* Tile 2: Value */}
                <Card className="bg-white border-l-4 border-emerald-600">
-                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Project Value (€)</label>
+                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Value (€)</label>
                  <NumberInput value={projectValue} onChange={setProjectValue} className="w-full font-bold text-slate-800 border-b border-dashed border-slate-300 focus:outline-none focus:border-emerald-500 bg-transparent text-lg" />
                </Card>
+
+               {/* Tile 3: Duration */}
                <Card className="bg-white border-l-4 border-slate-500">
-                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Est. Project Duration (Weeks)</label>
+                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Duration (Wks)</label>
                  <NumberInput value={projectDuration} onChange={setProjectDuration} className="w-full font-bold text-slate-800 border-b border-dashed border-slate-300 focus:outline-none focus:border-slate-500 bg-transparent text-lg" />
+               </Card>
+
+               {/* Tile 4: Cost Cont. */}
+               <Card className="bg-emerald-50 border-l-4 border-emerald-600">
+                 <label className="text-xs font-bold text-emerald-600/70 uppercase tracking-wider block mb-1">Contingency (€)</label>
+                 <div className="text-xl font-black text-emerald-700 truncate">€{stats.totalCostEV.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                 <div className="text-xs font-bold text-emerald-600 mt-1">{percentBudget}% of Value</div>
+               </Card>
+
+               {/* Tile 5: Time Cont. */}
+               <Card className="bg-slate-50 border-l-4 border-slate-500">
+                 <label className="text-xs font-bold text-slate-500/70 uppercase tracking-wider block mb-1">Contingency (Wks)</label>
+                 <div className="text-xl font-black text-slate-700">{stats.totalTimeEV.toFixed(1)} <span className="text-xs font-normal">wks</span></div>
+                 <div className="text-xs font-bold text-slate-500 mt-1">{percentSchedule}% of Duration</div>
                </Card>
             </div>
             
-            <div className="grid md:grid-cols-2 gap-4 mb-8">
-               <Card className="bg-emerald-50 border-l-4 border-emerald-600">
-                 <label className="text-xs font-bold text-emerald-600/70 uppercase tracking-wider block mb-1">Calculated Contingency (€)</label>
-                 <div className="flex justify-between items-end">
-                    <div className="text-2xl font-black text-emerald-700">€{stats.totalCostEV.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-                    <div className="text-sm font-bold text-emerald-600 bg-emerald-100 px-2 py-1 rounded">{percentBudget}% of Value</div>
-                 </div>
-               </Card>
-               <Card className="bg-slate-50 border-l-4 border-slate-500">
-                 <label className="text-xs font-bold text-slate-500/70 uppercase tracking-wider block mb-1">Calculated Contingency (Weeks)</label>
-                 <div className="flex justify-between items-end">
-                    <div className="text-2xl font-black text-slate-700">{stats.totalTimeEV.toFixed(1)} <span className="text-sm font-normal text-slate-400">weeks</span></div>
-                    <div className="text-sm font-bold text-slate-600 bg-slate-200 px-2 py-1 rounded">{percentSchedule}% of Duration</div>
-                 </div>
-               </Card>
-            </div>
-
             {/* Dashboard View */}
             <div className={view === 'dashboard' ? 'block' : 'hidden print-only'}>
               <div className="grid md:grid-cols-3 gap-6 mb-8">
