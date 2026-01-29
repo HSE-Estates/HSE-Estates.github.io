@@ -75,13 +75,22 @@
 
         const AppCard = ({ app }) => {
             // Logic to determine icon style based on app type
-            const isFinance = app.category === 'Financial';
+            const getIconStyle = (category) => {
+                switch(category) {
+                    case 'Financial': return 'bg-emerald-50 text-emerald-600';
+                    case 'Risk': return 'bg-amber-50 text-amber-600';
+                    case 'Operations': return 'bg-blue-50 text-blue-600';
+                    case 'Productivity': return 'bg-purple-50 text-purple-600';
+                    case 'Clinical Strategy': return 'bg-rose-50 text-rose-600';
+                    default: return 'bg-slate-50 text-slate-600';
+                }
+            };
             
             return (
                 <div className="app-card bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col h-full animate-fade-in">
                     <div className="p-6 flex-1">
                         <div className="flex justify-between items-start mb-4">
-                            <div className={`p-3 rounded-xl ${isFinance ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                            <div className={`p-3 rounded-xl ${getIconStyle(app.category)}`}>
                                 <Icon name={app.icon} size={24} />
                             </div>
                             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-50 px-2 py-1 rounded">
@@ -135,8 +144,43 @@
                     category: "Risk",
                     tag: "Appraisal Tool",
                     icon: "scale"
+                },
+                {
+                    id: 3,
+                    title: "Contingency Assessment",
+                    url: "https://hse-estates.github.io/Contingency/",
+                    description: "Determine appropriate contingency levels for capital projects based on risk exposure and project complexity factors.",
+                    category: "Financial",
+                    tag: "Budget Tool",
+                    icon: "calculator"
+                },
+                {
+                    id: 4,
+                    title: "SW Facilities Dashboard",
+                    url: "https://southwestfacilities.streamlit.app/",
+                    description: "Real-time portal for infrastructure monitoring and safety management across HSE South West facilities.",
+                    category: "Operations",
+                    tag: "FM Portal",
+                    icon: "building-2"
+                },
+                {
+                    id: 5,
+                    title: "Estates Minutes Assistant",
+                    url: "https://mai-recap.streamlit.app/",
+                    description: "AI-powered documentation tool. Automatically generates meeting minutes and formal estates briefs from transcripts.",
+                    category: "Productivity",
+                    tag: "Admin Support",
+                    icon: "bot"
+                },
+                {
+                    id: 6,
+                    title: "Waiting List Strategist",
+                    url: "https://waitinglist.streamlit.app/",
+                    description: "Strategic command centre using 'Prophet' AI to forecast patient influx, simulate staffing scenarios, and re-rank priorities.",
+                    category: "Clinical Strategy",
+                    tag: "Patient Flow",
+                    icon: "activity"
                 }
-                // To add a new app, copy one of the blocks above, paste it here, and change the details.
             ];
 
             useEffect(() => {
