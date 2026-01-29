@@ -54,7 +54,7 @@
 
     /* Print Styles - Enhanced for Report Quality */
     @media print {
-      @page { size: landscape; margin: 1.25cm; } 
+      @page { size: landscape; margin: 0.75cm; } /* Standard safe margins */
       
       body { 
         background: white; 
@@ -62,11 +62,11 @@
         print-color-adjust: exact !important;
       }
 
-      /* Allow the green header to print */
+      /* Allow the green header to print as a contained block */
       nav { 
         display: block !important; 
         margin-bottom: 20px; 
-        border-radius: 8px; /* Rounds the corners since it no longer touches edges */
+        border-radius: 0.5rem; /* Rounded corners since it sits inside margins */
       }
 
       /* Hide interactive UI Elements */
@@ -218,7 +218,7 @@
         if (window.HSE_PRELOADED_DATA && window.HSE_PRELOADED_DATA.config) return window.HSE_PRELOADED_DATA.config;
         const saved = localStorage.getItem(STORAGE_KEY);
         return saved ? JSON.parse(saved) : {
-          projectName: 'Strategic Capital Project A',
+          projectName: 'Example Project',
           budget: 2500000,
           duration: 24,
           fundingMonthly: 120000,
@@ -491,7 +491,7 @@
          if (!confirm("FULL WIPE: This will delete the Project Name, Budget, Duration, and ALL data. \n\nAre you sure you want to start completely fresh?")) return;
 
          const emptyConfig = {
-            projectName: 'New Project',
+            projectName: 'Example Project',
             budget: 0,
             duration: 12,
             fundingMonthly: 0,
