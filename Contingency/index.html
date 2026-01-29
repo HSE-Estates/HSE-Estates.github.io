@@ -48,22 +48,24 @@
     @media print {
       @page { 
         size: A4 landscape; 
-        margin: 12mm; /* Standard margins to prevent cutoff */
+        margin: 15mm; /* Increased margins to prevent edge cutoff */
       }
       
       body { 
         background-color: #ffffff !important; 
         color: #000 !important;
         width: 100%;
+        margin: 0 !important;
+        padding: 0 !important;
       }
 
       /* Hide interactive elements */
       .no-print, header button, .fixed-actions, .slider-container { display: none !important; }
       .print-only { display: block !important; }
       
-      /* Ensure Main Container Fits */
+      /* Ensure Main Container Fits and has padding */
       main {
-        padding: 0 !important;
+        padding: 0 10px !important; /* Extra safety padding */
         margin: 0 !important;
         width: 100% !important;
         max-width: 100% !important;
@@ -497,7 +499,7 @@
             
             {/* Dashboard View */}
             <div className={view === 'dashboard' ? 'block' : 'hidden print-only'}>
-              <div className="grid md:grid-cols-3 gap-6 mb-8 print:grid print:grid-cols-3 print:gap-6 print:break-inside-avoid">
+              <div className="grid md:grid-cols-3 gap-6 mb-8 print:grid print:grid-cols-3 print:gap-8 print:break-inside-avoid">
                 <Card className="md:col-span-2 print:col-span-2">
                   <div className="flex justify-between items-center mb-6">
                     <h3 className="font-bold text-slate-700 flex items-center gap-2"><Icons.Euro className="w-5 h-5 text-emerald-600"/> Contingency by Category</h3>
