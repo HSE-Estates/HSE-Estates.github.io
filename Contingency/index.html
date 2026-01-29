@@ -44,14 +44,53 @@
       background: #e2e8f0; border-radius: 2px;
     }
 
+    /* Print Specific Styles */
     @media print {
-      @page { size: A4 landscape; margin: 1cm; }
-      body { background-color: #ffffff !important; }
-      .no-print, header button, .fixed-actions { display: none !important; }
+      @page { 
+        size: A4 landscape; 
+        margin: 1.5cm; /* Standard print margins */
+      }
+      
+      body { 
+        background-color: #ffffff !important; 
+        color: #000 !important;
+      }
+
+      /* Hide interactive elements */
+      .no-print, header button, .fixed-actions, .slider-container { display: none !important; }
       .print-only { display: block !important; }
-      .card { box-shadow: none !important; border: 1px solid #e2e8f0 !important; break-inside: avoid; }
+      
+      /* Enhance Contrast for Print */
+      .card { 
+        box-shadow: none !important; 
+        border: 1px solid #cbd5e1 !important; 
+        break-inside: avoid; 
+        margin-bottom: 20px;
+      }
+
+      /* Chart Sizing for Print - Prevents Squashing */
+      .chart-container {
+        height: 350px !important;
+        width: 100% !important;
+        page-break-inside: avoid;
+      }
+      
+      /* Ensure text is black */
+      h1, h2, h3, p, td, th { color: #000 !important; }
+      
+      /* Page Breaks */
       .page-break { page-break-before: always; }
-      canvas { max-height: 300px !important; width: 100% !important; }
+      
+      /* Force footer to bottom of printed page */
+      .print-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        border-top: 1px solid #e2e8f0;
+        padding-top: 10px;
+        background: white;
+      }
     }
     .print-only { display: none; }
   </style>
@@ -66,11 +105,9 @@
 
     /* ========================================================================================
        CONSTANTS & CONFIGURATION
-       Derived from "Scoring.csv" and "RR Reference.csv"
        ======================================================================================== */
     
     // Probability Ratings (1-5) mapping to Percentage Factors
-    // These match the HSE CSV file exactly.
     const PROBABILITY_FACTORS = {
       1: { label: 'Very Low (VLO)', factor: 0.05, desc: '<10% Chance' },
       2: { label: 'Low (LO)', factor: 0.15, desc: '11-30% Chance' },
@@ -112,7 +149,6 @@
       Briefcase: (props) => <Icon {...props} path={<><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></>} />,
       Layout: (props) => <Icon {...props} path={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></>} />,
       List: (props) => <Icon {...props} path={<><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></>} />,
-      Clock: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>} />,
     };
 
     const Card = ({ children, className = '', noPad = false }) => (
@@ -124,15 +160,14 @@
     );
 
     /* ========================================================================================
-       NUMBER INPUT COMPONENT (HANDLES COMMAS)
+       NUMBER INPUT COMPONENT
        ======================================================================================== */
     const NumberInput = ({ value, onChange, className, placeholder }) => {
       const [displayValue, setDisplayValue] = useState('');
 
       useEffect(() => {
-        // Update display value when prop changes, formatting with commas
         if (value === 0 && displayValue === '') {
-           setDisplayValue(''); // Allow empty field
+           setDisplayValue(''); 
         } else {
            setDisplayValue(value ? Number(value).toLocaleString() : '');
         }
@@ -140,20 +175,9 @@
 
       const handleChange = (e) => {
         const inputVal = e.target.value;
-        // Remove all non-numeric characters except decimal point
         const cleanVal = inputVal.replace(/[^0-9.]/g, '');
-        
-        // Update internal display state immediately to allow typing
-        // We only format on blur or if it's a valid number to prevent jumping cursor
-        // For simplicity in this demo, we'll format as we type but handle the cursor issue loosely 
-        // by just updating the numeric value in parent
-        
-        // Better strategy: Store raw input locally, only formatting visually
         const numericVal = parseFloat(cleanVal);
         onChange(isNaN(numericVal) ? 0 : numericVal);
-        
-        // Add commas for display
-        // Simple regex for adding commas to integer part
         const parts = cleanVal.split('.');
         parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
         setDisplayValue(parts.join('.'));
@@ -185,32 +209,22 @@
     function App() {
       const saved = window.SAVED_STATE || {};
       
-      // -- State --
-      const [view, setView] = useState('dashboard'); // dashboard, register
+      const [view, setView] = useState('dashboard');
       const [projectValue, setProjectValue] = useState(saved.projectValue || 5000000);
-      const [projectDuration, setProjectDuration] = useState(saved.projectDuration || 52); // Weeks
+      const [projectDuration, setProjectDuration] = useState(saved.projectDuration || 52); 
       const [projectName, setProjectName] = useState(saved.projectName || 'Example Capital Project');
       const [risks, setRisks] = useState(saved.risks || INITIAL_RISKS);
       
       const [isModalOpen, setIsModalOpen] = useState(false);
       const [editingRisk, setEditingRisk] = useState(null);
 
-      // -- Calculations --
-
-      // Helper: Calculate Expected Value (Weighted Average * Probability Factor)
-      // Logic from tool: ((Min + ML + Max) / 3) * ProbabilityFactor
+      // Calculations
       const calculateEV = (min, ml, max, probRating) => {
         const avg = (Number(min) + Number(ml) + Number(max)) / 3;
         const factor = PROBABILITY_FACTORS[probRating].factor;
         return avg * factor;
       };
 
-      // Helper: Calculate Risk Score (Criticality)
-      // Scoring: 
-      // 1. Determine Cost Impact Rating based on % of Project Budget
-      //    >2% = 5, 1-2% = 4, 0.5-1% = 3, 0.1-0.5% = 2, <0.1% = 1
-      // 2. Multiply Cost Impact Rating * Probability Rating (1-5)
-      // 3. Score > 12 = High, 6-12 = Med, < 6 = Low
       const getCriticality = (evCost, probRating) => {
         const percentOfBudget = (evCost / projectValue) * 100;
         let impactRating = 1;
@@ -225,7 +239,6 @@
         return { label: 'Low', color: 'text-emerald-600 bg-emerald-50 border-emerald-200', score };
       };
 
-      // Derived Statistics
       const stats = useMemo(() => {
         let totalCostEV = 0;
         let totalTimeEV = 0;
@@ -249,8 +262,7 @@
         return { totalCostEV, totalTimeEV, catBreakdown, critBreakdown };
       }, [risks, projectValue]);
 
-      // -- Handlers --
-      
+      // Handlers
       const handleSave = () => {
         const stateToSave = { projectValue, projectDuration, projectName, risks };
         const clone = document.documentElement.cloneNode(true);
@@ -286,12 +298,18 @@
         setIsModalOpen(true);
       };
 
-      // -- Charts --
+      // -- Fancier Charts --
       
       const BarChart = ({ data }) => {
         const canvasRef = useRef(null);
         useEffect(() => {
           const ctx = canvasRef.current.getContext('2d');
+          
+          // Create gradient for bars
+          const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+          gradient.addColorStop(0, '#10b981'); // Emerald 500
+          gradient.addColorStop(1, '#064e3b'); // Emerald 900
+
           const chart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -299,20 +317,44 @@
               datasets: [{
                 label: 'Cost Contingency (€)',
                 data: Object.values(data),
-                backgroundColor: '#059669',
-                borderRadius: 4
+                backgroundColor: gradient,
+                borderRadius: 8,
+                borderSkipped: false,
+                barThickness: 'flex',
+                maxBarThickness: 40
               }]
             },
             options: {
               responsive: true,
               maintainAspectRatio: false,
-              plugins: { legend: { display: false } },
-              scales: { y: { beginAtZero: true, grid: { borderDash: [2, 2] } }, x: { grid: { display: false } } }
+              plugins: { 
+                legend: { display: false },
+                tooltip: {
+                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                  titleColor: '#1f2937',
+                  bodyColor: '#1f2937',
+                  borderColor: '#e5e7eb',
+                  borderWidth: 1,
+                  padding: 10,
+                  displayColors: false
+                }
+              },
+              scales: { 
+                y: { 
+                  beginAtZero: true, 
+                  grid: { borderDash: [4, 4], color: '#f3f4f6' },
+                  ticks: { font: { family: "'Segoe UI', sans-serif" } }
+                }, 
+                x: { 
+                  grid: { display: false },
+                  ticks: { font: { family: "'Segoe UI', sans-serif" } }
+                } 
+              }
             }
           });
           return () => chart.destroy();
         }, [data]);
-        return <div className="h-64"><canvas ref={canvasRef} /></div>;
+        return <div className="chart-container h-64"><canvas ref={canvasRef} /></div>;
       };
 
       const DoughnutChart = ({ data }) => {
@@ -325,26 +367,40 @@
               labels: Object.keys(data),
               datasets: [{
                 data: Object.values(data),
-                backgroundColor: ['#ef4444', '#d97706', '#10b981'], // Red, Amber, Green
-                borderWidth: 0
+                backgroundColor: ['#ef4444', '#f59e0b', '#10b981'], // Red 500, Amber 500, Emerald 500
+                hoverOffset: 4,
+                borderWidth: 2,
+                borderColor: '#ffffff'
               }]
             },
             options: {
               responsive: true,
               maintainAspectRatio: false,
-              cutout: '70%',
-              plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle' } } }
+              cutout: '65%',
+              plugins: { 
+                legend: { 
+                  position: 'bottom', 
+                  labels: { usePointStyle: true, pointStyle: 'circle', font: { family: "'Segoe UI', sans-serif", weight: 'bold' } } 
+                },
+                tooltip: {
+                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                  bodyColor: '#1f2937',
+                  borderColor: '#e5e7eb',
+                  borderWidth: 1,
+                  padding: 10
+                }
+              }
             }
           });
           return () => chart.destroy();
         }, [data]);
-        return <div className="h-64"><canvas ref={canvasRef} /></div>;
+        return <div className="chart-container h-64"><canvas ref={canvasRef} /></div>;
       };
 
       // -- Render --
 
       return (
-        <div className="min-h-screen pb-20">
+        <div className="min-h-screen pb-20 flex flex-col">
           
           {/* Header */}
           <header className="bg-emerald-900 text-white p-4 shadow-lg sticky top-0 z-50 no-print">
@@ -378,7 +434,7 @@
             </div>
           </header>
 
-          <main className="max-w-7xl mx-auto p-6">
+          <main className="max-w-7xl mx-auto p-6 flex-grow w-full">
             
             {/* Top Stats Bar */}
             <div className="grid md:grid-cols-4 gap-4 mb-8">
@@ -403,7 +459,7 @@
 
             {/* Dashboard View */}
             <div className={view === 'dashboard' ? 'block' : 'hidden print-only'}>
-              <div className="grid md:grid-cols-3 gap-6 mb-6">
+              <div className="grid md:grid-cols-3 gap-6 mb-8">
                 <Card className="md:col-span-2">
                   <div className="flex justify-between items-center mb-6">
                     <h3 className="font-bold text-slate-700 flex items-center gap-2"><Icons.Euro className="w-5 h-5 text-emerald-600"/> Contingency by Category</h3>
@@ -423,39 +479,42 @@
                 </Card>
               </div>
 
-              <Card className="overflow-hidden">
-                <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Icons.List className="w-5 h-5 text-slate-400"/> Top Risks (By Cost Impact)</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="text-xs text-slate-400 uppercase bg-slate-50 font-bold">
-                      <tr>
-                        <th className="px-4 py-3">Risk Name</th>
-                        <th className="px-4 py-3">Category</th>
-                        <th className="px-4 py-3">Probability</th>
-                        <th className="px-4 py-3 text-right">Expected Cost (€)</th>
-                        <th className="px-4 py-3 text-center">Criticality</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {[...risks].sort((a,b) => calculateEV(b.costMin, b.costML, b.costMax, b.probRating) - calculateEV(a.costMin, a.costML, a.costMax, a.probRating)).slice(0, 5).map(r => {
-                         const ev = calculateEV(r.costMin, r.costML, r.costMax, r.probRating);
-                         const crit = getCriticality(ev, r.probRating);
-                         return (
-                          <tr key={r.id} className="hover:bg-slate-50">
-                            <td className="px-4 py-3 font-medium text-slate-700">{r.name}</td>
-                            <td className="px-4 py-3 text-slate-500">{r.category}</td>
-                            <td className="px-4 py-3 text-slate-500">{PROBABILITY_FACTORS[r.probRating].label}</td>
-                            <td className="px-4 py-3 text-right font-mono font-medium">€{ev.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
-                            <td className="px-4 py-3 text-center">
-                              <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${crit.color}`}>{crit.label}</span>
-                            </td>
-                          </tr>
-                         )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
+              {/* Added Margin Top for Print Separation as requested */}
+              <div className="mt-8">
+                <Card className="overflow-hidden">
+                  <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Icons.List className="w-5 h-5 text-slate-400"/> Top Risks (By Cost Impact)</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="text-xs text-slate-400 uppercase bg-slate-50 font-bold">
+                        <tr>
+                          <th className="px-4 py-3">Risk Name</th>
+                          <th className="px-4 py-3">Category</th>
+                          <th className="px-4 py-3">Probability</th>
+                          <th className="px-4 py-3 text-right">Expected Cost (€)</th>
+                          <th className="px-4 py-3 text-center">Criticality</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {[...risks].sort((a,b) => calculateEV(b.costMin, b.costML, b.costMax, b.probRating) - calculateEV(a.costMin, a.costML, a.costMax, a.probRating)).slice(0, 5).map(r => {
+                           const ev = calculateEV(r.costMin, r.costML, r.costMax, r.probRating);
+                           const crit = getCriticality(ev, r.probRating);
+                           return (
+                            <tr key={r.id} className="hover:bg-slate-50">
+                              <td className="px-4 py-3 font-medium text-slate-700">{r.name}</td>
+                              <td className="px-4 py-3 text-slate-500">{r.category}</td>
+                              <td className="px-4 py-3 text-slate-500">{PROBABILITY_FACTORS[r.probRating].label}</td>
+                              <td className="px-4 py-3 text-right font-mono font-medium">€{ev.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                              <td className="px-4 py-3 text-center">
+                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${crit.color}`}>{crit.label}</span>
+                              </td>
+                            </tr>
+                           )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </div>
             </div>
 
             {/* Risk Register View */}
@@ -467,85 +526,96 @@
                 </button>
               </div>
 
-              <Card className="overflow-hidden" noPad>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="text-xs text-slate-400 uppercase bg-slate-50 font-bold border-b border-slate-200">
-                      <tr>
-                        <th className="px-4 py-3">Risk Details</th>
-                        <th className="px-4 py-3">Category / Stage</th>
-                        <th className="px-4 py-3">Probability</th>
-                        <th className="px-4 py-3">Est. Cost Range (€)</th>
-                        <th className="px-4 py-3 text-right bg-emerald-50/50">W. Avg Cost (€)</th>
-                        <th className="px-4 py-3 text-center">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {risks.map(r => {
-                         const ev = calculateEV(r.costMin, r.costML, r.costMax, r.probRating);
-                         const crit = getCriticality(ev, r.probRating);
-                         return (
-                          <tr key={r.id} className="hover:bg-slate-50 group">
-                            <td className="px-4 py-3 max-w-xs">
-                              <div className="font-bold text-slate-700">{r.name}</div>
-                              <div className="flex gap-2 mt-1">
-                                <span className={`text-[9px] px-1.5 py-0.5 rounded border uppercase font-bold ${r.type === 'Threat' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100'}`}>{r.type}</span>
-                                <span className={`text-[9px] px-1.5 py-0.5 rounded border uppercase font-bold ${crit.color}`}>{crit.label} Risk</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="text-slate-600 font-medium">{r.category}</div>
-                              <div className="text-xs text-slate-400">{r.stage}</div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                  <div className="h-full bg-emerald-500" style={{ width: `${r.probRating * 20}%` }}></div>
+              {/* Added top margin for print to separate if printed after dashboard */}
+              <div className="print:mt-8">
+                <Card className="overflow-hidden" noPad>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="text-xs text-slate-400 uppercase bg-slate-50 font-bold border-b border-slate-200">
+                        <tr>
+                          <th className="px-4 py-3">Risk Details</th>
+                          <th className="px-4 py-3">Category / Stage</th>
+                          <th className="px-4 py-3">Probability</th>
+                          <th className="px-4 py-3">Est. Cost Range (€)</th>
+                          <th className="px-4 py-3 text-right bg-emerald-50/50">W. Avg Cost (€)</th>
+                          <th className="px-4 py-3 text-center">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {risks.map(r => {
+                           const ev = calculateEV(r.costMin, r.costML, r.costMax, r.probRating);
+                           const crit = getCriticality(ev, r.probRating);
+                           return (
+                            <tr key={r.id} className="hover:bg-slate-50 group break-inside-avoid">
+                              <td className="px-4 py-3 max-w-xs">
+                                <div className="font-bold text-slate-700">{r.name}</div>
+                                <div className="flex gap-2 mt-1">
+                                  <span className={`text-[9px] px-1.5 py-0.5 rounded border uppercase font-bold ${r.type === 'Threat' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100'}`}>{r.type}</span>
+                                  <span className={`text-[9px] px-1.5 py-0.5 rounded border uppercase font-bold ${crit.color}`}>{crit.label} Risk</span>
                                 </div>
-                                <span className="text-xs font-bold text-slate-500">{PROBABILITY_FACTORS[r.probRating].factor * 100}%</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                              <div>Min: {Number(r.costMin).toLocaleString()}</div>
-                              <div className="font-bold text-slate-700">ML:  {Number(r.costML).toLocaleString()}</div>
-                              <div>Max: {Number(r.costMax).toLocaleString()}</div>
-                            </td>
-                            <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700 bg-emerald-50/30 border-l border-emerald-100/50">
-                              €{ev.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                            </td>
-                            <td className="px-4 py-3 text-center no-print">
-                              <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => openEdit(r)} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded"><Icons.Edit className="w-4 h-4"/></button>
-                                <button onClick={() => deleteRisk(r.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"><Icons.Trash className="w-4 h-4"/></button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {risks.length === 0 && (
-                        <tr><td colSpan="6" className="p-8 text-center text-slate-400 italic">No risks added yet. Click "Add New Risk" to begin.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="text-slate-600 font-medium">{r.category}</div>
+                                <div className="text-xs text-slate-400">{r.stage}</div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                    <div className="h-full bg-emerald-500" style={{ width: `${r.probRating * 20}%` }}></div>
+                                  </div>
+                                  <span className="text-xs font-bold text-slate-500">{PROBABILITY_FACTORS[r.probRating].factor * 100}%</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                                <div>Min: {Number(r.costMin).toLocaleString()}</div>
+                                <div className="font-bold text-slate-700">ML:  {Number(r.costML).toLocaleString()}</div>
+                                <div>Max: {Number(r.costMax).toLocaleString()}</div>
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700 bg-emerald-50/30 border-l border-emerald-100/50">
+                                €{ev.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                              </td>
+                              <td className="px-4 py-3 text-center no-print">
+                                <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => openEdit(r)} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded"><Icons.Edit className="w-4 h-4"/></button>
+                                  <button onClick={() => deleteRisk(r.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"><Icons.Trash className="w-4 h-4"/></button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {risks.length === 0 && (
+                          <tr><td colSpan="6" className="p-8 text-center text-slate-400 italic">No risks added yet. Click "Add New Risk" to begin.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </div>
             </div>
 
             {/* Print Footer */}
-            <div className="hidden print-only mt-12 pt-8 border-t border-slate-200">
-               <div className="flex justify-between items-end">
+            <div className="hidden print-only print-footer">
+               <div className="flex justify-between items-end px-6 pb-4">
                  <div>
                    <div className="h-px w-64 bg-slate-900 mb-2"></div>
                    <p className="text-xs font-bold uppercase text-slate-500">Approved By</p>
                  </div>
+                 <div className="text-center">
+                    <p className="text-xs font-bold text-slate-400">Created by Dave Maher</p>
+                 </div>
                  <div className="text-right">
-                   <p className="text-xs text-slate-400">Generated on {new Date().toLocaleDateString()}</p>
+                   <p className="text-xs text-slate-400">Generated on {new Date().toLocaleDateString('en-GB')}</p>
                    <p className="font-bold text-slate-700">HSE Capital Projects Contingency Tool</p>
                  </div>
                </div>
             </div>
-
           </main>
+          
+          {/* Screen Footer */}
+          <footer className="mt-8 py-6 bg-white border-t border-slate-200 text-center no-print">
+            <p className="text-sm font-bold text-slate-600">Created by Dave Maher</p>
+            <p className="text-xs text-slate-400 mt-1">&copy; {new Date().getFullYear()} HSE Project Contingency Tool</p>
+          </footer>
 
           {/* ADD/EDIT MODAL */}
           {isModalOpen && (
