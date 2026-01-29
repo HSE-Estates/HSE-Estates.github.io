@@ -48,31 +48,51 @@
     @media print {
       @page { 
         size: A4 landscape; 
-        margin: 1.0cm; /* Slightly reduced margin to help 5 tiles fit comfortably */
+        margin: 12mm; /* Standard margins to prevent cutoff */
       }
       
       body { 
         background-color: #ffffff !important; 
         color: #000 !important;
+        width: 100%;
       }
 
       /* Hide interactive elements */
       .no-print, header button, .fixed-actions, .slider-container { display: none !important; }
       .print-only { display: block !important; }
       
+      /* Ensure Main Container Fits */
+      main {
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+
       /* Enhance Contrast for Print */
       .card { 
         box-shadow: none !important; 
         border: 1px solid #cbd5e1 !important; 
-        break-inside: avoid; 
+        break-inside: avoid; /* Prevent card splitting */
+        page-break-inside: avoid;
         margin-bottom: 20px;
+        width: 100% !important;
       }
 
-      /* Chart Sizing for Print - Prevents Squashing */
+      /* Chart Sizing for Print - Fixed Height & Container Fit */
       .chart-container {
-        height: 350px !important;
+        height: 280px !important; /* Fixed height for print */
         width: 100% !important;
+        max-width: 100% !important;
         page-break-inside: avoid;
+        position: relative !important;
+      }
+      
+      canvas {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
       }
       
       /* Ensure text is black */
@@ -90,6 +110,7 @@
         border-top: 1px solid #e2e8f0;
         padding-top: 10px;
         background: white;
+        z-index: 9999;
       }
     }
     .print-only { display: none; }
