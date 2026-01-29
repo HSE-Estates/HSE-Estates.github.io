@@ -44,11 +44,9 @@
                 radial-gradient(circle at 80% 20%, rgba(0, 191, 165, 0.04) 0%, transparent 50%);
         }
 
-        /* Animated Gradient Header */
+        /* Gradient Header */
         .hse-gradient {
             background: linear-gradient(135deg, #004d42 0%, #006858 50%, #00836f 100%);
-            background-size: 200% 200%;
-            animation: gradientShift 15s ease infinite;
             position: relative;
             overflow: hidden;
         }
@@ -60,18 +58,8 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: radial-gradient(circle at 30% 50%, rgba(0, 191, 165, 0.1) 0%, transparent 60%);
-            animation: pulse 8s ease-in-out infinite;
-        }
-
-        @keyframes gradientShift {
-            0%, 100% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 0.5; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.1); }
+            background: radial-gradient(circle at 80% 20%, rgba(0, 191, 165, 0.15) 0%, transparent 60%);
+            pointer-events: none;
         }
 
         /* Premium Card Styling */
@@ -106,6 +94,7 @@
                 0 25px 50px -12px rgba(0, 104, 88, 0.15),
                 0 0 0 1px rgba(0, 191, 165, 0.1),
                 0 0 40px rgba(0, 191, 165, 0.1);
+            z-index: 10;
         }
 
         .app-card:hover .card-icon {
@@ -136,7 +125,7 @@
             left: -100%;
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            background: linear-gradient(90deg, transparent, rgba(0, 104, 88, 0.1), transparent);
             transition: left 0.5s;
         }
 
@@ -209,13 +198,6 @@
             animation: float 6s ease-in-out infinite;
         }
 
-        /* Glass Morphism Effect */
-        .glass-card {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-
         /* Shine Effect on Hover */
         .shine-effect {
             position: relative;
@@ -229,7 +211,7 @@
             right: -50%;
             bottom: -50%;
             left: -50%;
-            background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.3), transparent);
+            background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.5), transparent);
             transform: rotate(45deg) translateX(-100%);
             transition: transform 0.6s;
         }
@@ -256,18 +238,6 @@
         /* Footer Enhancement */
         .footer-gradient {
             background: linear-gradient(180deg, transparent 0%, rgba(0, 104, 88, 0.02) 100%);
-        }
-
-        /* Hover Reveal Animation */
-        .hover-reveal {
-            opacity: 0;
-            transform: translateY(10px);
-            transition: all 0.3s ease;
-        }
-
-        .app-card:hover .hover-reveal {
-            opacity: 1;
-            transform: translateY(0);
         }
     </style>
 </head>
@@ -399,9 +369,9 @@
 
             return (
                 <div className="min-h-screen flex flex-col">
-                    {/* Header */}
-                    <header className="hse-gradient text-white pt-10 pb-20 px-6 relative">
-                        <div className="max-w-6xl mx-auto relative z-10">
+                    {/* Header - RESTORED GREEN GRADIENT */}
+                    <header className="hse-gradient text-white pt-10 pb-24 px-6 shadow-xl relative z-10">
+                        <div className="max-w-6xl mx-auto relative z-20">
                             <nav className="flex justify-between items-center mb-14">
                                 <div className="flex items-center gap-5">
                                     <div className="bg-white p-2.5 rounded-xl shadow-lg float-animation">
@@ -411,9 +381,9 @@
                                             className="h-11"
                                         />
                                     </div>
-                                    <div className="border-l-2 border-white/30 pl-5">
+                                    <div className="border-l-2 border-white/20 pl-5">
                                         <h1 className="text-xl font-black tracking-tight">HSE Capital & Estates</h1>
-                                        <p className="text-xs text-emerald-200 font-semibold uppercase tracking-widest mt-0.5">Digital Infrastructure Hub</p>
+                                        <p className="text-xs text-emerald-200 font-bold uppercase tracking-widest mt-0.5">Digital Infrastructure Hub</p>
                                     </div>
                                 </div>
                                 <div className="hidden md:block text-right">
@@ -423,25 +393,25 @@
                             </nav>
 
                             <div className="max-w-2xl">
-                                <h2 className="text-5xl md:text-6xl font-black mb-5 leading-[1.1] tracking-tight">
+                                <h2 className="text-5xl md:text-6xl font-black mb-5 leading-[1.1] tracking-tight text-white drop-shadow-sm">
                                     Specialist Apps & <br/>
-                                    <span className="bg-gradient-to-r from-emerald-200 to-white bg-clip-text text-transparent">
+                                    <span className="text-emerald-100">
                                         Decision Support Tools
                                     </span>
                                 </h2>
-                                <p className="text-emerald-100 text-lg leading-relaxed font-medium">
+                                <p className="text-emerald-50 text-lg leading-relaxed font-medium max-w-xl">
                                     A central directory of custom-built applications designed to support strategic planning, 
                                     financial oversight, and capital project delivery within the HSE.
                                 </p>
                             </div>
                         </div>
                         
-                        {/* Decorative Elements */}
-                        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#f8fafc] to-transparent"></div>
+                        {/* Decorative Bottom Fade */}
+                        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-emerald-900/10 to-transparent pointer-events-none"></div>
                     </header>
 
                     {/* Main Content */}
-                    <main className="max-w-6xl mx-auto px-6 -mt-12 flex-1 w-full relative z-20">
+                    <main className="max-w-6xl mx-auto px-6 -mt-16 flex-1 w-full relative z-20">
                         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-7">
                             {myApps.map(app => (
                                 <AppCard key={app.id} app={app} />
@@ -450,7 +420,7 @@
 
                         {/* Additional Info Section */}
                         <div className="mt-20 info-section p-10 rounded-3xl border border-slate-200/50 flex flex-col md:flex-row items-center gap-10 backdrop-blur-xl">
-                            <div className="p-5 bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600 rounded-2xl shadow-lg">
+                            <div className="p-5 bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600 rounded-2xl shadow-lg border border-emerald-100">
                                 <Icon name="shield-check" size={44} />
                             </div>
                             <div>
