@@ -54,7 +54,7 @@
 
     /* Print Styles - Enhanced for Report Quality */
     @media print {
-      @page { size: landscape; margin: 0.75cm; } /* Standard safe margins */
+      @page { size: landscape; margin: 15mm; } /* Added 15mm margin */
       
       body { 
         background: white; 
@@ -62,12 +62,8 @@
         print-color-adjust: exact !important;
       }
 
-      /* Allow the green header to print as a contained block */
-      nav { 
-        display: block !important; 
-        margin-bottom: 20px; 
-        border-radius: 0.5rem; /* Rounded corners since it sits inside margins */
-      }
+      /* Allow the green header to print */
+      nav { display: block !important; margin-bottom: 20px; }
 
       /* Hide interactive UI Elements */
       .no-print, button, .modal-overlay { display: none !important; }
@@ -95,8 +91,8 @@
       /* Force Page Breaks */
       .print-break-avoid { break-inside: avoid; }
       
-      /* Reset main padding since page margin handles it now */
-      main, footer { padding: 0 !important; width: 100% !important; max-width: none !important; }
+      /* Reset margins/padding on main content as page margin handles it */
+      main, footer { padding-left: 0 !important; padding-right: 0 !important; width: 100% !important; max-width: none !important; }
     }
   </style>
 </head>
@@ -746,7 +742,7 @@
                                           <MoneyInput 
                                              value={item.value} 
                                              onChange={(val) => updateActualValue(i, val)}
-                                             className="w-full pl-6 pr-3 py-1.5 text-sm border border-slate-200 rounded focus:outline-none focus:border-[#006858] font-medium print:pl-6"
+                                             className="w-full pl-6 pr-3 py-1.5 text-sm border border-slate-200 rounded focus:outline-none focus:border-[#006858] font-medium print:pl-8"
                                           />
                                        </div>
                                        {milestone && (
