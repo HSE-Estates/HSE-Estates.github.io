@@ -68,7 +68,7 @@
         }
         .dependency-arrow {
             fill: none;
-            stroke: #94a3b8;
+            stroke: #64748b; /* Darker stroke for visibility */
             stroke-width: 1.5;
             transition: stroke 0.3s, opacity 0.3s;
         }
@@ -107,13 +107,22 @@
         }
 
         .group-header {
-            background: linear-gradient(to right, #f8fafc, #ffffff);
+            background: linear-gradient(to right, #f1f5f9, #ffffff);
+            border-bottom: 2px solid #e2e8f0;
         }
 
         .sort-header:hover {
             color: #059669;
             cursor: pointer;
             background-color: #f0fdf4;
+        }
+        
+        /* Grid Lines High Visibility */
+        .grid-line {
+            border-right: 1px solid #cbd5e1; /* Darker slate-300 equivalent */
+        }
+        .grid-line.weekend {
+            background-color: #f1f5f9; /* Darker background for weekends */
         }
 
         /* Print Optimisations */
@@ -169,7 +178,7 @@
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                 </button>
                 
-                <button id="download-html-btn" title="Download as Interactive HTML" class="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all border border-white/10">
+                <button id="download-html-btn" title="Download as Interactive HTML (Carbon Copy)" class="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all border border-white/10">
                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                     </svg>
@@ -228,7 +237,7 @@
             <svg id="dependency-lines">
                  <defs>
                     <marker id="arrow-head" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
-                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"></path>
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"></path>
                     </marker>
                     <marker id="arrow-head-critical" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
                         <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444"></path>
@@ -330,16 +339,18 @@
             // Dynamic list width based on screen size to show extra columns
             const getListWidth = () => window.innerWidth < 768 ? 160 : 420;
 
-            // Initialize state with check for window.CACHED_DATA (for HTML export loading)
+            // Check for injected state (Carbon Copy)
+            const cachedState = window.CACHED_STATE || {};
+
             let state = {
-                tasks: window.CACHED_DATA || JSON.parse(localStorage.getItem('gantt-pro-data')) || [
+                tasks: cachedState.tasks || JSON.parse(localStorage.getItem('gantt-pro-data')) || [
                     { id: 1, name: "Project Initiation", group: "Planning", start: "2026-02-01", end: "2026-02-05", progress: 100, color: "#10b981", dependencies: [] },
                     { id: 2, name: "Requirement Gathering", group: "Planning", start: "2026-02-06", end: "2026-02-12", progress: 60, color: "#0ea5e9", dependencies: [1] },
                     { id: 3, name: "Design System", group: "Design", start: "2026-02-13", end: "2026-02-25", progress: 20, color: "#8b5cf6", dependencies: [2] },
                     { id: 4, name: "Database Schema", group: "Backend", start: "2026-02-15", end: "2026-02-20", progress: 0, color: "#f59e0b", dependencies: [2] }
                 ],
-                viewMode: 'day',
-                sortBy: 'group', // 'group', 'start', 'end', 'duration'
+                viewMode: cachedState.viewMode || 'day',
+                sortBy: cachedState.sortBy || 'group',
                 showCriticalPath: false,
                 filterTerm: '',
                 dragTarget: null,
@@ -349,6 +360,9 @@
                 maxDate: null,
                 listWidth: getListWidth()
             };
+
+            // Set UI elements to match restored state
+            document.getElementById('view-mode').value = state.viewMode;
 
             // --- UI REFS ---
             const refs = {
@@ -435,7 +449,6 @@
             // --- SORTING ---
             window.toggleSort = (mode) => {
                 if (state.sortBy === mode && mode !== 'group') {
-                    // Toggle off if clicking same non-group sort
                     state.sortBy = 'group';
                 } else {
                     state.sortBy = mode;
@@ -459,14 +472,16 @@
 
                 calculateCriticalPath();
 
-                // Sort Logic
+                // Sort Logic: Always primary by group, then secondary by selected criteria
                 const sorted = [...filtered].sort((a,b) => {
-                    if (state.sortBy === 'group') {
-                        const gA = (a.group || 'General').toLowerCase();
-                        const gB = (b.group || 'General').toLowerCase();
-                        if (gA !== gB) return gA.localeCompare(gB);
-                        return parseDate(a.start) - parseDate(b.start);
-                    } else if (state.sortBy === 'start') {
+                    const gA = (a.group || 'General').toLowerCase();
+                    const gB = (b.group || 'General').toLowerCase();
+                    
+                    // Primary Sort: Group
+                    if (gA !== gB) return gA.localeCompare(gB);
+
+                    // Secondary Sort (Within Group)
+                    if (state.sortBy === 'start') {
                         return parseDate(a.start) - parseDate(b.start);
                     } else if (state.sortBy === 'end') {
                         return parseDate(a.end) - parseDate(b.end);
@@ -475,6 +490,8 @@
                         const dB = dayDiff(b.start, b.end);
                         return dB - dA; // Descending duration
                     }
+                    // Default fallback secondary: ID or Start
+                    return parseDate(a.start) - parseDate(b.start);
                 });
 
                 // Calculate timeline bounds
@@ -502,7 +519,7 @@
                     const isWeekend = d.getDay() === 0 || d.getDay() === 6;
                     const dateNum = d.getDate();
                     let cellContent = '';
-                    let borderClass = 'border-r border-slate-100';
+                    let borderClass = 'grid-line';
                     
                     if (state.viewMode === 'day') {
                         cellContent = `<div class="text-[9px] text-slate-400 leading-none">${d.toLocaleString('en-GB',{weekday:'narrow'})}</div>
@@ -510,40 +527,36 @@
                     } else if (state.viewMode === 'week') {
                         if (d.getDay() === 1) { // Monday
                             cellContent = `<div class="text-[10px] text-slate-500 font-bold pl-1">W${getWeekNumber(d)}</div>`;
-                            borderClass = 'border-l border-slate-300';
+                            borderClass = 'grid-line border-l border-slate-400'; // Thicker line for week start
                         }
                     } else if (state.viewMode === 'month') {
                          if (d.getDate() === 1) {
                             cellContent = `<div class="text-[10px] text-slate-700 font-bold pl-1 sticky left-0">${d.toLocaleString('en-GB',{month:'short'})}</div>`;
-                            borderClass = 'border-l border-slate-400';
+                            borderClass = 'grid-line border-l border-slate-500'; // Thicker line for month
                         }
                     } else if (state.viewMode === 'year') {
-                         // Yearly view (showing months compressed)
                          if (d.getDate() === 1) {
-                            // Show Month Name
                             cellContent = `<div class="text-[9px] text-slate-700 font-bold pl-1 sticky left-0 overflow-visible whitespace-nowrap">${d.toLocaleString('en-GB',{month:'narrow'})}</div>`;
                             borderClass = 'border-l border-slate-300';
                          }
                          if (d.getMonth() === 0 && d.getDate() === 1) {
-                             // Show Year prominently
                              cellContent = `<div class="text-[10px] text-emerald-700 font-bold pl-1 sticky left-0 border-l-2 border-emerald-500 bg-emerald-50">${d.getFullYear()}</div>`;
                          }
                     }
 
-                    // Hide borders in year view for cleaner look unless it's a month start
                     if (state.viewMode === 'year' && d.getDate() !== 1) borderClass = '';
 
-                    html += `<div class="flex-none flex flex-col justify-end pb-1 text-center ${borderClass} ${isWeekend && state.viewMode !== 'year' ? 'bg-slate-50/50' : ''}" style="width: ${colW}px; height: 36px; overflow:hidden;">${cellContent}</div>`;
+                    html += `<div class="flex-none flex flex-col justify-end pb-1 text-center ${borderClass} ${isWeekend && state.viewMode !== 'year' ? 'weekend' : ''}" style="width: ${colW}px; height: 36px; overflow:hidden;">${cellContent}</div>`;
                 }
                 html += `</div></div>`;
 
                 // 2. Task Rows
                 let currentGroup = null;
                 sorted.forEach(t => {
-                    // Only show group header if sorting by group
-                    if (state.sortBy === 'group' && t.group !== currentGroup) {
+                    // Always show group header since we force Sort-By-Group first
+                    if (t.group !== currentGroup) {
                         currentGroup = t.group || 'General';
-                        html += `<div class="flex group-header border-b border-slate-200 sticky left-0 z-20">
+                        html += `<div class="flex group-header sticky left-0 z-20">
                             <div class="flex-none px-4 py-1.5 text-[10px] font-bold uppercase text-slate-500 tracking-wider w-full">📂 ${currentGroup}</div>
                         </div>`;
                     }
@@ -571,19 +584,17 @@
                         <div class="flex relative flex-1 h-full items-center">
                              <div class="absolute inset-0 flex pointer-events-none">`;
                              
-                             // Optimization: Don't render grid lines for every day in Year view to save DOM nodes
                              if (state.viewMode !== 'year') {
                                  for(let i=0; i<totalDays; i++) {
                                      const d = addDays(state.minDate, i);
                                      const isWk = d.getDay() === 0 || d.getDay() === 6;
-                                     html += `<div class="flex-none border-r border-slate-50 ${isWk ? 'bg-slate-50/30' : ''}" style="width: ${colW}px"></div>`;
+                                     html += `<div class="flex-none grid-line ${isWk ? 'weekend' : ''}" style="width: ${colW}px"></div>`;
                                  }
                              } else {
-                                 // Just render month lines for Year view
                                  for(let i=0; i<totalDays; i++) {
                                      const d = addDays(state.minDate, i);
                                      const isMonthStart = d.getDate() === 1;
-                                     html += `<div class="flex-none ${isMonthStart ? 'border-l border-slate-200' : ''}" style="width: ${colW}px"></div>`;
+                                     html += `<div class="flex-none ${isMonthStart ? 'border-l border-slate-300' : ''}" style="width: ${colW}px"></div>`;
                                  }
                              }
 
@@ -616,7 +627,7 @@
                 svg.setAttribute('height', refs.chart.scrollHeight);
 
                 const defs = `<defs>
-                    <marker id="arrow-normal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"></path></marker>
+                    <marker id="arrow-normal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"></path></marker>
                     <marker id="arrow-critical" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444"></path></marker>
                 </defs>`;
                 svg.innerHTML = defs;
@@ -663,7 +674,6 @@
                         el.classList.add('dragging');
                         document.body.style.cursor = 'grabbing';
                         
-                        // Add move listener to window to track drag outside element
                         window.addEventListener('mousemove', handleDragMove);
                         window.addEventListener('mouseup', handleDragEnd);
                     };
@@ -679,7 +689,6 @@
                 const dx = e.clientX - state.dragStartX;
                 const newLeft = state.initialLeft + dx;
                 
-                // Visual update only - NO re-render during drag
                 el.style.left = `${newLeft}px`;
             };
 
@@ -707,10 +716,8 @@
                         
                         cascadeDates(t.id);
                         saveState();
-                        // Render triggers here - will recalculate bounds (shrink or expand)
                         render();
                     } else {
-                        // Snap back if 0 days moved but pixels changed
                         el.style.left = `${state.initialLeft}px`;
                     }
                 }
@@ -755,7 +762,6 @@
                 render();
             };
             
-            // Handle window resize to adjust list width
             window.onresize = () => {
                 state.listWidth = getListWidth();
                 render();
@@ -854,12 +860,19 @@
                 // Get current HTML
                 let html = document.documentElement.outerHTML;
                 
-                // Remove any existing saved data script to avoid duplicates
+                // State to preserve (Tasks + View Mode + Sort)
+                const saveState = {
+                    tasks: state.tasks,
+                    viewMode: state.viewMode,
+                    sortBy: state.sortBy
+                };
+
+                // Remove any existing saved data script
                 html = html.replace(/<script id="gantt-data-state">[\s\S]*?<\/script>/gi, '');
                 
-                // Inject new data script with split string to avoid breaking the script parser
+                // Inject new data script safely
                 const closingScript = '<' + '/script>'; 
-                const dataScript = `<script id="gantt-data-state">window.CACHED_DATA = ${JSON.stringify(state.tasks)};${closingScript}`;
+                const dataScript = `<script id="gantt-data-state">window.CACHED_STATE = ${JSON.stringify(saveState)};${closingScript}`;
                 html = html.replace('</head>', `${dataScript}\n</head>`);
                 
                 const blob = new Blob([html], { type: 'text/html' });
@@ -927,5 +940,3 @@
     </script>
 </body>
 </html>
-
-
