@@ -93,7 +93,7 @@
         };
 
         const INITIAL_ROOMS = [
-            { id: 'mr1', name: 'Meeting Room 01', capacity: 8, amenities: ['Projector', 'Video Conf'], type: 'Room', floor: '1st Floor', color: 'bg-hse-primary text-white' },
+            { id: 'mr1', name: 'Meeting Room 01', capacity: 8, amenities: ['Projector', 'Video Conf', 'Whiteboard'], type: 'Room', floor: '1st Floor', color: 'bg-hse-primary text-white' },
             { id: 'hd1', name: 'Hot Desk 01', capacity: 1, amenities: ['Dual Monitor'], type: 'Desk', floor: 'Ground Floor', color: 'bg-emerald-50 text-hse-primary' },
             { id: 'hd2', name: 'Hot Desk 02', capacity: 1, amenities: ['Dual Monitor'], type: 'Desk', floor: 'Ground Floor', color: 'bg-emerald-50 text-hse-primary' },
             { id: 'hd3', name: 'Hot Desk 03', capacity: 1, amenities: ['Single Monitor'], type: 'Desk', floor: 'Ground Floor', color: 'bg-emerald-50 text-hse-primary' },
@@ -240,7 +240,7 @@
             bookings.forEach(b => { if(b.organiser) orgs[b.organiser] = (orgs[b.organiser] || 0) + 1; });
             const list = Object.entries(orgs).sort((a,b) => b[1] - a[1]).slice(0, 5);
             return (
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-full">
                     <h4 className="font-bold text-slate-700 text-sm mb-4 flex items-center gap-2"><Icon name="crown" size={16} className="text-hse-primary"/> Top Organisers</h4>
                     <div className="space-y-3">
                         {list.map(([name, count], i) => (
@@ -255,6 +255,52 @@
             );
         };
 
+        const ScheduleAnalytics = ({ bookings }) => {
+            const now = new Date();
+            const weekAheadDaily = [];
+            for (let i=0; i<7; i++) {
+                const d = new Date(); d.setDate(d.getDate() + i); d.setHours(0,0,0,0);
+                const count = bookings.filter(b => {
+                    const bDate = new Date(b.start); bDate.setHours(0,0,0,0);
+                    return bDate.getTime() === d.getTime();
+                }).length;
+                weekAheadDaily.push({ day: d.toLocaleDateString('en-GB', {weekday:'short'}), count });
+            }
+            const total = bookings.length || 1;
+            const internal = bookings.filter(b => b.type === 'Internal').length;
+            const external = bookings.filter(b => b.type === 'External').length;
+
+            return (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 pt-6 border-t border-slate-100">
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <h4 className="font-bold text-slate-700 text-sm mb-4 flex items-center gap-2"><Icon name="pie-chart" size={16} className="text-hse-primary"/> Booking Type Split</h4>
+                        <div className="flex h-6 rounded-full overflow-hidden w-full bg-slate-100 mb-2">
+                            <div className="bg-hse-primary h-full transition-all" style={{width: `${(internal/total)*100}%`}}></div>
+                            <div className="bg-amber-400 h-full transition-all" style={{width: `${(external/total)*100}%`}}></div>
+                        </div>
+                        <div className="flex justify-between text-xs font-bold">
+                            <span className="text-hse-primary flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-hse-primary"></div> {Math.round((internal/total)*100)}% Internal</span>
+                            <span className="text-amber-500 flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-amber-400"></div> {Math.round((external/total)*100)}% External</span>
+                        </div>
+                    </div>
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <h4 className="font-bold text-slate-700 text-sm mb-4 flex items-center gap-2"><Icon name="bar-chart-2" size={16} className="text-hse-primary"/> Volume: Next 7 Days</h4>
+                        <div className="flex items-end justify-between h-24 gap-2">
+                            {weekAheadDaily.map((d, i) => (
+                                <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
+                                    <div className="w-full bg-emerald-100 rounded-t-sm relative transition-all group-hover:bg-emerald-200" style={{height: `${Math.max((d.count/8)*100, 10)}%`}}>
+                                        {d.count > 0 && <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] font-bold text-hse-primary">{d.count}</span>}
+                                    </div>
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase">{d.day}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <TopOrganisersChart bookings={bookings} />
+                </div>
+            )
+        };
+
         // --- MAIN APP ---
         function App() {
             const [activeTab, setActiveTab] = useState('dashboard');
@@ -265,6 +311,8 @@
             const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
             const [currentTime, setCurrentTime] = useState(new Date());
             const [notification, setNotification] = useState(null);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [typeFilter, setTypeFilter] = useState('All');
             
             const [newBooking, setNewBooking] = useState({
                 title: '', organiser: '', roomId: '',
@@ -315,7 +363,6 @@
                 e.preventDefault();
                 if (conflict) return;
                 
-                // Simple create logic (ignoring repeat for brevity in fix, but structure supports it)
                 const start = new Date(newBooking.date);
                 const [h, m] = newBooking.startTime.split(':').map(Number);
                 start.setHours(h, m, 0, 0);
@@ -337,12 +384,16 @@
                 }
             };
 
-            // Stats
+            // Stats & Filtering
+            const filteredRooms = useMemo(() => INITIAL_ROOMS.filter(r => 
+                (r.name.toLowerCase().includes(searchQuery.toLowerCase()) || r.amenities.some(a => a.toLowerCase().includes(searchQuery.toLowerCase()))) &&
+                (typeFilter === 'All' || r.type === typeFilter)
+            ), [searchQuery, typeFilter]);
+
             const stats = useMemo(() => {
                 const today = new Date().toDateString();
                 const todays = bookings.filter(b => b.start?.toDateString() === today);
                 const active = new Set(todays.map(b => b.roomId)).size;
-                // RE-ADDED: Desk Calculation
                 const desksUsed = todays.filter(b => INITIAL_ROOMS.find(r => r.id === b.roomId)?.type === 'Desk').length;
                 return { 
                     total: todays.length, 
@@ -391,9 +442,9 @@
                             {activeTab === 'dashboard' && (
                                 <div className="space-y-6 animate-in">
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                        <div className="bg-white p-4 rounded shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400">TODAY</p><h3 className="text-2xl font-bold">{stats.total}</h3></div>
+                                        {/* UPDATED: LABEL CHANGE */}
+                                        <div className="bg-white p-4 rounded shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400">TODAY'S BOOKINGS</p><h3 className="text-2xl font-bold">{stats.total}</h3></div>
                                         <div className="bg-white p-4 rounded shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400">UTILISATION</p><h3 className="text-2xl font-bold">{stats.util}%</h3></div>
-                                        {/* RE-ADDED DESKS USED CARD */}
                                         <div className="bg-white p-4 rounded shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400">DESKS USED</p><h3 className="text-2xl font-bold">{stats.desk}</h3></div>
                                         <div className="bg-white p-4 rounded shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400">AVAILABLE</p><h3 className="text-2xl font-bold">{stats.avail}</h3></div>
                                     </div>
@@ -401,29 +452,52 @@
                                         <div className="md:col-span-2"><OccupancyHeatmap bookings={bookings} rooms={INITIAL_ROOMS} /></div>
                                         <UtilisationStats bookings={bookings} totalResources={INITIAL_ROOMS.length} />
                                     </div>
-                                    <div className="grid md:grid-cols-2 gap-6">
+                                    <div className="grid md:grid-cols-3 gap-6">
                                         <MeetingRoomWidget bookings={bookings} />
+                                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-full flex flex-col">
+                                            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Icon name="calendar" size={18} className="text-hse-primary" /> Upcoming Schedule</h3>
+                                            <div className="space-y-2 flex-1 overflow-y-auto custom-scroll pr-2 max-h-60">
+                                                {bookings.filter(b => b.start >= new Date(new Date().setHours(0,0,0,0))).sort((a,b) => a.start - b.start).slice(0, 10).map(b => (
+                                                    <div key={b.id} className="flex gap-4 items-center p-2 hover:bg-slate-50 rounded border-b border-slate-50 last:border-0 group">
+                                                        <div className="bg-emerald-50 text-hse-primary px-2 py-1 rounded text-xs font-bold min-w-[80px] text-center">
+                                                            {formatTime(b.start)}
+                                                            <div className="text-[10px] font-normal opacity-75">{new Date(b.start).toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'})}</div>
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <div className="font-bold text-sm text-slate-800">{b.title}</div>
+                                                            <div className="text-xs text-slate-500">{INITIAL_ROOMS.find(r => r.id === b.roomId)?.name} • {b.organiser}</div>
+                                                        </div>
+                                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button onClick={() => generateICS(b, INITIAL_ROOMS.find(r => r.id === b.roomId)?.name)} className="p-1 hover:bg-blue-50 text-blue-600 rounded" title="Add to Calendar"><Icon name="calendar-plus" size={16}/></button>
+                                                            <button onClick={() => handleDelete(b.id)} className="p-1 hover:bg-red-50 text-red-600 rounded" title="Delete Booking"><Icon name="trash-2" size={16}/></button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {bookings.length === 0 && <p className="text-slate-400 italic text-sm">No upcoming bookings.</p>}
+                                            </div>
+                                        </div>
                                         <TopOrganisersChart bookings={bookings} />
                                     </div>
                                 </div>
                             )}
 
                             {activeTab === 'schedule' && (
-                                <div className="bg-white rounded-xl border border-slate-200 p-4 overflow-auto animate-in">
-                                    <div className="flex justify-between mb-4">
-                                        <button onClick={() => {const d = new Date(selectedDate); d.setDate(d.getDate()-1); setSelectedDate(d)}} className="p-1 hover:bg-slate-100 rounded"><Icon name="chevron-left" /></button>
-                                        <span className="font-bold">{formatDate(selectedDate)}</span>
-                                        <button onClick={() => {const d = new Date(selectedDate); d.setDate(d.getDate()+1); setSelectedDate(d)}} className="p-1 hover:bg-slate-100 rounded"><Icon name="chevron-right" /></button>
+                                <div className="bg-white rounded-xl border border-slate-200 p-4 overflow-auto animate-in flex flex-col gap-6">
+                                    <div className="flex justify-between items-center bg-emerald-50 p-2 rounded-lg border border-emerald-100 mb-4">
+                                        <button onClick={() => {const d = new Date(selectedDate); d.setDate(d.getDate()-1); setSelectedDate(d)}} className="p-1 hover:bg-emerald-200 text-hse-primary rounded"><Icon name="chevron-left" /></button>
+                                        <span className="font-bold text-hse-primary">{formatDate(selectedDate)}</span>
+                                        <button onClick={() => {const d = new Date(selectedDate); d.setDate(d.getDate()+1); setSelectedDate(d)}} className="p-1 hover:bg-emerald-200 text-hse-primary rounded"><Icon name="chevron-right" /></button>
                                     </div>
                                     <div className="min-w-[600px]">
-                                        <div className="grid grid-cols-[150px_1fr] border-b border-slate-100 pb-2">
-                                            <div className="font-bold text-sm text-slate-500">Resource</div>
-                                            <div className="grid grid-cols-11">{getHoursArray().map(h => <div key={h} className="text-xs text-center text-slate-400">{h}:00</div>)}</div>
+                                        {/* UPDATED: DARK GREEN HEADER */}
+                                        <div className="grid grid-cols-[150px_1fr] border-b border-[#005548] bg-hse-primary pb-2 pt-2 rounded-t-lg">
+                                            <div className="p-2 pl-4 font-bold text-sm text-white">Resource</div>
+                                            <div className="grid grid-cols-11">{getHoursArray().map(h => <div key={h} className="text-xs text-center text-emerald-50 font-medium">{h}:00</div>)}</div>
                                         </div>
-                                        <div className="divide-y divide-slate-100">
-                                            {INITIAL_ROOMS.map(r => (
-                                                <div key={r.id} className="grid grid-cols-[150px_1fr] py-3 hover:bg-slate-50 relative h-16">
-                                                    <div className="text-sm font-bold text-slate-700 flex items-center pr-2 border-r border-slate-100">{r.name}</div>
+                                        <div className="divide-y divide-emerald-50">
+                                            {filteredRooms.map(r => (
+                                                <div key={r.id} className="grid grid-cols-[150px_1fr] py-3 hover:bg-emerald-50 border-b border-slate-50 last:border-0 relative h-16 transition-colors">
+                                                    <div className="text-sm font-bold text-hse-primary flex items-center pr-2 border-r border-slate-100 pl-4">{r.name}</div>
                                                     <div className="relative">
                                                         {bookings.filter(b => b.roomId === r.id && b.start?.toDateString() === selectedDate.toDateString()).map(b => {
                                                             const startH = b.start.getHours() + b.start.getMinutes()/60;
@@ -441,16 +515,28 @@
                                             ))}
                                         </div>
                                     </div>
+                                    <ScheduleAnalytics bookings={bookings} />
                                 </div>
                             )}
 
                             {activeTab === 'rooms' && (
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in">
-                                    {INITIAL_ROOMS.map(r => (
-                                        <div key={r.id} className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-                                            <h3 className="font-bold text-lg text-slate-800 mb-2">{r.name}</h3>
-                                            <p className="text-sm text-slate-500 mb-4">{r.type} • {r.capacity} Seats</p>
-                                            <button onClick={() => { setNewBooking(p => ({...p, roomId: r.id})); setIsBookingModalOpen(true); }} className="w-full py-2 border-2 border-hse-primary text-hse-primary font-bold rounded hover:bg-hse-primary hover:text-white transition uppercase text-xs">Book</button>
+                                    {filteredRooms.map(r => (
+                                        // UPDATED: DARK GREEN CARD HEADER
+                                        <div key={r.id} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all overflow-hidden group">
+                                            <div className="bg-hse-primary p-4 flex items-center justify-between">
+                                                <h3 className="font-bold text-lg text-white">{r.name}</h3>
+                                                <div className="text-emerald-100 bg-white/10 p-2 rounded-lg">
+                                                     <Icon name={r.type === 'Room' ? "presentation" : "monitor"} size={20} />
+                                                </div>
+                                            </div>
+                                            <div className="p-6 pt-4">
+                                                <p className="text-sm text-slate-500 mb-4 font-medium">{r.type} • {r.capacity} Seats</p>
+                                                <div className="text-xs text-slate-500 mb-6 flex flex-wrap gap-2">
+                                                    {r.amenities.map(a => <span key={a} className="bg-slate-100 px-2 py-1 rounded">{a}</span>)}
+                                                </div>
+                                                <button onClick={() => { setNewBooking(p => ({...p, roomId: r.id})); setIsBookingModalOpen(true); }} className="w-full py-2 border-2 border-hse-primary text-hse-primary font-bold rounded hover:bg-hse-primary hover:text-white transition uppercase text-xs">Book Now</button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
