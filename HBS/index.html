@@ -177,16 +177,17 @@
     };
 
     // Table E Data from Manual (Summary of Approvals)
+    // ADDED LINKS HERE
     const getApprovalWorkflow = (band) => {
       const workflow = [
-        { id: 'init', stage: 'Initiation Approval', authority: 'Head of Estates (HoE)' },
-        { id: 'pr1', stage: 'PR1: Engage Design Team', authority: band === 'A' ? 'Estates Manager (Recommendation)' : (band === 'B' ? 'ANDE' : 'HoE') },
-        { id: 'pr2', stage: 'PR2: Preliminary Design', authority: band === 'A' ? 'Estates Manager' : (band === 'B' ? 'ANDE' : (band === 'C' ? 'ANDE/HoE' : 'HoE')) },
-        { id: 'pr3', stage: 'PR3: Scheme Design', authority: band === 'A' ? 'Estates Manager' : (band === 'B' ? 'ANDE' : (band === 'C' ? 'HoE' : 'HoE')) },
-        { id: 'pr4', stage: 'PR4: Statutory Conditions', authority: band === 'A' ? 'Estates Manager' : 'ANDE' },
-        { id: 'pr5', stage: 'PR5: Detailed Design & Tender', authority: band === 'A' ? 'Estates Manager' : (band === 'B' ? 'ANDE' : 'HoE') },
-        { id: 'pr6', stage: 'PR6: Approval to Accept Tender', authority: band === 'A' ? 'Estates Manager' : (band === 'B' ? 'ANDE' : (band === 'C' ? 'HoE (>10m Board)' : 'Board')) },
-        { id: 'pr7', stage: 'PR7: Final Account', authority: band === 'A' ? 'Estates Manager' : (band === 'B' ? 'ANDE' : (band === 'C' ? 'HoE' : 'HoE')) }
+        { id: 'init', stage: 'Initiation Approval', authority: 'Head of Estates (HoE)', link: '#' },
+        { id: 'pr1', stage: 'PR1: Engage Design Team', authority: band === 'A' ? 'Estates Manager (Recommendation)' : (band === 'B' ? 'ANDE' : 'HoE'), link: '#' },
+        { id: 'pr2', stage: 'PR2: Preliminary Design', authority: band === 'A' ? 'Estates Manager' : (band === 'B' ? 'ANDE' : (band === 'C' ? 'ANDE/HoE' : 'HoE')), link: '#' },
+        { id: 'pr3', stage: 'PR3: Scheme Design', authority: band === 'A' ? 'Estates Manager' : (band === 'B' ? 'ANDE' : (band === 'C' ? 'HoE' : 'HoE')), link: '#' },
+        { id: 'pr4', stage: 'PR4: Statutory Conditions', authority: band === 'A' ? 'Estates Manager' : 'ANDE', link: '#' },
+        { id: 'pr5', stage: 'PR5: Detailed Design & Tender', authority: band === 'A' ? 'Estates Manager' : (band === 'B' ? 'ANDE' : 'HoE'), link: '#' },
+        { id: 'pr6', stage: 'PR6: Approval to Accept Tender', authority: band === 'A' ? 'Estates Manager' : (band === 'B' ? 'ANDE' : (band === 'C' ? 'HoE (>10m Board)' : 'Board')), link: '#' },
+        { id: 'pr7', stage: 'PR7: Final Account', authority: band === 'A' ? 'Estates Manager' : (band === 'B' ? 'ANDE' : (band === 'C' ? 'HoE' : 'HoE')), link: '#' }
       ];
       return workflow;
     };
@@ -196,7 +197,10 @@
     function CapitalProjectsApp() {
       // --- STATE ---
       
-      const [details, setDetails] = useState({
+      // Load saved data if available from window object (injected when saving)
+      const savedData = window.HSE_SAVED_DATA || {};
+
+      const [details, setDetails] = useState(savedData.details || {
         name: '',
         location: '',
         manager: '',
@@ -205,8 +209,8 @@
         date: new Date().toISOString().split('T')[0],
       });
 
+      const [workflowStatus, setWorkflowStatus] = useState(savedData.workflowStatus || {});
       const [calculatedBand, setCalculatedBand] = useState(null);
-      const [workflowStatus, setWorkflowStatus] = useState({});
 
       // --- HELPERS ---
       
@@ -254,21 +258,43 @@
       const handlePrint = () => window.print();
 
       const handleSave = () => {
-        const data = {
-          projectDetails: details,
-          classification: { 
-            band: calculatedBand, 
-            info: calculatedBand ? projectBands[calculatedBand] : null 
-          },
-          workflow: workflowStatus,
-          meta: { createdBy: details.manager, date: new Date().toISOString() }
+        // 1. Prepare Data to Save
+        const dataToSave = {
+            details,
+            workflowStatus
         };
         
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        // 2. Create a script block that will re-hydrate the state when the file is opened
+        const scriptContent = `window.HSE_SAVED_DATA = ${JSON.stringify(dataToSave)};`;
+        const dataScript = `<script id="hse-saved-data">${scriptContent}<\/script>`; // Escaped slash for safety
+
+        // 3. Get the current HTML source of the document
+        let htmlContent = document.documentElement.outerHTML;
+        
+        // 4. Clean up: Remove any previous saved data scripts to avoid duplication
+        htmlContent = htmlContent.replace(/<script id="hse-saved-data">.*?<\/script>/s, '');
+
+        // 5. Inject the new data script into the <head>
+        const position = htmlContent.indexOf('</head>');
+        if (position !== -1) {
+            htmlContent = htmlContent.slice(0, position) + dataScript + htmlContent.slice(position);
+        }
+
+        // 6. Prepend the Doctype (outerHTML doesn't include it)
+        const finalHtml = `<!DOCTYPE html>\n${htmlContent}`;
+
+        // 7. Create Blob and Trigger Download
+        const blob = new Blob([finalHtml], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${details.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'capital_project'}_assessment.json`;
+        
+        // Use project name for filename
+        const filename = details.name 
+            ? `${details.name.replace(/[^a-z0-9\s-]/gi, '_')}.html` 
+            : 'HSE_Assessment_Tool.html';
+            
+        link.download = filename;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -301,7 +327,7 @@
                   className="px-3 py-1.5 rounded text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white/90 w-full md:w-64"
                 />
                 <button onClick={handleSave} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm font-medium transition-colors">
-                  <Save className="w-4 h-4" /> Save
+                  <Save className="w-4 h-4" /> Save as HTML
                 </button>
                 <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-white text-emerald-900 hover:bg-emerald-50 rounded text-sm font-bold transition-colors shadow-sm">
                   <Printer className="w-4 h-4" /> Print
@@ -362,15 +388,18 @@
                   <SectionHeader title="Financial Input" icon={Euro} color="text-emerald-700" />
                   <div className="space-y-2">
                     <label className="label-text">Estimated Total Project Cost (Ex VAT)</label>
-                    <div className="relative">
+                    <div className="flex items-center">
+                        {/* Currency Symbol Outside Box */}
+                        <span className="inline-flex items-center px-3 py-2 rounded-l-md border border-r-0 border-slate-300 bg-slate-100 text-slate-500 text-lg font-bold">
+                            €
+                        </span>
                         <input 
                             type="text" 
-                            className="input-field pl-10 font-bold text-lg" 
+                            className="input-field rounded-l-none font-bold text-lg" 
                             value={formatNumber(details.cost)} 
                             onChange={handleCostChange} 
                             placeholder="0.00" 
                         />
-                        <span className="absolute left-3 top-2.5 text-slate-500 font-bold pointer-events-none z-10">€</span>
                     </div>
                     <p className="text-[10px] text-slate-500 italic mt-1">
                         Includes: Construction, Enabling Works, Design Fees, Equipping, Site Costs, etc.
@@ -445,7 +474,16 @@
                             <tbody>
                                 {getApprovalWorkflow(calculatedBand).map((step, idx) => (
                                     <tr key={step.id} className={`border-b border-slate-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                                        <td className="px-4 py-3 font-medium text-slate-800">{step.stage}</td>
+                                        <td className="px-4 py-3 font-medium text-slate-800">
+                                            {/* RENDER LINKS IF AVAILABLE */}
+                                            {step.link ? (
+                                                <a href={step.link} target="_blank" rel="noopener noreferrer" className="text-emerald-700 hover:underline hover:text-emerald-900 flex items-center gap-1 group">
+                                                    {step.stage} <span className="text-[10px] opacity-50 group-hover:opacity-100 transition-opacity">↗</span>
+                                                </a>
+                                            ) : (
+                                                step.stage
+                                            )}
+                                        </td>
                                         <td className="px-4 py-3 text-slate-600">
                                             <Badge>{step.authority}</Badge>
                                         </td>
