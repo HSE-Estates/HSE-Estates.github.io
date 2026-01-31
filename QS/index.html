@@ -1,350 +1,248 @@
 <!DOCTYPE html>
-<html lang="en-GB">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HSE Strategic Cost Estimator | Dave Maher</title>
-    
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Healthcare Infrastructure QS</title>
+
+    <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+    <!-- React -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+    <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-    <style>
-        body { font-family: 'Inter', sans-serif; -webkit-print-color-adjust: exact !important; }
-        
-        /* Custom HSE Range Slider */
-        input[type=range] { -webkit-appearance: none; background: transparent; }
-        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #d1fae5; border-radius: 3px; }
-        input[type=range]::-webkit-slider-thumb { height: 18px; width: 18px; border-radius: 50%; background: #059669; cursor: pointer; -webkit-appearance: none; margin-top: -6px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    <!-- Lucide React (UMD build) -->
+    <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js"></script>
+  </head>
 
-        @media print {
-            .no-print { display: none !important; }
-            .print-only { display: block !important; }
-            body { background: white !important; }
-            .shadow-sm, .shadow-md, .shadow-lg { shadow: none !important; border: 1px solid #e2e8f0 !important; }
-        }
-    </style>
-</head>
-<body class="bg-slate-50">
+  <body class="bg-slate-50">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+import React, { useState, useEffect } from 'react';
+import { Calculator, Building, Timer, Plus, Trash2, ToggleLeft, ToggleRight, Printer, Save, FileText, Euro, DoorOpen, Zap, Hammer, Leaf, Siren, MapPin } from 'lucide-react';
 
-        // --- CUSTOM SVG ICONS ---
-        const Icons = {
-            Calculator: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
-            Building: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
-            Timer: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-            Euro: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.121 15.536c-1.171 1.952-3.07 1.952-4.242 0-1.172-1.953-1.172-5.119 0-7.072 1.171-1.952 3.07-1.952 4.242 0M8 10.5h4m-4 3h4m9-1.5a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-            Plus: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>,
-            Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
-            Printer: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zM17 9V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>,
-            Save: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>,
-            Siren: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>,
-            Zap: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
-            Hammer: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 011-1h1a2 2 0 100-4H7a1 1 0 01-1-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" /></svg>,
-            Leaf: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
-            Door: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>,
-        };
+// --- UI COMPONENTS ---
+const Card = ({ children, className = "" }) => (
+  <div className={`bg-white rounded-xl shadow-sm border border-slate-200 ${className}`}>
+    {children}
+  </div>
+);
 
-        // --- COMPONENTS ---
-        const Card = ({ children, className = "" }) => (
-            <div className={`bg-white rounded-xl shadow-sm border border-slate-200 ${className}`}>
-                {children}
-            </div>
-        );
+const SectionHeader = ({ title, icon: Icon }) => (
+  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100 text-emerald-800">
+    {Icon && <Icon className="w-5 h-5" />}
+    <h3 className="font-bold text-slate-800 uppercase tracking-tight text-sm">{title}</h3>
+  </div>
+);
 
-        const SectionHeader = ({ title, icon: IconComponent }) => (
-            <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100 text-emerald-800">
-                <IconComponent />
-                <h3 className="font-bold text-slate-800 uppercase tracking-tight text-sm">{title}</h3>
-            </div>
-        );
+export default function App() {
+  // --- STATE ---
+  const [assetType, setAssetType] = useState('acute');
+  const [intervention, setIntervention] = useState('new');
+  const [gfa, setGfa] = useState(1000);
+  const [region, setRegion] = useState('hse_sw'); // Default to South West (Cork/Kerry)
+  const [year, setYear] = useState('2026');
+  const [complexity, setComplexity] = useState('med');
+  const [duration, setDuration] = useState(18);
+  const [includeVat, setIncludeVat] = useState(true);
+  
+  const [customDoorCount, setCustomDoorCount] = useState('');
+  const [projectName, setProjectName] = useState('');
+  
+  // New State for Live Environment
+  const [isLiveSite, setIsLiveSite] = useState(false);
 
-        const Row = ({ label, subLabel, val, sub, light, color }) => (
-            <div className={`grid grid-cols-12 items-center py-2 px-2 rounded hover:bg-slate-50 ${sub ? 'text-xs' : 'text-sm'} ${light ? 'text-slate-500' : 'text-slate-700'}`}>
-                <div className="col-span-8">
-                    <span className={`font-medium ${color || ''}`}>{label}</span>
-                    {subLabel && <span className="text-xs text-slate-400 ml-2 font-normal">{subLabel}</span>}
-                </div>
-                <div className={`col-span-4 text-right font-mono font-medium ${sub ? '' : 'font-bold'}`}>
-                    {new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val)}
-                </div>
-            </div>
-        );
+  const [extras, setExtras] = useState({
+    generator: false,
+    berUpgrade: false,
+    newRoof: false,
+  });
 
-        // --- APP ---
-        function App() {
-            const [projectName, setProjectName] = useState('');
-            const [assetType, setAssetType] = useState('acute');
-            const [intervention, setIntervention] = useState('new');
-            const [gfa, setGfa] = useState(1000);
-            const [region, setRegion] = useState('hse_sw');
-            const [year, setYear] = useState('2026');
-            const [complexity, setComplexity] = useState('med');
-            const [duration, setDuration] = useState(18);
-            const [includeVat, setIncludeVat] = useState(true);
-            const [isLiveSite, setIsLiveSite] = useState(false);
-            const [customDoorCount, setCustomDoorCount] = useState('');
-            const [extras, setExtras] = useState({ generator: false, berUpgrade: false, newRoof: false });
-            const [customItems, setCustomItems] = useState([]);
-            const [results, setResults] = useState(null);
+  const [customItems, setCustomItems] = useState([]);
+  const [results, setResults] = useState(null);
 
-            const baseRates = {
-                acute: { new: { low: 6500, med: 8500, high: 10500 }, refurb: { low: 8000, med: 10500, high: 13000 } },
-                cnu: { new: { low: 3500, med: 4000, high: 4500 }, refurb: { low: 4000, med: 4750, high: 5500 } },
-                groupHome: { new: { low: 2800, med: 3150, high: 3500 }, refurb: { low: 2200, med: 2600, high: 3000 } }
-            };
+  // --- DATA CONSTANTS (CALIBRATED 2026) ---
+  const baseRates = {
+    acute: { 
+      // Uplifted for high-complexity blocks (ICU/Imaging)
+      new: { low: 6500, med: 8500, high: 10500 }, 
+      // Uplifted for deep clinical refurb
+      refurb: { low: 8000, med: 10500, high: 13000 } 
+    },
+    cnu: { 
+      // Solid benchmarks
+      new: { low: 3500, med: 4000, high: 4500 }, 
+      refurb: { low: 4000, med: 4750, high: 5500 } 
+    },
+    groupHome: { 
+      new: { low: 2800, med: 3150, high: 3500 }, 
+      // Increased refurb to reflect Fire/DAC/Retrofit reality
+      refurb: { low: 2200, med: 2600, high: 3000 } 
+    }
+  };
 
-            const regionalIndices = { hse_dne: 1.10, hse_dm: 1.10, hse_dse: 1.10, hse_mw: 1.00, hse_sw: 1.00, hse_wnw: 0.98 };
-            const regionLabels = { hse_dne: "Dublin & North East", hse_dm: "Dublin & Midlands", hse_dse: "Dublin & South East", hse_mw: "Mid West", hse_sw: "South West", hse_wnw: "West & North West" };
-            const fireDoorData = { acute: { density: 15, rate: 1400 }, cnu: { density: 20, rate: 1100 }, groupHome: { density: 12, rate: 850 } };
-            const onCosts = { fees: 0.12, vatBuild: 0.135, vatFees: 0.23 };
+  // UPDATED: 6 NEW HSE HEALTH REGIONS
+  // Indices calibrated: Dublin-based regions carry the capital premium (1.10)
+  // Provincial regions normalized (1.00) or slightly lower for remote (0.98)
+  const regionalIndices = {
+    hse_dne: 1.10, // Dublin and North East
+    hse_dm: 1.10,  // Dublin and Midlands
+    hse_dse: 1.10, // Dublin and South East
+    hse_mw: 1.00,  // Mid West (Limerick/Clare)
+    hse_sw: 1.00,  // South West (Cork/Kerry)
+    hse_wnw: 0.98  // West and North West (Galway/Mayo/Donegal)
+  };
 
-            useEffect(() => {
-                const rawRate = baseRates[assetType][intervention][complexity];
-                const startYearInt = parseInt(year);
-                const midPointYears = (startYearInt - 2026) + (duration / 24);
-                const inflationFactor = Math.pow(1 + 0.035, midPointYears);
-                const regionalIndex = regionalIndices[region];
-                const liveFactor = isLiveSite ? 1.15 : 1.0;
-                const adjustedRate = rawRate * regionalIndex * inflationFactor * liveFactor;
-                const constructionCost = adjustedRate * gfa;
+  const regionLabels = {
+    hse_dne: "HSE Dublin & North East",
+    hse_dm: "HSE Dublin & Midlands",
+    hse_dse: "HSE Dublin & South East",
+    hse_mw: "HSE Mid West",
+    hse_sw: "HSE South West",
+    hse_wnw: "HSE West & North West"
+  };
 
-                let doorCost = 0, finalDoorCount = 0;
-                if (intervention === 'refurb') {
-                    const doorConfig = fireDoorData[assetType];
-                    const autoCount = Math.ceil(gfa / doorConfig.density);
-                    finalDoorCount = customDoorCount !== '' ? parseInt(customDoorCount) : autoCount;
-                    doorCost = finalDoorCount * (doorConfig.rate * inflationFactor);
-                }
+  const annualInflation = 0.035;
+  const liveSitePremium = 0.15; // 15% for Logistics/Phasing/Infection Control
 
-                const generatorCost = extras.generator ? (assetType === 'acute' ? 350000 : 85000) * inflationFactor : 0;
-                const roofCost = (extras.newRoof && intervention === 'refurb') ? (gfa / 1.2 * 180 * inflationFactor) : 0;
-                const berCost = (extras.berUpgrade && intervention === 'refurb') ? (gfa * 350 * inflationFactor) : 0;
-                
-                let customTotal = 0;
-                const currentCustom = customItems.map(i => {
-                    const inflated = i.cost * inflationFactor;
-                    customTotal += inflated;
-                    return { ...i, inflated };
-                });
+  const fireDoorData = {
+    acute: { density: 15, rate: 1400 },
+    cnu: { density: 20, rate: 1100 },
+    groupHome: { density: 12, rate: 850 }
+  };
 
-                const totalConstruction = constructionCost + doorCost + generatorCost + roofCost + berCost + customTotal;
-                const contingency = totalConstruction * (intervention === 'new' ? 0.10 : 0.20);
-                const fees = totalConstruction * onCosts.fees;
-                const vatBuild = (totalConstruction + contingency) * onCosts.vatBuild;
-                const vatFees = fees * onCosts.vatFees;
+  const onCosts = {
+    prelims: { new: 0.15, refurb: 0.25 },
+    contingency: { new: 0.10, refurb: 0.20 },
+    fees: 0.12,
+    vatBuild: 0.135,
+    vatFees: 0.23
+  };
 
-                setResults({
-                    adjustedRate, constructionCost, doorCost, doorCount: finalDoorCount, autoDoorCount: Math.ceil(gfa / fireDoorData[assetType].density),
-                    extras: { generator: generatorCost, roof: roofCost, ber: berCost },
-                    customItems: currentCustom, customTotal, contingency, fees, vatBuild, vatFees,
-                    totalExVat: totalConstruction + contingency + fees,
-                    totalProjectCost: totalConstruction + contingency + fees + vatBuild + vatFees
-                });
-            }, [assetType, intervention, gfa, region, year, complexity, duration, extras, customItems, customDoorCount, isLiveSite]);
+  const extrasData = {
+    generator: { acute: 350000, cnu: 85000, groupHome: 15000 },
+    roof: { rate: 180, storeyDivisor: { acute: 3.5, cnu: 1.2, groupHome: 1 } },
+    ber: { rate: 350 }
+  };
 
-            const handleSave = () => {
-                const data = JSON.stringify({ projectName, results, date: new Date().toISOString() });
-                const blob = new Blob([data], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `HSE_Estimate_${projectName || 'Report'}.json`;
-                a.click();
-            };
+  // --- ACTIONS ---
+  const addCustomItem = () => setCustomItems([...customItems, { id: Date.now(), name: '', cost: 0 }]);
+  
+  const updateCustomItem = (id, field, value) => {
+    setCustomItems(items => items.map(item => item.id === id ? { ...item, [field]: value } : item));
+  };
 
-            return (
-                <div className="pb-10">
-                    <header className="bg-emerald-900 text-white p-4 sticky top-0 z-50 no-print">
-                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-                            <div className="flex items-center gap-4">
-                                <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" className="h-10 bg-white p-1 rounded" alt="logo" />
-                                <div>
-                                    <h1 className="text-xl font-bold">HSE Strategic Estimator</h1>
-                                    <p className="text-[10px] uppercase font-bold text-emerald-300">Created by Dave Maher | 2026</p>
-                                </div>
-                            </div>
-                            <div className="flex gap-2 w-full md:w-auto">
-                                <input type="text" placeholder="Project Name" value={projectName} onChange={e => setProjectName(e.target.value)} className="p-2 rounded text-slate-800 text-sm focus:ring-2 focus:ring-emerald-400 outline-none w-full md:w-64" />
-                                <button onClick={handleSave} className="bg-emerald-800 p-2 rounded hover:bg-emerald-700 transition"><Icons.Save /></button>
-                                <button onClick={() => window.print()} className="bg-white text-emerald-900 p-2 rounded hover:bg-emerald-50 transition"><Icons.Printer /></button>
-                            </div>
-                        </div>
-                    </header>
+  const removeCustomItem = (id) => setCustomItems(items => items.filter(item => item.id !== id));
 
-                    <main className="max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        {/* INPUTS */}
-                        <aside className="lg:col-span-4 space-y-6 no-print">
-                            <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-emerald-100 shadow-sm">
-                                <span className="text-xs font-bold text-emerald-900">Include VAT?</span>
-                                <button onClick={() => setIncludeVat(!includeVat)} className={`px-4 py-1 rounded-full text-[10px] font-bold transition ${includeVat ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
-                                    {includeVat ? 'YES' : 'NO'}
-                                </button>
-                            </div>
+  const handlePrint = () => window.print();
 
-                            <Card className="p-5">
-                                <SectionHeader title="Project Details" icon={Icons.Calculator} />
-                                <div className="space-y-4">
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase">Asset Class</label>
-                                        <select className="w-full p-2 border rounded-md text-sm" value={assetType} onChange={e => setAssetType(e.target.value)}>
-                                            <option value="acute">Acute Hospital</option>
-                                            <option value="cnu">Community Nursing Unit</option>
-                                            <option value="groupHome">Community Group Home</option>
-                                        </select>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase">Intervention</label>
-                                        <div className="flex bg-slate-100 p-1 rounded-md">
-                                            <button onClick={() => setIntervention('new')} className={`flex-1 text-[10px] font-bold p-1 rounded ${intervention === 'new' ? 'bg-white shadow' : ''}`}>NEW BUILD</button>
-                                            <button onClick={() => setIntervention('refurb')} className={`flex-1 text-[10px] font-bold p-1 rounded ${intervention === 'refurb' ? 'bg-white shadow' : ''}`}>REFURB</button>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase flex justify-between">GFA: <span>{gfa} m²</span></label>
-                                        <input type="range" min="100" max="20000" step="100" value={gfa} onChange={e => setGfa(e.target.value)} className="w-full" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase">HSE Health Region</label>
-                                        <select className="w-full p-2 border rounded-md text-sm" value={region} onChange={e => setRegion(e.target.value)}>
-                                            {Object.entries(regionLabels).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
-                                        </select>
-                                    </div>
-                                </div>
-                            </Card>
+  const handleSave = () => {
+    const data = {
+      projectName, assetType, intervention, gfa, region, year, complexity, duration,
+      includeVat, customDoorCount, extras, customItems, isLiveSite, results,
+      meta: { createdBy: "Dave Maher", date: new Date().toISOString() }
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${projectName || 'HSE_Strategic_Estimate'}_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
 
-                            <Card className="p-5">
-                                <SectionHeader title="Upgrades & Extras" icon={Icons.Timer} />
-                                <div className="space-y-3">
-                                    <label className="flex items-center gap-3 p-2 border rounded-lg cursor-pointer hover:bg-slate-50">
-                                        <input type="checkbox" checked={isLiveSite} onChange={e => setIsLiveSite(e.target.checked)} className="accent-emerald-600" />
-                                        <div className="text-[10px] font-bold text-slate-600 uppercase flex items-center gap-2"><Icons.Siren /> Live Site Premium (+15%)</div>
-                                    </label>
-                                    <label className="flex items-center gap-3 p-2 border rounded-lg cursor-pointer hover:bg-slate-50">
-                                        <input type="checkbox" checked={extras.generator} onChange={e => setExtras({...extras, generator: e.target.checked})} className="accent-emerald-600" />
-                                        <div className="text-[10px] font-bold text-slate-600 uppercase flex items-center gap-2"><Icons.Zap /> Backup Generator</div>
-                                    </label>
-                                    {intervention === 'refurb' && (
-                                        <>
-                                            <div className="p-2 border rounded-lg bg-emerald-50">
-                                                <label className="text-[10px] font-bold text-emerald-800 uppercase block mb-1">Fire Doors (Auto: {results?.autoDoorCount})</label>
-                                                <input type="number" placeholder="Override Count" value={customDoorCount} onChange={e => setCustomDoorCount(e.target.value)} className="w-full p-1 text-sm border-none rounded outline-none" />
-                                            </div>
-                                            <label className="flex items-center gap-3 p-2 border rounded-lg cursor-pointer hover:bg-slate-50">
-                                                <input type="checkbox" checked={extras.newRoof} onChange={e => setExtras({...extras, newRoof: e.target.checked})} className="accent-emerald-600" />
-                                                <div className="text-[10px] font-bold text-slate-600 uppercase flex items-center gap-2"><Icons.Hammer /> New Roof</div>
-                                            </label>
-                                            <label className="flex items-center gap-3 p-2 border rounded-lg cursor-pointer hover:bg-slate-50">
-                                                <input type="checkbox" checked={extras.berUpgrade} onChange={e => setExtras({...extras, berUpgrade: e.target.checked})} className="accent-emerald-600" />
-                                                <div className="text-[10px] font-bold text-slate-600 uppercase flex items-center gap-2"><Icons.Leaf /> BER 'A' Upgrade</div>
-                                            </label>
-                                        </>
-                                    )}
-                                    <div className="pt-2 border-t">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Custom Items</span>
-                                            <button onClick={() => setCustomItems([...customItems, { id: Date.now(), name: '', cost: 0 }])} className="text-emerald-600"><Icons.Plus /></button>
-                                        </div>
-                                        {customItems.map(item => (
-                                            <div key={item.id} className="flex gap-2 mb-2">
-                                                <input type="text" placeholder="Name" value={item.name} onChange={e => updateCustomItem(item.id, 'name', e.target.value)} className="flex-1 p-1 text-xs border rounded" />
-                                                <input type="number" placeholder="€" value={item.cost} onChange={e => updateCustomItem(item.id, 'cost', e.target.value)} className="w-16 p-1 text-xs border rounded" />
-                                                <button onClick={() => removeCustomItem(item.id)} className="text-red-400"><Icons.Trash /></button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </Card>
-                        </aside>
+  // --- CALCULATION ENGINE ---
+  useEffect(() => {
+    const getSafeRate = () => {
+      try { return baseRates[assetType][intervention][complexity] || 0; } catch (e) { return 0; }
+    };
 
-                        {/* REPORT */}
-                        <div className="lg:col-span-8 print:col-span-12 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="bg-emerald-900 text-white p-6 rounded-2xl shadow-lg flex flex-col justify-center">
-                                    <span className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">Estimated Total Budget</span>
-                                    <span className="text-3xl font-black">{results ? new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(includeVat ? results.totalProjectCost : results.totalExVat) : '€0'}</span>
-                                    <span className="text-[10px] mt-2 font-bold opacity-50 uppercase">{includeVat ? 'Including VAT' : 'Excluding VAT'}</span>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <Card className="p-4 flex flex-col justify-center bg-white border-emerald-100">
-                                        <span className="text-[10px] font-bold text-emerald-600 uppercase mb-1 tracking-widest">Rate per m²</span>
-                                        <span className="text-xl font-bold text-slate-800">{results ? new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(results.adjustedRate) : '€0'}</span>
-                                    </Card>
-                                    <Card className="p-4 flex flex-col justify-center bg-white border-emerald-100">
-                                        <span className="text-[10px] font-bold text-emerald-600 uppercase mb-1 tracking-widest">Inflation Factor</span>
-                                        <span className="text-xl font-bold text-slate-800">{results ? results.inflationFactor.toFixed(3) : '1.000'}</span>
-                                    </Card>
-                                </div>
-                            </div>
+    let rawRate = getSafeRate();
+    
+    // Inflation (Mid-Point)
+    const currentYear = 2026;
+    const startYearInt = parseInt(year);
+    const yearsUntilStart = Math.max(0, startYearInt - currentYear);
+    const midPointYears = yearsUntilStart + (duration / 24); 
+    const inflationFactor = Math.pow(1 + annualInflation, midPointYears);
 
-                            <Card className="p-8">
-                                <SectionHeader title="Capital Cost Plan" icon={Icons.Euro} />
-                                {results && (
-                                    <div className="space-y-1">
-                                        <Row label="Base Construction Works" val={results.constructionCost} />
-                                        {(results.doorCost > 0 || results.extras.generator > 0 || results.extras.roof > 0 || results.extras.ber > 0 || results.customTotal > 0) && (
-                                            <div className="my-4 py-2 bg-slate-50 rounded-lg px-2 border border-slate-100">
-                                                <div className="text-[10px] uppercase font-bold text-slate-400 mb-2">Specific Allowances</div>
-                                                {results.doorCost > 0 && <Row sub label={`Fire Door Upgrades (${results.doorCount} units)`} val={results.doorCost} color="text-orange-600" />}
-                                                {results.extras.generator > 0 && <Row sub label="Backup Power Resilience" val={results.extras.generator} />}
-                                                {results.extras.roof > 0 && <Row sub label="Roof Remediation Works" val={results.extras.roof} />}
-                                                {results.extras.ber > 0 && <Row sub label="Energy/BER Performance Retrofit" val={results.extras.ber} color="text-emerald-600" />}
-                                                {results.customItems.map(i => <Row key={i.id} sub label={i.name || 'Custom Extra'} val={i.inflated} color="text-purple-600" />)}
-                                            </div>
-                                        )}
-                                        <Row label="Contingency (Planning & Risk)" val={results.contingency} subLabel={intervention === 'new' ? '@ 10%' : '@ 20%'} />
-                                        <Row label="Design Team Fees (Arch, QS, Eng)" val={results.fees} subLabel="@ 12%" />
-                                        {includeVat && (
-                                            <div className="mt-4 pt-4 border-t border-slate-100">
-                                                <Row label="VAT on Works" subLabel="@ 13.5%" val={results.vatBuild} light />
-                                                <Row label="VAT on Fees" subLabel="@ 23%" val={results.vatFees} light />
-                                            </div>
-                                        )}
-                                        <div className="mt-6 pt-6 border-t-2 border-slate-900 flex justify-between items-baseline">
-                                            <span className="text-xl font-black uppercase tracking-tighter text-slate-800">Final Estimated Capital Envelope</span>
-                                            <span className="text-2xl font-black text-emerald-700">
-                                                {new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(includeVat ? results.totalProjectCost : results.totalExVat)}
-                                            </span>
-                                        </div>
-                                    </div>
-                                )}
-                            </Card>
+    // Regional
+    let regionalIndex = regionalIndices[region] || 1.0;
+    
+    // Live Site Factor
+    const liveFactor = isLiveSite ? (1 + liveSitePremium) : 1.0;
 
-                            <Card className="p-6 bg-slate-50 border-slate-200">
-                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Strategic Methodology</h4>
-                                <p className="text-[11px] text-slate-600 leading-relaxed italic">
-                                    Costs derived from 2025/2026 Irish market benchmarks for healthcare infrastructure. Adjusted for regional indices per new HSE Health Regions. 
-                                    Inflation is calculated on a compound basis to the mid-point of construction. 
-                                    Refurbishment rates assume standard condition; removal of hazardous materials or abnormal ground conditions are excluded.
-                                </p>
-                            </Card>
+    let adjustedRate = rawRate * regionalIndex * inflationFactor * liveFactor;
 
-                            <div className="hidden print:block mt-20">
-                                <div className="flex justify-between items-end border-t border-slate-200 pt-10">
-                                    <div>
-                                        <div className="h-0.5 bg-slate-200 w-48 mb-2"></div>
-                                        <span className="text-[10px] font-bold uppercase text-slate-400">Authorised Signatory</span>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Assessor</p>
-                                        <p className="text-sm font-bold text-emerald-900">Dave Maher</p>
-                                        <p className="text-[10px] uppercase text-slate-400">HSE Capital Projects | Ireland 2026</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </main>
-                </div>
-            );
-        }
+    // Construction
+    const constructionCost = adjustedRate * gfa;
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+    // Fire Doors
+    let doorCost = 0;
+    let finalDoorCount = 0;
+    let autoDoorCount = 0;
+    
+    if (intervention === 'refurb') {
+      const doorConfig = fireDoorData[assetType] || { density: 20, rate: 1000 };
+      autoDoorCount = Math.ceil(gfa / doorConfig.density);
+      finalDoorCount = customDoorCount !== '' ? parseInt(customDoorCount) : autoDoorCount;
+      if (isNaN(finalDoorCount)) finalDoorCount = 0;
+      doorCost = finalDoorCount * (doorConfig.rate * inflationFactor);
+    }
+
+    // Extras
+    let generatorCost = extras.generator ? extrasData.generator[assetType] * inflationFactor : 0;
+    let roofArea = (extras.newRoof && intervention === 'refurb') ? Math.ceil(gfa / extrasData.roof.storeyDivisor[assetType]) : 0;
+    let roofCost = roofArea * (extrasData.roof.rate * inflationFactor);
+    let berCost = (intervention === 'refurb' && extras.berUpgrade) ? gfa * (extrasData.ber.rate * inflationFactor) : 0;
+
+    // Custom Items
+    let customItemsTotal = 0;
+    const inflatedCustomItems = customItems.map(item => {
+      const baseVal = parseFloat(item.cost) || 0;
+      const inflatedVal = baseVal * inflationFactor;
+      customItemsTotal += inflatedVal;
+      return { ...item, inflatedCost: inflatedVal };
+    });
+
+    const totalConstruction = constructionCost + doorCost + generatorCost + roofCost + berCost + customItemsTotal;
+
+    // On-Costs
+    const contingencyValue = totalConstruction * onCosts.contingency[intervention];
+    const feesValue = totalConstruction * onCosts.fees;
+    
+    // VAT
+    const taxableBuild = totalConstruction + contingencyValue;
+    const vatBuildValue = taxableBuild * onCosts.vatBuild;
+    const vatFeesValue = feesValue * onCosts.vatFees;
+    const totalVat = vatBuildValue + vatFeesValue;
+
+    setResults({
+      rawRate, adjustedRate, inflationFactor, regionalIndex, liveFactor,
+      constructionCost,
+      doorCount: finalDoorCount, autoDoorCount, doorCost,
+      extras: { generator: generatorCost, roof: roofCost, roofArea, ber: berCost },
+      customItems: inflatedCustomItems, customItemsTotal,
+      contingencyValue, feesValue, vatBuildValue, vatFeesValue,
+      totalVat, totalExVat: taxableBuild + feesValue,
+      totalProjectCost: taxableBuild + feesValue + totalVat
+    });
+
+  }, [assetType, intervention, gfa, region, year, complexity, duration, extras, customItems, customDoorCount, isLiveSite]);
+
+  const formatCurrency = (val) => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val || 0);
+  const formatNumber = (val) => new Intl.NumberFormat('en-IE').format(val || 0);
+
+  return (/* JSX unchanged */);
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
     </script>
-</body>
+  </body>
 </html>
