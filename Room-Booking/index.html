@@ -2,7 +2,7 @@
 <html lang="en-GB">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>HSE Resource Booking</title>
     
     <!-- Tailwind CSS -->
@@ -31,6 +31,8 @@
         .custom-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
         .animate-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        /* Safe area for mobile bottom nav */
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -77,7 +79,6 @@
         const getHoursArray = () => Array.from({length: 11}, (_, i) => i + 8); 
         const isOverlapping = (startA, endA, startB, endB) => startA < endB && endA > startB;
 
-        // New Helper for Relative Time
         const getRelativeTime = (date) => {
             const now = new Date();
             const diff = date - now;
@@ -140,13 +141,11 @@
             { id: 'hd5', name: 'Hot Desk 05', capacity: 1, amenities: ['Quiet Zone'], type: 'Desk', floor: 'Ground Floor', color: 'bg-emerald-50 text-hse-primary' },
         ];
 
-        // --- CHART COMPONENTS (DASHBOARD) ---
-        
+        // --- CHART COMPONENTS ---
         const OccupancyHeatmap = ({ bookings, rooms }) => {
             const [filter, setFilter] = useState('All');
             const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
             const hours = [8, 10, 12, 14, 16];
-            
             const targetRooms = rooms.filter(r => filter === 'All' || r.type === filter);
             const totalCapacity = targetRooms.length;
 
@@ -164,10 +163,8 @@
                 const first = curr.getDate() - curr.getDay() + 1;
                 const dayDate = new Date(curr.setDate(first + dayIndex));
                 dayDate.setHours(0,0,0,0);
-
                 const slotStart = new Date(dayDate); slotStart.setHours(hour);
                 const slotEnd = new Date(dayDate); slotEnd.setHours(hour + 2);
-
                 const count = bookings.filter(b => {
                     if (filter !== 'All') {
                          const roomType = rooms.find(r => r.id === b.roomId)?.type;
@@ -177,7 +174,6 @@
                     const bEnd = new Date(b.end);
                     return isOverlapping(slotStart, slotEnd, bStart, bEnd);
                 }).length;
-
                 return { count, pct: Math.round((count/totalCapacity)*100) };
             };
 
@@ -223,7 +219,6 @@
             const first = curr.getDate() - curr.getDay() + 1;
             const weekStart = new Date(curr.setDate(first)); weekStart.setHours(0,0,0,0);
             const weekEnd = new Date(curr.setDate(first + 6)); weekEnd.setHours(23,59,59,999);
-
             const weeklyBookings = bookings.filter(b => b.start >= weekStart && b.start <= weekEnd);
             const totalCapacityHours = totalResources * 40; 
             const bookedHours = weeklyBookings.reduce((acc, b) => acc + ((b.end - b.start) / 3600000), 0);
@@ -261,13 +256,10 @@
             );
         };
 
-        // --- UPDATED COMPONENT: Meeting Room Status Box ---
         const MeetingRoomWidget = ({ bookings }) => {
             const now = new Date();
-            const mrId = 'mr1'; // Hardcoded for Meeting Room 01
-            
+            const mrId = 'mr1';
             const current = bookings.find(b => b.roomId === mrId && now >= b.start && now <= b.end);
-            // Get next booking that starts in the future
             const next = bookings.filter(b => b.roomId === mrId && b.start > now).sort((a,b) => a.start - b.start)[0];
             
             return (
@@ -280,22 +272,17 @@
                             {current ? 'Occupied' : 'Available'}
                         </div>
                     </div>
-                    
                     <div className="mt-4 pt-4 border-t border-black/5">
                         {current ? (
                             <div className="text-sm text-orange-800">
-                                <div className="font-bold flex items-center gap-1">
-                                    <Icon name="clock" size={14}/> Free at: {formatTime(current.end)} ({getRelativeTime(current.end)})
-                                </div>
+                                <div className="font-bold flex items-center gap-1"><Icon name="clock" size={14}/> Free at: {formatTime(current.end)} ({getRelativeTime(current.end)})</div>
                                 <div className="text-xs opacity-75 mt-1 truncate">Current: {current.title}</div>
                             </div>
                         ) : (
                             <div className="text-sm text-emerald-800">
                                 {next ? (
                                     <>
-                                        <div className="font-bold flex items-center gap-1">
-                                            <Icon name="calendar-clock" size={14}/> Next booking: {formatTime(next.start)}
-                                        </div>
+                                        <div className="font-bold flex items-center gap-1"><Icon name="calendar-clock" size={14}/> Next booking: {formatTime(next.start)}</div>
                                         <div className="text-xs font-bold mt-0.5 mb-1 ml-5 opacity-90">({getRelativeTime(next.start)})</div>
                                         <div className="text-xs opacity-75 mt-1 truncate">{next.title}</div>
                                     </>
@@ -311,30 +298,19 @@
 
         const TopOrganisersChart = ({ bookings }) => {
             const organisers = {};
-            bookings.forEach(b => { 
-                if(b.organiser) organisers[b.organiser] = (organisers[b.organiser] || 0) + 1; 
-            });
+            bookings.forEach(b => { if(b.organiser) organisers[b.organiser] = (organisers[b.organiser] || 0) + 1; });
             const topList = Object.entries(organisers).sort((a,b) => b[1] - a[1]).slice(0, 5);
 
             return (
                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-full">
-                    <h4 className="font-bold text-slate-700 text-sm mb-4 flex items-center gap-2">
-                        <Icon name="crown" size={16} className="text-hse-primary"/> Top Organisers
-                    </h4>
+                    <h4 className="font-bold text-slate-700 text-sm mb-4 flex items-center gap-2"><Icon name="crown" size={16} className="text-hse-primary"/> Top Organisers</h4>
                     <div className="space-y-3">
                         {topList.map(([name, count], i) => (
                             <div key={i} className="flex items-center gap-3">
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${i===0 ? 'bg-yellow-100 text-yellow-700' : i===1 ? 'bg-slate-200 text-slate-600' : i===2 ? 'bg-orange-100 text-orange-700' : 'bg-slate-50 text-slate-400'}`}>
-                                    {i+1}
-                                </div>
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${i===0 ? 'bg-yellow-100 text-yellow-700' : i===1 ? 'bg-slate-200 text-slate-600' : i===2 ? 'bg-orange-100 text-orange-700' : 'bg-slate-50 text-slate-400'}`}>{i+1}</div>
                                 <div className="flex-1">
-                                    <div className="flex justify-between text-xs font-medium text-slate-700">
-                                        <span className="truncate max-w-[120px]">{name}</span>
-                                        <span className="font-bold">{count}</span>
-                                    </div>
-                                    <div className="w-full bg-slate-50 h-1.5 rounded-full mt-1">
-                                        <div className="bg-hse-primary h-full rounded-full opacity-60" style={{width: `${(count/Math.max(topList[0][1], 1))*100}%`}}></div>
-                                    </div>
+                                    <div className="flex justify-between text-xs font-medium text-slate-700"><span className="truncate max-w-[120px]">{name}</span><span className="font-bold">{count}</span></div>
+                                    <div className="w-full bg-slate-50 h-1.5 rounded-full mt-1"><div className="bg-hse-primary h-full rounded-full opacity-60" style={{width: `${(count/Math.max(topList[0][1], 1))*100}%`}}></div></div>
                                 </div>
                             </div>
                         ))}
@@ -343,8 +319,6 @@
                 </div>
             );
         };
-
-        // --- CHART COMPONENTS (SCHEDULE) ---
 
         const ScheduleAnalytics = ({ bookings }) => {
             const now = new Date();
@@ -357,18 +331,14 @@
                 }).length;
                 weekAheadDaily.push({ day: d.toLocaleDateString('en-GB', {weekday:'short'}), count });
             }
-
             const total = bookings.length || 1;
             const internal = bookings.filter(b => b.type === 'Internal').length;
             const external = bookings.filter(b => b.type === 'External').length;
 
             return (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 pt-6 border-t border-slate-100">
-                    {/* Internal Split */}
                     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                        <h4 className="font-bold text-slate-700 text-sm mb-4 flex items-center gap-2">
-                            <Icon name="pie-chart" size={16} className="text-hse-primary"/> Booking Type Split
-                        </h4>
+                        <h4 className="font-bold text-slate-700 text-sm mb-4 flex items-center gap-2"><Icon name="pie-chart" size={16} className="text-hse-primary"/> Booking Type Split</h4>
                         <div className="flex h-6 rounded-full overflow-hidden w-full bg-slate-100 mb-2">
                             <div className="bg-hse-primary h-full transition-all" style={{width: `${(internal/total)*100}%`}}></div>
                             <div className="bg-amber-400 h-full transition-all" style={{width: `${(external/total)*100}%`}}></div>
@@ -378,12 +348,8 @@
                             <span className="text-amber-500 flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-amber-400"></div> {Math.round((external/total)*100)}% External</span>
                         </div>
                     </div>
-
-                    {/* Volume */}
                     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                        <h4 className="font-bold text-slate-700 text-sm mb-4 flex items-center gap-2">
-                            <Icon name="bar-chart-2" size={16} className="text-hse-primary"/> Volume: Next 7 Days
-                        </h4>
+                        <h4 className="font-bold text-slate-700 text-sm mb-4 flex items-center gap-2"><Icon name="bar-chart-2" size={16} className="text-hse-primary"/> Volume: Next 7 Days</h4>
                         <div className="flex items-end justify-between h-24 gap-2">
                             {weekAheadDaily.map((d, i) => (
                                 <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
@@ -395,8 +361,6 @@
                             ))}
                         </div>
                     </div>
-
-                    {/* Reuse Top Organisers Logic */}
                     <TopOrganisersChart bookings={bookings} />
                 </div>
             )
@@ -418,6 +382,25 @@
             );
         };
 
+        const NavLink = ({ active, onClick, icon, label }) => (
+            <button 
+                onClick={onClick}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-all ${active ? 'bg-[#005548] text-white shadow-sm' : 'text-emerald-100 hover:bg-[#005548]/50 hover:text-white'}`}
+            >
+                <Icon name={icon} size={18} /> {label}
+            </button>
+        );
+
+        const MobileNavLink = ({ active, onClick, icon, label }) => (
+            <button 
+                onClick={onClick}
+                className={`flex flex-col items-center justify-center py-2 flex-1 transition-all ${active ? 'text-hse-primary' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+                <Icon name={icon} size={24} className={active ? 'scale-110 transition-transform' : ''} />
+                <span className="text-[10px] font-bold mt-1">{label}</span>
+            </button>
+        );
+
         // --- MAIN APP ---
         function App() {
             const [activeTab, setActiveTab] = useState('dashboard');
@@ -428,20 +411,18 @@
             const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
             const [searchQuery, setSearchQuery] = useState('');
             const [typeFilter, setTypeFilter] = useState('All');
-            const [currentTime, setCurrentTime] = useState(new Date()); // Live Clock State
+            const [currentTime, setCurrentTime] = useState(new Date());
             
             const [newBooking, setNewBooking] = useState({
                 title: '', organiser: '', roomId: '',
                 date: new Date().toISOString().split('T')[0],
                 startTime: '09:00', duration: '60', type: 'Internal',
-                recurrence: 'None', // None, Daily, Weekly, BiWeekly, Monthly
-                repeatUntil: ''
+                recurrence: 'None', repeatUntil: ''
             });
 
             const [conflict, setConflict] = useState(null);
             const [notification, setNotification] = useState(null);
 
-            // Fetch Data
             useEffect(() => {
                 const unsubscribe = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'bookings'), 
                     (snapshot) => {
@@ -461,26 +442,19 @@
                 return () => unsubscribe();
             }, []);
 
-            // 30-Second Refresh Timer (Updates Clock & Relative Times)
             useEffect(() => {
                 const timer = setInterval(() => setCurrentTime(new Date()), 30000);
                 return () => clearInterval(timer);
             }, []);
 
-            // Helper to generate recurrence dates
             const getRecurringDates = () => {
                 if (!newBooking.date) return [];
                 const dates = [];
                 const start = new Date(newBooking.date);
-                if (newBooking.recurrence === 'None' || !newBooking.repeatUntil) {
-                    return [start];
-                }
-
+                if (newBooking.recurrence === 'None' || !newBooking.repeatUntil) return [start];
                 const endRepeat = new Date(newBooking.repeatUntil);
                 endRepeat.setHours(23, 59, 59);
-                
                 let curr = new Date(start);
-                
                 while (curr <= endRepeat) {
                     if (newBooking.recurrence === 'Daily') {
                         const day = curr.getDay();
@@ -495,41 +469,28 @@
                     } else if (newBooking.recurrence === 'Monthly') {
                         dates.push(new Date(curr));
                         curr.setMonth(curr.getMonth() + 1);
-                    } else {
-                        break; 
-                    }
+                    } else { break; }
                     if (dates.length > 50) break; 
                 }
                 return dates;
             };
 
-            // Conflict Check - OPTIMIZED
             useEffect(() => {
-                if (!newBooking.roomId || !newBooking.date || !newBooking.startTime) {
-                    setConflict(null); return;
-                }
-                
+                if (!newBooking.roomId || !newBooking.date || !newBooking.startTime) { setConflict(null); return; }
                 const proposedDates = getRecurringDates();
                 const [h, m] = newBooking.startTime.split(':').map(Number);
                 const durationMs = parseInt(newBooking.duration) * 60000;
-
                 for (let d of proposedDates) {
                     const start = new Date(d); start.setHours(h, m, 0, 0);
                     const end = new Date(start.getTime() + durationMs);
-                    
                     const found = bookings.find(b => b.roomId === newBooking.roomId && isOverlapping(start, end, b.start, b.end));
-                    if (found) {
-                        setConflict({ ...found, conflictDate: d });
-                        return;
-                    }
+                    if (found) { setConflict({ ...found, conflictDate: d }); return; }
                 }
                 setConflict(null);
             }, [newBooking.roomId, newBooking.date, newBooking.startTime, newBooking.duration, newBooking.recurrence, newBooking.repeatUntil, bookings]);
 
-            // Notification Timer
             useEffect(() => { if(notification) { const t = setTimeout(() => setNotification(null), 3000); return () => clearTimeout(t); } }, [notification]);
 
-            // Stats Logic
             const filteredRooms = useMemo(() => INITIAL_ROOMS.filter(r => 
                 (r.name.toLowerCase().includes(searchQuery.toLowerCase()) || r.amenities.some(a => a.toLowerCase().includes(searchQuery.toLowerCase()))) &&
                 (typeFilter === 'All' || r.type === typeFilter)
@@ -551,16 +512,13 @@
             const handleCreate = async (e) => {
                 e.preventDefault();
                 if (conflict) return;
-                
                 const proposedDates = getRecurringDates();
                 const [h, m] = newBooking.startTime.split(':').map(Number);
                 const durationMs = parseInt(newBooking.duration) * 60000;
-
                 try {
                     const promises = proposedDates.map(date => {
                         const start = new Date(date); start.setHours(h, m, 0, 0);
                         const end = new Date(start.getTime() + durationMs);
-                        
                         return addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'bookings'), {
                             roomId: newBooking.roomId, title: newBooking.title || 'Desk Booking',
                             organiser: newBooking.organiser, type: newBooking.type,
@@ -568,200 +526,155 @@
                             createdAt: Timestamp.now(), createdBy: 'public'
                         });
                     });
-
                     await Promise.all(promises);
-                    
                     setIsBookingModalOpen(false);
                     setNotification({ type: 'success', message: `${proposedDates.length} Booking(s) Confirmed` });
                     setNewBooking(prev => ({ ...prev, title: '', organiser: '', recurrence: 'None', repeatUntil: '' }));
-                } catch(err) {
-                    setNotification({ type: 'error', message: 'Error saving booking' });
-                }
+                } catch(err) { setNotification({ type: 'error', message: 'Error saving booking' }); }
             };
 
             const handleDelete = async (id) => {
                 if(!confirm("Are you sure you want to cancel this booking?")) return;
-                try {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'bookings', id));
-                    setNotification({ type: 'success', message: 'Booking Cancelled' });
-                } catch(err) {
-                    setNotification({ type: 'error', message: 'Could not delete' });
-                }
+                try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'bookings', id)); setNotification({ type: 'success', message: 'Booking Cancelled' }); } catch(err) { setNotification({ type: 'error', message: 'Could not delete' }); }
             };
 
             if (isLoading) return <div className="min-h-screen flex items-center justify-center text-hse-primary font-bold animate-pulse">Loading HSE Estates...</div>;
 
             return (
-                <div className="min-h-screen flex flex-col">
+                <div className="min-h-screen flex flex-col pb-16 md:pb-0">
                     {/* NAV */}
                     <nav className="bg-hse-primary text-white shadow-lg sticky top-0 z-50">
                         <div className="px-4 py-3 md:px-6 md:py-4 flex justify-between items-center">
-                            <div className="flex items-center gap-3 md:gap-4">
-                                <div className="bg-white p-1 md:p-1.5 rounded-lg shrink-0">
-                                    <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-6 md:h-8" />
+                            <div className="flex items-center gap-3 md:gap-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-white p-1 md:p-1.5 rounded-lg shrink-0"><img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-6 md:h-8" /></div>
+                                    <div>
+                                        <h1 className="text-sm md:text-xl font-bold leading-tight">HSE Capital & Estates</h1>
+                                        <p className="text-[10px] md:text-xs text-emerald-100 opacity-80 uppercase tracking-widest hidden sm:block">Resource Booking</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h1 className="text-sm md:text-xl font-bold leading-tight">HSE Capital & Estates</h1>
-                                    <p className="text-[10px] md:text-xs text-emerald-100 opacity-80 uppercase tracking-widest hidden sm:block">Resource Booking</p>
+                                {/* DESKTOP NAV */}
+                                <div className="hidden md:flex items-center gap-2">
+                                    <NavLink active={activeTab==='dashboard'} onClick={()=>setActiveTab('dashboard')} icon="bar-chart-3" label="Dashboard" />
+                                    <NavLink active={activeTab==='schedule'} onClick={()=>setActiveTab('schedule')} icon="calendar" label="Schedule" />
+                                    <NavLink active={activeTab==='rooms'} onClick={()=>setActiveTab('rooms')} icon="map-pin" label="Directory" />
                                 </div>
                             </div>
                             
-                            {/* LIVE CLOCK DISPLAY - Made visible on mobile */}
-                            <div className="text-right">
-                                <div className="text-lg md:text-2xl font-bold leading-none">
-                                    {currentTime.toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'})}
-                                </div>
-                                <div className="text-[10px] md:text-xs text-emerald-100 opacity-80 uppercase tracking-widest">
-                                    {currentTime.toLocaleDateString('en-GB', {weekday: 'short', day: 'numeric', month: 'short'})}
-                                </div>
+                            <div className="hidden md:block text-right">
+                                <div className="text-lg md:text-2xl font-bold leading-none">{currentTime.toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'})}</div>
+                                <div className="text-[10px] md:text-xs text-emerald-100 opacity-80 uppercase tracking-widest">{currentTime.toLocaleDateString('en-GB', {weekday: 'short', day: 'numeric', month: 'short'})}</div>
                             </div>
                         </div>
                     </nav>
 
-                    <div className="flex flex-1 overflow-hidden">
-                        {/* SIDEBAR */}
-                        <aside className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col z-10">
-                            <div className="p-6 space-y-1">
-                                <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition ${activeTab === 'dashboard' ? 'bg-emerald-50 text-hse-primary border-r-4 border-hse-primary' : 'text-slate-600 hover:bg-slate-50'}`}><Icon name="bar-chart-3" /> Dashboard</button>
-                                <button onClick={() => setActiveTab('schedule')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition ${activeTab === 'schedule' ? 'bg-emerald-50 text-hse-primary border-r-4 border-hse-primary' : 'text-slate-600 hover:bg-slate-50'}`}><Icon name="calendar" /> Schedule</button>
-                                <button onClick={() => setActiveTab('rooms')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition ${activeTab === 'rooms' ? 'bg-emerald-50 text-hse-primary border-r-4 border-hse-primary' : 'text-slate-600 hover:bg-slate-50'}`}><Icon name="map-pin" /> Directory</button>
-                            </div>
-                        </aside>
+                    {/* MAIN */}
+                    <main className="flex-1 overflow-auto bg-slate-50/50 p-6">
+                        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                            <h2 className="text-xl font-bold text-slate-800 hidden md:block">{activeTab === 'dashboard' ? 'Overview' : activeTab === 'schedule' ? 'Schedule' : 'Directory'}</h2>
+                            <button onClick={() => setIsBookingModalOpen(true)} className="bg-hse-primary hover-bg-hse-dark text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition transform active:scale-95 shrink-0 ml-auto w-full md:w-auto justify-center">
+                                <Icon name="plus" /> <span>New Booking</span>
+                            </button>
+                        </div>
 
-                        {/* MAIN */}
-                        <main className="flex-1 overflow-auto bg-slate-50/50 p-6">
-                            {/* ACTION BAR */}
-                            <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                                <h2 className="text-xl font-bold text-slate-800 hidden md:block">{activeTab === 'dashboard' ? 'Overview' : activeTab === 'schedule' ? 'Schedule' : 'Directory'}</h2>
-                                <button onClick={() => setIsBookingModalOpen(true)} className="bg-hse-primary hover-bg-hse-dark text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition transform active:scale-95 shrink-0 ml-auto">
-                                    <Icon name="plus" /> <span className="hidden sm:inline">New Booking</span>
-                                </button>
-                            </div>
-
-                            {/* DASHBOARD */}
-                            {activeTab === 'dashboard' && (
-                                <div className="space-y-6 animate-in">
-                                    {/* ROW 1: STATS */}
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400 uppercase">Bookings Today</p><h3 className="text-2xl font-bold">{stats.total}</h3></div>
-                                        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400 uppercase">Utilisation</p><h3 className="text-2xl font-bold">{stats.util}%</h3></div>
-                                        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400 uppercase">Desks Used</p><h3 className="text-2xl font-bold">{stats.desk}</h3></div>
-                                        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400 uppercase">Free Now</p><h3 className="text-2xl font-bold">{stats.avail}</h3></div>
-                                    </div>
-
-                                    {/* ROW 2: HEATMAP & TREND */}
-                                    <div className="grid md:grid-cols-3 gap-6">
-                                        <div className="md:col-span-2">
-                                            <OccupancyHeatmap bookings={bookings} rooms={INITIAL_ROOMS} />
+                        {activeTab === 'dashboard' && (
+                            <div className="space-y-6 animate-in">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400 uppercase">Bookings Today</p><h3 className="text-2xl font-bold">{stats.total}</h3></div>
+                                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400 uppercase">Utilisation</p><h3 className="text-2xl font-bold">{stats.util}%</h3></div>
+                                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400 uppercase">Desks Used</p><h3 className="text-2xl font-bold">{stats.desk}</h3></div>
+                                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400 uppercase">Free Now</p><h3 className="text-2xl font-bold">{stats.avail}</h3></div>
+                                </div>
+                                <div className="grid md:grid-cols-3 gap-6">
+                                    <div className="md:col-span-2"><OccupancyHeatmap bookings={bookings} rooms={INITIAL_ROOMS} /></div>
+                                    <div><UtilisationStats bookings={bookings} totalResources={INITIAL_ROOMS.length} /></div>
+                                </div>
+                                <div className="grid md:grid-cols-3 gap-6">
+                                    <MeetingRoomWidget bookings={bookings} />
+                                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-full flex flex-col">
+                                        <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Icon name="calendar" size={18} className="text-hse-primary" /> Upcoming Schedule</h3>
+                                        <div className="space-y-2 flex-1 overflow-y-auto custom-scroll pr-2 max-h-60">
+                                            {bookings.filter(b => b.start >= new Date(new Date().setHours(0,0,0,0))).sort((a,b) => a.start - b.start).map(b => (
+                                                <div key={b.id} className="flex gap-4 items-center p-2 hover:bg-slate-50 rounded border-b border-slate-50 last:border-0 group">
+                                                    <div className="bg-emerald-50 text-hse-primary px-2 py-1 rounded text-xs font-bold min-w-[80px] text-center">{formatTime(b.start)}<div className="text-[10px] font-normal opacity-75">{new Date(b.start).toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'})}</div></div>
+                                                    <div className="flex-1"><div className="font-bold text-sm text-slate-800">{b.title}</div><div className="text-xs text-slate-500">{INITIAL_ROOMS.find(r => r.id === b.roomId)?.name} • {b.organiser}</div></div>
+                                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => generateICS(b, INITIAL_ROOMS.find(r => r.id === b.roomId)?.name)} className="p-1 hover:bg-blue-50 text-blue-600 rounded" title="Add to Calendar"><Icon name="calendar-plus" size={16}/></button>
+                                                        <button onClick={() => handleDelete(b.id)} className="p-1 hover:bg-red-50 text-red-600 rounded" title="Delete Booking"><Icon name="trash-2" size={16}/></button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {bookings.length === 0 && <p className="text-slate-400 italic text-sm">No upcoming bookings.</p>}
                                         </div>
-                                        <div>
-                                            <UtilisationStats bookings={bookings} totalResources={INITIAL_ROOMS.length} />
-                                        </div>
                                     </div>
+                                    <TopOrganisersChart bookings={bookings} />
+                                </div>
+                            </div>
+                        )}
 
-                                    {/* ROW 3: MEETING ROOM STATUS + UPCOMING + LEADERBOARD */}
-                                    <div className="grid md:grid-cols-3 gap-6">
-                                        {/* Meeting Room Widget */}
-                                        <MeetingRoomWidget bookings={bookings} />
-
-                                        {/* Upcoming List */}
-                                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-full flex flex-col">
-                                            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Icon name="calendar" size={18} className="text-hse-primary" /> Upcoming Schedule</h3>
-                                            <div className="space-y-2 flex-1 overflow-y-auto custom-scroll pr-2 max-h-60">
-                                                {bookings.filter(b => b.start >= new Date(new Date().setHours(0,0,0,0))).sort((a,b) => a.start - b.start).map(b => (
-                                                    <div key={b.id} className="flex gap-4 items-center p-2 hover:bg-slate-50 rounded border-b border-slate-50 last:border-0 group">
-                                                        <div className="bg-emerald-50 text-hse-primary px-2 py-1 rounded text-xs font-bold min-w-[80px] text-center">
-                                                            {formatTime(b.start)}
-                                                            {/* UPDATED DATE FORMAT */}
-                                                            <div className="text-[10px] font-normal opacity-75">{new Date(b.start).toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'})}</div>
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <div className="font-bold text-sm text-slate-800">{b.title}</div>
-                                                            <div className="text-xs text-slate-500">{INITIAL_ROOMS.find(r => r.id === b.roomId)?.name} • {b.organiser}</div>
-                                                        </div>
-                                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button onClick={() => generateICS(b, INITIAL_ROOMS.find(r => r.id === b.roomId)?.name)} className="p-1 hover:bg-blue-50 text-blue-600 rounded" title="Add to Calendar"><Icon name="calendar-plus" size={16}/></button>
-                                                            <button onClick={() => handleDelete(b.id)} className="p-1 hover:bg-red-50 text-red-600 rounded" title="Delete Booking"><Icon name="trash-2" size={16}/></button>
+                        {activeTab === 'schedule' && (
+                            <div className="animate-in flex flex-col space-y-6">
+                                <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-200">
+                                    <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()-1); setSelectedDate(d); }} className="p-1 hover:bg-slate-100 rounded"><Icon name="chevron-left" /></button>
+                                    <span className="font-bold text-slate-700">{formatDate(selectedDate)}</span>
+                                    <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()+1); setSelectedDate(d); }} className="p-1 hover:bg-slate-100 rounded"><Icon name="chevron-right" /></button>
+                                </div>
+                                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden relative min-h-[300px]">
+                                    <div className="overflow-x-auto">
+                                        <div className="min-w-[800px]">
+                                            <div className="grid grid-cols-[200px_1fr] border-b border-slate-200 bg-slate-50">
+                                                <div className="p-4 font-bold text-sm text-slate-600">Resource</div>
+                                                <div className="grid grid-cols-11">{getHoursArray().map(h => <div key={h} className="p-4 text-xs font-bold text-slate-400 border-l border-slate-200 text-center">{h}:00</div>)}</div>
+                                            </div>
+                                            <div className="divide-y divide-slate-100">
+                                                {filteredRooms.map(r => (
+                                                    <div key={r.id} className="grid grid-cols-[200px_1fr] hover:bg-emerald-50/30 min-h-[70px]">
+                                                        <div className="p-4 text-sm font-bold text-slate-700 border-r border-slate-200 flex flex-col justify-center">{r.name}<span className="text-xs text-slate-400 font-normal">Cap: {r.capacity}</span></div>
+                                                        <div className="relative h-full">
+                                                            <div className="absolute inset-0 grid grid-cols-11 pointer-events-none">{getHoursArray().map(h => <div key={h} className="border-l border-slate-100 h-full"></div>)}</div>
+                                                            {bookings.filter(b => b.roomId === r.id && b.start.toDateString() === selectedDate.toDateString()).map(b => {
+                                                                const startH = b.start.getHours() + b.start.getMinutes()/60;
+                                                                const dur = (b.end - b.start)/3600000;
+                                                                return (
+                                                                    <div key={b.id} className="absolute top-2 bottom-2 rounded bg-hse-primary/10 border border-hse-primary/20 text-hse-primary text-[10px] font-bold p-1 overflow-hidden group cursor-pointer hover:z-20 hover:scale-105 transition-all shadow-sm" 
+                                                                         style={{ left: `${((startH-8)/11)*100}%`, width: `${(dur/11)*100}%` }} title={b.title}>
+                                                                        <div className="truncate">{b.title}</div>
+                                                                        <div className="hidden group-hover:flex absolute top-0 right-0 bottom-0 bg-white/90 items-center px-1"><button onClick={(e) => {e.stopPropagation(); handleDelete(b.id)}} className="text-red-600 p-1 hover:bg-red-100 rounded"><Icon name="trash-2" size={12}/></button></div>
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
                                                     </div>
                                                 ))}
-                                                {bookings.length === 0 && <p className="text-slate-400 italic text-sm">No upcoming bookings.</p>}
                                             </div>
                                         </div>
-                                        
-                                        {/* Leaderboard */}
-                                        <TopOrganisersChart bookings={bookings} />
                                     </div>
                                 </div>
-                            )}
+                                <ScheduleAnalytics bookings={bookings} />
+                            </div>
+                        )}
 
-                            {/* SCHEDULE */}
-                            {activeTab === 'schedule' && (
-                                <div className="animate-in flex flex-col space-y-6">
-                                    <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-200">
-                                        <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()-1); setSelectedDate(d); }} className="p-1 hover:bg-slate-100 rounded"><Icon name="chevron-left" /></button>
-                                        <span className="font-bold text-slate-700">{formatDate(selectedDate)}</span>
-                                        <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()+1); setSelectedDate(d); }} className="p-1 hover:bg-slate-100 rounded"><Icon name="chevron-right" /></button>
-                                    </div>
-                                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden relative min-h-[300px]">
-                                        <div className="overflow-x-auto">
-                                            <div className="min-w-[800px]">
-                                                <div className="grid grid-cols-[200px_1fr] border-b border-slate-200 bg-slate-50">
-                                                    <div className="p-4 font-bold text-sm text-slate-600">Resource</div>
-                                                    <div className="grid grid-cols-11">{getHoursArray().map(h => <div key={h} className="p-4 text-xs font-bold text-slate-400 border-l border-slate-200 text-center">{h}:00</div>)}</div>
-                                                </div>
-                                                <div className="divide-y divide-slate-100">
-                                                    {filteredRooms.map(r => (
-                                                        <div key={r.id} className="grid grid-cols-[200px_1fr] hover:bg-emerald-50/30 min-h-[70px]">
-                                                            <div className="p-4 text-sm font-bold text-slate-700 border-r border-slate-200 flex flex-col justify-center">{r.name}<span className="text-xs text-slate-400 font-normal">Cap: {r.capacity}</span></div>
-                                                            <div className="relative h-full">
-                                                                <div className="absolute inset-0 grid grid-cols-11 pointer-events-none">{getHoursArray().map(h => <div key={h} className="border-l border-slate-100 h-full"></div>)}</div>
-                                                                {bookings.filter(b => b.roomId === r.id && b.start.toDateString() === selectedDate.toDateString()).map(b => {
-                                                                    const startH = b.start.getHours() + b.start.getMinutes()/60;
-                                                                    const dur = (b.end - b.start)/3600000;
-                                                                    return (
-                                                                        <div key={b.id} className="absolute top-2 bottom-2 rounded bg-hse-primary/10 border border-hse-primary/20 text-hse-primary text-[10px] font-bold p-1 overflow-hidden group cursor-pointer hover:z-20 hover:scale-105 transition-all shadow-sm" 
-                                                                             style={{ left: `${((startH-8)/11)*100}%`, width: `${(dur/11)*100}%` }} title={b.title}>
-                                                                            <div className="truncate">{b.title}</div>
-                                                                            <div className="hidden group-hover:flex absolute top-0 right-0 bottom-0 bg-white/90 items-center px-1">
-                                                                                <button onClick={(e) => {e.stopPropagation(); handleDelete(b.id)}} className="text-red-600 p-1 hover:bg-red-100 rounded"><Icon name="trash-2" size={12}/></button>
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
+                        {activeTab === 'rooms' && (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in">
+                                {filteredRooms.map(room => (
+                                    <div key={room.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden group">
+                                        <div className={`h-24 ${room.color.replace('text', 'bg').split(' ')[0]} flex items-center justify-center relative`}><h3 className="font-bold text-xl relative z-10 px-6 text-center text-white">{room.name}</h3></div>
+                                        <div className="p-6">
+                                            <div className="flex gap-2 text-sm text-slate-600 mb-4"><span>Cap: <b>{room.capacity}</b></span> • <span>{room.floor}</span></div>
+                                            <div className="text-xs text-slate-500 mb-6">{room.amenities.join(', ')}</div>
+                                            <button onClick={() => { setNewBooking(p => ({...p, roomId: room.id})); setIsBookingModalOpen(true); }} className="w-full py-2 border-2 border-hse-primary text-hse-primary font-bold rounded hover:bg-hse-primary hover:text-white transition uppercase text-xs">Book Now</button>
                                         </div>
                                     </div>
-                                    
-                                    {/* ANALYTICS SECTION */}
-                                    <ScheduleAnalytics bookings={bookings} />
-                                </div>
-                            )}
+                                ))}
+                            </div>
+                        )}
+                    </main>
 
-                            {/* ROOMS */}
-                            {activeTab === 'rooms' && (
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in">
-                                    {filteredRooms.map(room => (
-                                        <div key={room.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden group">
-                                            <div className={`h-24 ${room.color.replace('text', 'bg').split(' ')[0]} flex items-center justify-center relative`}>
-                                                <h3 className="font-bold text-xl relative z-10 px-6 text-center text-white">{room.name}</h3>
-                                            </div>
-                                            <div className="p-6">
-                                                <div className="flex gap-2 text-sm text-slate-600 mb-4">
-                                                    <span>Cap: <b>{room.capacity}</b></span> • <span>{room.floor}</span>
-                                                </div>
-                                                <div className="text-xs text-slate-500 mb-6">{room.amenities.join(', ')}</div>
-                                                <button onClick={() => { setNewBooking(p => ({...p, roomId: room.id})); setIsBookingModalOpen(true); }} className="w-full py-2 border-2 border-hse-primary text-hse-primary font-bold rounded hover:bg-hse-primary hover:text-white transition uppercase text-xs">Book Now</button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </main>
+                    {/* MOBILE NAV (FIXED BOTTOM) */}
+                    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-2 flex justify-around items-center z-50 pb-safe">
+                        <MobileNavLink active={activeTab==='dashboard'} onClick={()=>setActiveTab('dashboard')} icon="bar-chart-3" label="Dashboard" />
+                        <MobileNavLink active={activeTab==='schedule'} onClick={()=>setActiveTab('schedule')} icon="calendar" label="Schedule" />
+                        <MobileNavLink active={activeTab==='rooms'} onClick={()=>setActiveTab('rooms')} icon="map-pin" label="Directory" />
                     </div>
 
                     {/* MODAL */}
@@ -770,53 +683,21 @@
                             {conflict && <div className="bg-red-50 border-l-4 border-red-500 p-3 text-red-800 text-xs font-bold rounded animate-in">
                                 Conflict on {conflict.conflictDate ? new Date(conflict.conflictDate).toLocaleDateString('en-GB') : ''}: Overlaps with "{conflict.title}"
                             </div>}
-                            
                             <div><label className="text-xs font-bold uppercase text-slate-500">Title</label><input required className="w-full p-2 border rounded font-medium focus:ring-2 ring-hse-primary outline-none" value={newBooking.title} onChange={e => setNewBooking({...newBooking, title: e.target.value})} placeholder="e.g. Team Sync" /></div>
-                            
-                            <div><label className="text-xs font-bold uppercase text-slate-500">Resource</label>
-                                <select required className="w-full p-2 border rounded font-medium bg-white focus:ring-2 ring-hse-primary outline-none" value={newBooking.roomId} onChange={e => setNewBooking({...newBooking, roomId: e.target.value})}>
-                                    <option value="">-- Select --</option>
-                                    <optgroup label="Rooms">{INITIAL_ROOMS.filter(r => r.type === 'Room').map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</optgroup>
-                                    <optgroup label="Desks">{INITIAL_ROOMS.filter(r => r.type === 'Desk').map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</optgroup>
-                                </select>
-                            </div>
-                            
+                            <div><label className="text-xs font-bold uppercase text-slate-500">Resource</label><select required className="w-full p-2 border rounded font-medium bg-white focus:ring-2 ring-hse-primary outline-none" value={newBooking.roomId} onChange={e => setNewBooking({...newBooking, roomId: e.target.value})}><option value="">-- Select --</option><optgroup label="Rooms">{INITIAL_ROOMS.filter(r => r.type === 'Room').map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</optgroup><optgroup label="Desks">{INITIAL_ROOMS.filter(r => r.type === 'Desk').map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</optgroup></select></div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div><label className="text-xs font-bold uppercase text-slate-500">Organiser</label><input required className="w-full p-2 border rounded font-medium focus:ring-2 ring-hse-primary outline-none" value={newBooking.organiser} onChange={e => setNewBooking({...newBooking, organiser: e.target.value})} /></div>
                                 <div><label className="text-xs font-bold uppercase text-slate-500">Type</label><select className="w-full p-2 border rounded font-medium bg-white" value={newBooking.type} onChange={e => setNewBooking({...newBooking, type: e.target.value})}><option>Internal</option><option>External</option></select></div>
                             </div>
-                            
                             <div className="grid grid-cols-2 gap-4">
                                 <div><label className="text-xs font-bold uppercase text-slate-500">Start Date</label><input required type="date" className="w-full p-2 border rounded font-medium focus:ring-2 ring-hse-primary outline-none" value={newBooking.date} onChange={e => setNewBooking({...newBooking, date: e.target.value})} /></div>
                                 <div><label className="text-xs font-bold uppercase text-slate-500">Time</label><input required type="time" className="w-full p-2 border rounded font-medium focus:ring-2 ring-hse-primary outline-none" value={newBooking.startTime} onChange={e => setNewBooking({...newBooking, startTime: e.target.value})} /></div>
                             </div>
-                            
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs font-bold uppercase text-slate-500">Duration</label>
-                                    <select className="w-full p-2 border rounded font-medium bg-white focus:ring-2 ring-hse-primary outline-none" value={newBooking.duration} onChange={e => setNewBooking({...newBooking, duration: e.target.value})}>
-                                        {getDurationOptions().map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold uppercase text-slate-500">Repeat?</label>
-                                    <select className="w-full p-2 border rounded font-medium bg-white focus:ring-2 ring-hse-primary outline-none" value={newBooking.recurrence} onChange={e => setNewBooking({...newBooking, recurrence: e.target.value})}>
-                                        <option value="None">No Repeat</option>
-                                        <option value="Daily">Daily (Mon-Fri)</option>
-                                        <option value="Weekly">Weekly</option>
-                                        <option value="BiWeekly">Bi-Weekly</option>
-                                        <option value="Monthly">Monthly</option>
-                                    </select>
-                                </div>
+                                <div><label className="text-xs font-bold uppercase text-slate-500">Duration</label><select className="w-full p-2 border rounded font-medium bg-white focus:ring-2 ring-hse-primary outline-none" value={newBooking.duration} onChange={e => setNewBooking({...newBooking, duration: e.target.value})}>{getDurationOptions().map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></div>
+                                <div><label className="text-xs font-bold uppercase text-slate-500">Repeat?</label><select className="w-full p-2 border rounded font-medium bg-white focus:ring-2 ring-hse-primary outline-none" value={newBooking.recurrence} onChange={e => setNewBooking({...newBooking, recurrence: e.target.value})}><option value="None">No Repeat</option><option value="Daily">Daily (Mon-Fri)</option><option value="Weekly">Weekly</option><option value="BiWeekly">Bi-Weekly</option><option value="Monthly">Monthly</option></select></div>
                             </div>
-
-                            {newBooking.recurrence !== 'None' && (
-                                <div className="animate-in">
-                                    <label className="text-xs font-bold uppercase text-slate-500">Repeat Until</label>
-                                    <input required type="date" className="w-full p-2 border rounded font-medium focus:ring-2 ring-hse-primary outline-none" value={newBooking.repeatUntil} onChange={e => setNewBooking({...newBooking, repeatUntil: e.target.value})} />
-                                </div>
-                            )}
-
+                            {newBooking.recurrence !== 'None' && (<div className="animate-in"><label className="text-xs font-bold uppercase text-slate-500">Repeat Until</label><input required type="date" className="w-full p-2 border rounded font-medium focus:ring-2 ring-hse-primary outline-none" value={newBooking.repeatUntil} onChange={e => setNewBooking({...newBooking, repeatUntil: e.target.value})} /></div>)}
                             <div className="flex gap-2 pt-2">
                                 <button type="button" onClick={() => setIsBookingModalOpen(false)} className="flex-1 py-2 border rounded font-bold text-xs uppercase hover:bg-slate-50">Cancel</button>
                                 <button type="submit" disabled={!!conflict} className={`flex-1 py-2 rounded font-bold text-xs uppercase text-white ${conflict ? 'bg-slate-400' : 'bg-hse-primary hover-bg-hse-dark'}`}>Confirm</button>
@@ -824,9 +705,9 @@
                         </form>
                     </Modal>
 
-                    {notification && <div className={`fixed bottom-4 right-4 px-4 py-3 rounded shadow-lg text-white text-sm font-bold z-50 animate-in ${notification.type === 'success' ? 'bg-hse-primary' : 'bg-red-500'}`}>{notification.message}</div>}
+                    {notification && <div className={`fixed bottom-20 md:bottom-4 right-4 px-4 py-3 rounded shadow-lg text-white text-sm font-bold z-50 animate-in ${notification.type === 'success' ? 'bg-hse-primary' : 'bg-red-500'}`}>{notification.message}</div>}
                     
-                    <footer className="py-6 text-center border-t border-slate-200">
+                    <footer className="py-6 text-center border-t border-slate-200 hidden md:block">
                         <p className="text-slate-600 font-bold text-sm">Created by Dave Maher</p>
                         <p className="text-[10px] text-slate-400 mt-1">HSE Capital & Estates • &copy; 2026</p>
                     </footer>
