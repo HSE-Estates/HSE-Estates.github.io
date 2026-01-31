@@ -31,7 +31,7 @@
     @media print {
       @page { 
         size: A4 landscape; 
-        margin: 10mm;
+        margin: 15mm; /* Increased margin to prevent cutoff */
       }
       
       body { 
@@ -39,17 +39,19 @@
         color: #000 !important;
         margin: 0 !important;
         padding: 0 !important;
+        width: 100% !important;
       }
 
       /* Hide interactive elements */
       .no-print, header button, .input-field, input[type="text"], input[type="date"], input[type="number"], select, button { display: none !important; }
       .print-only { display: block !important; }
       
-      /* Ensure Main Container Fits */
+      /* Ensure Main Container Fits and respects margin */
       main {
         max-width: 100% !important;
         padding: 0 !important;
         margin: 0 !important;
+        overflow: visible !important; /* Ensure content isn't clipped */
       }
       
       /* Force backgrounds */
@@ -58,6 +60,13 @@
       /* Hide layout columns that are input-only */
       .input-column { display: none !important; }
       .report-column { width: 100% !important; grid-column: span 12 !important; }
+      
+      /* Reset Card styles for print to be flatter */
+      .bg-white, .shadow-sm, .rounded-xl, .border {
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        border-color: #ccc !important;
+      }
     }
     
     .print-only { display: none; }
