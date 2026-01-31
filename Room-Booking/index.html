@@ -12,7 +12,7 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    <!-- Babel (Pinned to stable version 7.23.8 to fix "esmodules" error) -->
+    <!-- Babel (Pinned to stable version) -->
     <script src="https://unpkg.com/@babel/standalone@7.23.8/babel.min.js"></script>
     
     <!-- Lucide Icons -->
@@ -37,8 +37,8 @@
 <body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
 
-    <!-- Added data-presets to fix Babel configuration error -->
-    <script type="text/babel" data-type="module" data-presets="env,react">
+    <!-- UPDATED: Removed 'env' from presets to stop 'require is not defined' error -->
+    <script type="text/babel" data-type="module" data-presets="react">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
