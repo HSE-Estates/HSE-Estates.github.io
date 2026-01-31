@@ -12,8 +12,8 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    <!-- Babel -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Babel (Pinned to stable version 7.23.8 to fix "esmodules" error) -->
+    <script src="https://unpkg.com/@babel/standalone@7.23.8/babel.min.js"></script>
     
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -37,7 +37,8 @@
 <body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
 
-    <script type="text/babel" data-type="module">
+    <!-- Added data-presets to fix Babel configuration error -->
+    <script type="text/babel" data-type="module" data-presets="env,react">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -320,8 +321,10 @@
                 startTime: '09:00', duration: '60', type: 'Internal', recurrence: 'None', repeatUntil: ''
             });
 
-            // Update Icons on render
-            useEffect(() => { if(window.lucide) window.lucide.createIcons(); });
+            // Update Icons on render - Optimized with dependency array
+            useEffect(() => { 
+                if(window.lucide) window.lucide.createIcons(); 
+            }, [activeTab, bookings, isSidebarOpen]);
 
             // Clock
             useEffect(() => {
@@ -582,5 +585,3 @@
     </script>
 </body>
 </html>
-
-
