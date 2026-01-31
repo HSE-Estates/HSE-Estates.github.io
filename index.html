@@ -19,12 +19,12 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         
         body { 
             font-family: 'Inter', system-ui, -apple-system, sans-serif; 
             -webkit-font-smoothing: antialiased;
-            background-color: #f8fafc;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
             color: #1e293b;
         }
         
@@ -35,31 +35,99 @@
         }
 
         .hse-gradient {
-            background: linear-gradient(135deg, var(--hse-primary) 0%, var(--hse-dark) 100%);
+            background: linear-gradient(135deg, #004d42 0%, #006858 50%, #00917a 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hse-gradient::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            opacity: 0.4;
         }
 
         .app-card {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background: linear-gradient(to bottom, #ffffff, #fefefe);
+            border: 1px solid rgba(226, 232, 240, 0.8);
         }
 
         .app-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 25px 50px -12px rgba(0, 104, 88, 0.15), 0 10px 20px -8px rgba(0, 0, 0, 0.1);
+            border-color: rgba(0, 191, 165, 0.3);
+        }
+
+        .app-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--hse-primary), var(--hse-secondary));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .app-card:hover::before {
+            opacity: 1;
+        }
+
+        /* Premium Glass Effect for Filter Tabs */
+        .filter-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
         }
 
         /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar { width: 10px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        ::-webkit-scrollbar-thumb { 
+            background: linear-gradient(135deg, #cbd5e1, #94a3b8); 
+            border-radius: 10px; 
+        }
+        ::-webkit-scrollbar-thumb:hover { background: linear-gradient(135deg, #94a3b8, #64748b); }
 
         .animate-fade-in {
             animation: fadeIn 0.6s ease-out forwards;
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+            from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+
+        .pulse-glow {
+            animation: pulseGlow 2s ease-in-out infinite;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 5px rgba(16, 185, 129, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.8); }
+        }
+
+        .category-badge {
+            backdrop-filter: blur(8px);
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+
+        .shimmer {
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            animation: shimmer 3s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
         }
     </style>
 </head>
@@ -74,50 +142,65 @@
         };
 
         const AppCard = ({ app }) => {
-            const getIconStyle = (category) => {
-                switch(category) {
-                    case 'Financial': return 'bg-emerald-50 text-emerald-600';
-                    case 'Risk': return 'bg-amber-50 text-amber-600';
-                    case 'Operations': return 'bg-blue-50 text-blue-600';
-                    case 'Productivity': return 'bg-purple-50 text-purple-600';
-                    case 'Clinical Strategy': return 'bg-rose-50 text-rose-600';
-                    case 'Governance': return 'bg-indigo-50 text-indigo-600';
-                    default: return 'bg-slate-50 text-slate-600';
+            const getIconStyle = (categories) => {
+                // Use the first category for styling
+                const primaryCategory = Array.isArray(categories) ? categories[0] : categories;
+                switch(primaryCategory) {
+                    case 'Financial': return 'bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600 shadow-emerald-200/50';
+                    case 'Risk': return 'bg-gradient-to-br from-amber-50 to-amber-100 text-amber-600 shadow-amber-200/50';
+                    case 'Operations': return 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-600 shadow-blue-200/50';
+                    case 'Productivity': return 'bg-gradient-to-br from-purple-50 to-purple-100 text-purple-600 shadow-purple-200/50';
+                    case 'Clinical Strategy': return 'bg-gradient-to-br from-rose-50 to-rose-100 text-rose-600 shadow-rose-200/50';
+                    case 'Governance': return 'bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-600 shadow-indigo-200/50';
+                    default: return 'bg-gradient-to-br from-slate-50 to-slate-100 text-slate-600 shadow-slate-200/50';
                 }
             };
+
+            const categories = Array.isArray(app.category) ? app.category : [app.category];
             
             return (
-                <div className="app-card bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col h-full animate-fade-in">
+                <div className="app-card bg-white rounded-2xl overflow-hidden flex flex-col h-full animate-fade-in relative shadow-lg">
                     <div className="p-6 flex-1">
                         <div className="flex justify-between items-start mb-4">
-                            <div className={`p-3 rounded-xl ${getIconStyle(app.category)}`}>
-                                <Icon name={app.icon} size={24} />
+                            <div className={`p-4 rounded-2xl shadow-lg ${getIconStyle(app.category)}`}>
+                                <Icon name={app.icon} size={28} />
                             </div>
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-50 px-2 py-1 rounded">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg shadow-sm">
                                 {app.tag}
                             </span>
                         </div>
                         
-                        <h3 className="text-xl font-bold text-slate-800 mb-2">
+                        <h3 className="text-xl font-black text-slate-900 mb-3 leading-tight">
                             {app.title}
                         </h3>
                         
                         <p className="text-slate-600 text-sm leading-relaxed mb-4">
                             {app.description}
                         </p>
+
+                        {/* Multiple Category Badges */}
+                        {categories.length > 1 && (
+                            <div className="flex flex-wrap gap-1.5 mt-3">
+                                {categories.map(cat => (
+                                    <span key={cat} className="category-badge text-[9px] font-bold uppercase tracking-wider text-slate-600 px-2 py-1 rounded-md shadow-sm">
+                                        {cat}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     
-                    <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                    <div className="px-6 py-5 bg-gradient-to-r from-slate-50 to-slate-100/50 border-t border-slate-200/60 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                             <span className="text-[10px] font-bold text-slate-500 uppercase">Live System</span>
+                             <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 pulse-glow"></div>
+                             <span className="text-[10px] font-black text-slate-600 uppercase tracking-wide">Live System</span>
                         </div>
                         <a 
                             href={app.url}
                             target="_blank"
-                            className="flex items-center gap-2 text-sm font-bold text-[#006858] hover:text-[#00bfa5] transition-colors"
+                            className="flex items-center gap-2 text-sm font-black text-[#006858] hover:text-[#00bfa5] transition-all hover:gap-3"
                         >
-                            Launch App <Icon name="external-link" size={14} />
+                            Launch <Icon name="arrow-right" size={16} />
                         </a>
                     </div>
                 </div>
@@ -133,7 +216,7 @@
                     title: "Cash Flow Analysis",
                     url: "https://hse-estates.github.io/cashflow/",
                     description: "Capital project financial tracking tool. Monitors budget performance, actuals, and forecasts using S-Curve methodology.",
-                    category: "Financial",
+                    category: ["Financial", "Operations"],
                     tag: "Project Controls",
                     icon: "line-chart"
                 },
@@ -142,7 +225,7 @@
                     title: "Optimism Bias Calculator",
                     url: "https://hse-estates.github.io/OptimismBias/",
                     description: "Risk assessment utility based on the Public Spending Code. Calculates bias adjustments for project appraisals.",
-                    category: "Risk",
+                    category: ["Risk", "Financial"],
                     tag: "Appraisal Tool",
                     icon: "scale"
                 },
@@ -151,7 +234,7 @@
                     title: "Contingency Assessment",
                     url: "https://hse-estates.github.io/Contingency/",
                     description: "Determine appropriate contingency levels for capital projects based on risk exposure and project complexity factors.",
-                    category: "Financial",
+                    category: ["Financial", "Risk"],
                     tag: "Budget Tool",
                     icon: "calculator"
                 },
@@ -160,7 +243,7 @@
                     title: "SW Facilities Dashboard",
                     url: "https://southwestfacilities.streamlit.app/",
                     description: "Real-time portal for infrastructure monitoring and safety management across HSE South West facilities.",
-                    category: "Operations",
+                    category: ["Operations"],
                     tag: "FM Portal",
                     icon: "building-2"
                 },
@@ -169,7 +252,7 @@
                     title: "Estates Minutes Assistant",
                     url: "https://mai-recap.streamlit.app/",
                     description: "AI-powered documentation tool. Automatically generates meeting minutes and formal estates briefs from transcripts.",
-                    category: "Productivity",
+                    category: ["Productivity"],
                     tag: "Admin Support",
                     icon: "bot"
                 },
@@ -178,7 +261,7 @@
                     title: "Waiting List Strategist",
                     url: "https://hsewaitinglist.streamlit.app/",
                     description: "Strategic command centre using 'Prophet' AI for influx forecasting, staffing simulations, and dynamic sorting of weighted clinical priorities.",
-                    category: "Clinical Strategy",
+                    category: ["Clinical Strategy"],
                     tag: "Patient Flow",
                     icon: "activity"
                 },
@@ -187,7 +270,7 @@
                     title: "Project Programme Planner",
                     url: "https://hse-estates.github.io/Programme/",
                     description: "Digital Gantt chart tool for planning capital works. Tracks timelines, dependencies, and critical path milestones.",
-                    category: "Operations",
+                    category: ["Operations"],
                     tag: "Scheduling",
                     icon: "calendar-range"
                 },
@@ -196,7 +279,7 @@
                     title: "Aspergillus Risk Assessment",
                     url: "https://hse-estates.github.io/aspergillus/",
                     description: "Digital workflow for infection control risk assessments during construction, ensuring compliance with clinical safety standards.",
-                    category: "Risk",
+                    category: ["Risk", "Governance"],
                     tag: "Infection Control",
                     icon: "shield-alert"
                 },
@@ -205,7 +288,7 @@
                     title: "Room & Desk Booking",
                     url: "https://hse-estates.github.io/Room-Booking/",
                     description: "Internal resource management dashboard. Facilitates booking of meeting rooms and hot desks with usage analytics.",
-                    category: "Productivity",
+                    category: ["Productivity", "Operations"],
                     tag: "Facilities Mgmt",
                     icon: "calendar-check"
                 },
@@ -214,7 +297,7 @@
                     title: "Construction Cost Estimator",
                     url: "https://hse-estates.github.io/QS/",
                     description: "Roughly how much will this building project cost? Quick estimation utility for preliminary project budgeting.",
-                    category: "Financial",
+                    category: ["Financial"],
                     tag: "Quantity Surveying",
                     icon: "hard-hat" 
                 },
@@ -223,7 +306,7 @@
                     title: "Capital Projects Assessment Tool",
                     url: "https://hse-estates.github.io/HBS/",
                     description: "Automates project classification and governance tracking. Categorises work into risk bands (A-D) based on financial thresholds and generates tailored compliance workflows.",
-                    category: "Governance",
+                    category: ["Governance", "Risk", "Financial"],
                     tag: "Compliance",
                     icon: "clipboard-check" 
                 }
@@ -234,15 +317,21 @@
                 return [...myApps].sort((a, b) => a.title.localeCompare(b.title));
             }, []);
 
-            // 2. Derive Categories
+            // 2. Derive Categories from all apps (flatten arrays)
             const categories = useMemo(() => {
-                return ["All", ...new Set(sortedApps.map(app => app.category))];
+                const allCategories = sortedApps.flatMap(app => 
+                    Array.isArray(app.category) ? app.category : [app.category]
+                );
+                return ["All", ...new Set(allCategories)];
             }, [sortedApps]);
 
-            // 3. Filter based on selection
+            // 3. Filter based on selection (check if category is in app's category array)
             const displayedApps = useMemo(() => {
                 if (selectedCategory === "All") return sortedApps;
-                return sortedApps.filter(app => app.category === selectedCategory);
+                return sortedApps.filter(app => {
+                    const categories = Array.isArray(app.category) ? app.category : [app.category];
+                    return categories.includes(selectedCategory);
+                });
             }, [sortedApps, selectedCategory]);
 
             useEffect(() => {
@@ -253,38 +342,38 @@
                         console.warn("Lucide icons failed to load:", e);
                     }
                 }
-            }, [displayedApps]); // Re-run icons when filtered list changes
+            }, [displayedApps]);
 
             return (
                 <div className="min-h-screen flex flex-col">
                     {/* Header */}
-                    <header className="hse-gradient text-white pt-8 pb-20 px-6">
-                        <div className="max-w-6xl mx-auto">
-                            <nav className="flex justify-between items-center mb-12">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-white p-2 rounded-xl">
+                    <header className="hse-gradient text-white pt-10 pb-24 px-6 relative">
+                        <div className="max-w-7xl mx-auto relative z-10">
+                            <nav className="flex justify-between items-center mb-16">
+                                <div className="flex items-center gap-5">
+                                    <div className="bg-white p-3 rounded-2xl shadow-2xl">
                                         <img 
                                             src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" 
                                             alt="HSE Logo" 
-                                            className="h-10"
+                                            className="h-11"
                                         />
                                     </div>
-                                    <div className="border-l border-white/20 pl-4">
-                                        <h1 className="text-xl font-extrabold tracking-tight">HSE Capital & Estates</h1>
-                                        <p className="text-xs text-emerald-200 font-medium uppercase tracking-widest">Digital Infrastructure Hub</p>
+                                    <div className="border-l-2 border-white/30 pl-5">
+                                        <h1 className="text-2xl font-black tracking-tight">HSE Capital & Estates</h1>
+                                        <p className="text-xs text-emerald-100 font-bold uppercase tracking-widest">Digital Infrastructure Hub</p>
                                     </div>
                                 </div>
                                 <div className="hidden md:block text-right">
-                                    <p className="text-xs font-bold text-emerald-300 uppercase">Principal Developer</p>
-                                    <p className="text-sm font-semibold">Dave Maher</p>
+                                    <p className="text-xs font-black text-emerald-200 uppercase tracking-wider">Principal Developer</p>
+                                    <p className="text-base font-bold">Dave Maher</p>
                                 </div>
                             </nav>
 
                             <div className="max-w-2xl">
-                                <h2 className="text-4xl md:text-5xl font-black mb-4 leading-tight">
+                                <h2 className="text-5xl md:text-6xl font-black mb-5 leading-tight">
                                     Specialist Apps & <br/>Decision Support Tools
                                 </h2>
-                                <p className="text-emerald-100/80 text-lg leading-relaxed">
+                                <p className="text-emerald-50/90 text-lg leading-relaxed font-medium">
                                     A central directory of custom-built applications designed to support strategic planning, 
                                     financial oversight, and capital project delivery within the HSE.
                                 </p>
@@ -293,18 +382,18 @@
                     </header>
 
                     {/* Main Content */}
-                    <main className="max-w-6xl mx-auto px-6 -mt-12 flex-1 w-full relative z-10">
+                    <main className="max-w-7xl mx-auto px-6 -mt-16 flex-1 w-full relative z-10">
                         
                         {/* Filter Tabs */}
-                        <div className="flex flex-wrap gap-2 mb-8 bg-white/90 backdrop-blur p-2 rounded-2xl shadow-sm border border-slate-100 w-fit">
+                        <div className="flex flex-wrap gap-3 mb-10 filter-container p-3 rounded-2xl w-fit shadow-xl">
                             {categories.map(cat => (
                                 <button
                                     key={cat}
                                     onClick={() => setSelectedCategory(cat)}
-                                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+                                    className={`px-5 py-2.5 text-xs font-black rounded-xl transition-all ${
                                         selectedCategory === cat 
-                                        ? 'bg-[#006858] text-white shadow-md transform scale-105' 
-                                        : 'bg-transparent text-slate-500 hover:bg-slate-100'
+                                        ? 'bg-gradient-to-r from-[#006858] to-[#00917a] text-white shadow-xl transform scale-105' 
+                                        : 'bg-transparent text-slate-600 hover:bg-slate-100 hover:shadow-md'
                                     }`}
                                 >
                                     {cat}
@@ -312,7 +401,7 @@
                             ))}
                         </div>
 
-                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                             {displayedApps.map(app => (
                                 <AppCard key={app.id} app={app} />
                             ))}
@@ -321,18 +410,19 @@
                         {/* Empty State if needed */}
                         {displayedApps.length === 0 && (
                             <div className="text-center py-20 text-slate-400">
-                                <p>No apps found in this category.</p>
+                                <Icon name="inbox" size={48} className="mx-auto mb-4 opacity-30" />
+                                <p className="font-semibold">No apps found in this category.</p>
                             </div>
                         )}
 
                         {/* Additional Info Section */}
-                        <div className="mt-16 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center gap-8">
-                            <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl">
-                                <Icon name="shield-check" size={40} />
+                        <div className="mt-20 bg-gradient-to-br from-white to-slate-50 p-10 rounded-3xl border border-slate-200 shadow-2xl flex flex-col md:flex-row items-center gap-10">
+                            <div className="p-6 bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600 rounded-3xl shadow-xl">
+                                <Icon name="shield-check" size={48} />
                             </div>
                             <div>
-                                <h4 className="text-xl font-bold text-slate-800 mb-2">Governance & Reliability</h4>
-                                <p className="text-slate-600 leading-relaxed text-sm">
+                                <h4 className="text-2xl font-black text-slate-900 mb-3">Governance & Reliability</h4>
+                                <p className="text-slate-600 leading-relaxed">
                                     These tools use client-side logic for maximum security and performance. 
                                     Data is stored locally on your device or via project file exports, ensuring no 
                                     sensitive financial data is transmitted to external servers.
@@ -342,21 +432,21 @@
                     </main>
 
                     {/* Footer */}
-                    <footer className="mt-20 border-t border-slate-200 bg-white py-12 px-6">
-                        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
+                    <footer className="mt-24 border-t border-slate-300 bg-gradient-to-b from-white to-slate-50 py-12 px-6">
+                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
                             <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                    <div className="w-6 h-6 bg-[#006858] rounded flex items-center justify-center">
-                                        <img src="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico" className="w-4 h-4 brightness-0 invert" alt=""/>
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-8 h-8 bg-gradient-to-br from-[#006858] to-[#004d42] rounded-lg flex items-center justify-center shadow-lg">
+                                        <img src="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico" className="w-5 h-5 brightness-0 invert" alt=""/>
                                     </div>
-                                    <span className="font-extrabold text-slate-800">HSE Capital & Estates</span>
+                                    <span className="font-black text-slate-900 text-lg">HSE Capital & Estates</span>
                                 </div>
-                                <p className="text-xs text-slate-500">&copy; 2026 Health Service Executive. All rights reserved.</p>
+                                <p className="text-xs text-slate-500 font-medium">&copy; 2026 Health Service Executive. All rights reserved.</p>
                             </div>
 
                             <div className="text-center md:text-right">
-                                <p className="text-sm font-bold text-slate-700">Digital Solutions Developed by Dave Maher</p>
-                                <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-widest font-medium">HSE Estates Infrastructure Intelligence</p>
+                                <p className="text-sm font-black text-slate-800">Digital Solutions Developed by Dave Maher</p>
+                                <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-widest font-bold">HSE Estates Infrastructure Intelligence</p>
                             </div>
                         </div>
                     </footer>
