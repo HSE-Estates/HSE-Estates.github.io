@@ -1,248 +1,134 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Healthcare Infrastructure QS</title>
+<head>
+  <meta charset="UTF-8" />
+  <title>Healthcare Infrastructure QS</title>
 
-    <!-- Tailwind -->
-    <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- React -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <!-- React -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 
-    <!-- Babel -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Babel -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Lucide React (UMD build) -->
-    <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js"></script>
-  </head>
+  <!-- Lucide React (UMD) -->
+  <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js"></script>
+</head>
 
-  <body class="bg-slate-50">
-    <div id="root"></div>
+<body class="bg-slate-50">
+  <div id="root"></div>
 
-    <script type="text/babel">
-import React, { useState, useEffect } from 'react';
-import { Calculator, Building, Timer, Plus, Trash2, ToggleLeft, ToggleRight, Printer, Save, FileText, Euro, DoorOpen, Zap, Hammer, Leaf, Siren, MapPin } from 'lucide-react';
+  <script type="text/babel">
+    const { useState, useEffect } = React;
 
-// --- UI COMPONENTS ---
-const Card = ({ children, className = "" }) => (
-  <div className={`bg-white rounded-xl shadow-sm border border-slate-200 ${className}`}>
-    {children}
-  </div>
-);
+    const {
+      Calculator, Building, Timer, Plus, Trash2, ToggleLeft, ToggleRight,
+      Printer, Save, FileText, Euro, DoorOpen, Zap, Hammer, Leaf, Siren, MapPin
+    } = lucideReact;
 
-const SectionHeader = ({ title, icon: Icon }) => (
-  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100 text-emerald-800">
-    {Icon && <Icon className="w-5 h-5" />}
-    <h3 className="font-bold text-slate-800 uppercase tracking-tight text-sm">{title}</h3>
-  </div>
-);
+    // --- UI COMPONENTS ---
+    const Card = ({ children, className = "" }) => (
+      <div className={`bg-white rounded-xl shadow-sm border border-slate-200 ${className}`}>
+        {children}
+      </div>
+    );
 
-export default function App() {
-  // --- STATE ---
-  const [assetType, setAssetType] = useState('acute');
-  const [intervention, setIntervention] = useState('new');
-  const [gfa, setGfa] = useState(1000);
-  const [region, setRegion] = useState('hse_sw'); // Default to South West (Cork/Kerry)
-  const [year, setYear] = useState('2026');
-  const [complexity, setComplexity] = useState('med');
-  const [duration, setDuration] = useState(18);
-  const [includeVat, setIncludeVat] = useState(true);
-  
-  const [customDoorCount, setCustomDoorCount] = useState('');
-  const [projectName, setProjectName] = useState('');
-  
-  // New State for Live Environment
-  const [isLiveSite, setIsLiveSite] = useState(false);
+    const SectionHeader = ({ title, icon: Icon }) => (
+      <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100 text-emerald-800">
+        {Icon && <Icon className="w-5 h-5" />}
+        <h3 className="font-bold text-slate-800 uppercase tracking-tight text-sm">{title}</h3>
+      </div>
+    );
 
-  const [extras, setExtras] = useState({
-    generator: false,
-    berUpgrade: false,
-    newRoof: false,
-  });
+    function App() {
+      const [assetType, setAssetType] = useState('acute');
+      const [intervention, setIntervention] = useState('new');
+      const [gfa, setGfa] = useState(1000);
+      const [region, setRegion] = useState('hse_sw');
+      const [year, setYear] = useState('2026');
+      const [complexity, setComplexity] = useState('med');
+      const [duration, setDuration] = useState(18);
+      const [includeVat, setIncludeVat] = useState(true);
+      const [customDoorCount, setCustomDoorCount] = useState('');
+      const [projectName, setProjectName] = useState('');
+      const [isLiveSite, setIsLiveSite] = useState(false);
+      const [customItems, setCustomItems] = useState([]);
+      const [results, setResults] = useState(null);
 
-  const [customItems, setCustomItems] = useState([]);
-  const [results, setResults] = useState(null);
+      const [extras, setExtras] = useState({
+        generator: false,
+        berUpgrade: false,
+        newRoof: false,
+      });
 
-  // --- DATA CONSTANTS (CALIBRATED 2026) ---
-  const baseRates = {
-    acute: { 
-      // Uplifted for high-complexity blocks (ICU/Imaging)
-      new: { low: 6500, med: 8500, high: 10500 }, 
-      // Uplifted for deep clinical refurb
-      refurb: { low: 8000, med: 10500, high: 13000 } 
-    },
-    cnu: { 
-      // Solid benchmarks
-      new: { low: 3500, med: 4000, high: 4500 }, 
-      refurb: { low: 4000, med: 4750, high: 5500 } 
-    },
-    groupHome: { 
-      new: { low: 2800, med: 3150, high: 3500 }, 
-      // Increased refurb to reflect Fire/DAC/Retrofit reality
-      refurb: { low: 2200, med: 2600, high: 3000 } 
-    }
-  };
+      const baseRates = {
+        acute: { new: { low: 6500, med: 8500, high: 10500 }, refurb: { low: 8000, med: 10500, high: 13000 } },
+        cnu: { new: { low: 3500, med: 4000, high: 4500 }, refurb: { low: 4000, med: 4750, high: 5500 } },
+        groupHome: { new: { low: 2800, med: 3150, high: 3500 }, refurb: { low: 2200, med: 2600, high: 3000 } }
+      };
 
-  // UPDATED: 6 NEW HSE HEALTH REGIONS
-  // Indices calibrated: Dublin-based regions carry the capital premium (1.10)
-  // Provincial regions normalized (1.00) or slightly lower for remote (0.98)
-  const regionalIndices = {
-    hse_dne: 1.10, // Dublin and North East
-    hse_dm: 1.10,  // Dublin and Midlands
-    hse_dse: 1.10, // Dublin and South East
-    hse_mw: 1.00,  // Mid West (Limerick/Clare)
-    hse_sw: 1.00,  // South West (Cork/Kerry)
-    hse_wnw: 0.98  // West and North West (Galway/Mayo/Donegal)
-  };
+      const regionalIndices = {
+        hse_dne: 1.10, hse_dm: 1.10, hse_dse: 1.10,
+        hse_mw: 1.00, hse_sw: 1.00, hse_wnw: 0.98
+      };
 
-  const regionLabels = {
-    hse_dne: "HSE Dublin & North East",
-    hse_dm: "HSE Dublin & Midlands",
-    hse_dse: "HSE Dublin & South East",
-    hse_mw: "HSE Mid West",
-    hse_sw: "HSE South West",
-    hse_wnw: "HSE West & North West"
-  };
+      const annualInflation = 0.035;
+      const liveSitePremium = 0.15;
 
-  const annualInflation = 0.035;
-  const liveSitePremium = 0.15; // 15% for Logistics/Phasing/Infection Control
+      useEffect(() => {
+        const rawRate = baseRates[assetType][intervention][complexity];
+        const inflationFactor = Math.pow(1 + annualInflation, duration / 24);
+        const adjustedRate = rawRate * regionalIndices[region] * inflationFactor * (isLiveSite ? 1.15 : 1);
+        const constructionCost = adjustedRate * gfa;
 
-  const fireDoorData = {
-    acute: { density: 15, rate: 1400 },
-    cnu: { density: 20, rate: 1100 },
-    groupHome: { density: 12, rate: 850 }
-  };
+        setResults({
+          adjustedRate,
+          constructionCost,
+          totalProjectCost: constructionCost * 1.35
+        });
+      }, [assetType, intervention, complexity, region, duration, gfa, isLiveSite]);
 
-  const onCosts = {
-    prelims: { new: 0.15, refurb: 0.25 },
-    contingency: { new: 0.10, refurb: 0.20 },
-    fees: 0.12,
-    vatBuild: 0.135,
-    vatFees: 0.23
-  };
+      const formatCurrency = (v) =>
+        new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v || 0);
 
-  const extrasData = {
-    generator: { acute: 350000, cnu: 85000, groupHome: 15000 },
-    roof: { rate: 180, storeyDivisor: { acute: 3.5, cnu: 1.2, groupHome: 1 } },
-    ber: { rate: 350 }
-  };
+      return (
+        <div className="min-h-screen p-6">
+          <header className="bg-emerald-900 text-white p-4 rounded-xl mb-6">
+            <h1 className="text-2xl font-black">Healthcare Infrastructure QS</h1>
+          </header>
 
-  // --- ACTIONS ---
-  const addCustomItem = () => setCustomItems([...customItems, { id: Date.now(), name: '', cost: 0 }]);
-  
-  const updateCustomItem = (id, field, value) => {
-    setCustomItems(items => items.map(item => item.id === id ? { ...item, [field]: value } : item));
-  };
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="p-6">
+              <SectionHeader title="Project Parameters" icon={Calculator} />
+              <label className="block text-xs font-bold mb-1">GFA (m²)</label>
+              <input
+                type="range"
+                min="100"
+                max="20000"
+                step="50"
+                value={gfa}
+                onChange={(e) => setGfa(+e.target.value)}
+                className="w-full"
+              />
+              <div className="mt-2 font-bold">{gfa} m²</div>
+            </Card>
 
-  const removeCustomItem = (id) => setCustomItems(items => items.filter(item => item.id !== id));
-
-  const handlePrint = () => window.print();
-
-  const handleSave = () => {
-    const data = {
-      projectName, assetType, intervention, gfa, region, year, complexity, duration,
-      includeVat, customDoorCount, extras, customItems, isLiveSite, results,
-      meta: { createdBy: "Dave Maher", date: new Date().toISOString() }
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${projectName || 'HSE_Strategic_Estimate'}_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
-
-  // --- CALCULATION ENGINE ---
-  useEffect(() => {
-    const getSafeRate = () => {
-      try { return baseRates[assetType][intervention][complexity] || 0; } catch (e) { return 0; }
-    };
-
-    let rawRate = getSafeRate();
-    
-    // Inflation (Mid-Point)
-    const currentYear = 2026;
-    const startYearInt = parseInt(year);
-    const yearsUntilStart = Math.max(0, startYearInt - currentYear);
-    const midPointYears = yearsUntilStart + (duration / 24); 
-    const inflationFactor = Math.pow(1 + annualInflation, midPointYears);
-
-    // Regional
-    let regionalIndex = regionalIndices[region] || 1.0;
-    
-    // Live Site Factor
-    const liveFactor = isLiveSite ? (1 + liveSitePremium) : 1.0;
-
-    let adjustedRate = rawRate * regionalIndex * inflationFactor * liveFactor;
-
-    // Construction
-    const constructionCost = adjustedRate * gfa;
-
-    // Fire Doors
-    let doorCost = 0;
-    let finalDoorCount = 0;
-    let autoDoorCount = 0;
-    
-    if (intervention === 'refurb') {
-      const doorConfig = fireDoorData[assetType] || { density: 20, rate: 1000 };
-      autoDoorCount = Math.ceil(gfa / doorConfig.density);
-      finalDoorCount = customDoorCount !== '' ? parseInt(customDoorCount) : autoDoorCount;
-      if (isNaN(finalDoorCount)) finalDoorCount = 0;
-      doorCost = finalDoorCount * (doorConfig.rate * inflationFactor);
+            <Card className="p-6">
+              <SectionHeader title="Summary" icon={Euro} />
+              <div className="text-3xl font-black text-emerald-700">
+                {results && formatCurrency(results.totalProjectCost)}
+              </div>
+            </Card>
+          </div>
+        </div>
+      );
     }
 
-    // Extras
-    let generatorCost = extras.generator ? extrasData.generator[assetType] * inflationFactor : 0;
-    let roofArea = (extras.newRoof && intervention === 'refurb') ? Math.ceil(gfa / extrasData.roof.storeyDivisor[assetType]) : 0;
-    let roofCost = roofArea * (extrasData.roof.rate * inflationFactor);
-    let berCost = (intervention === 'refurb' && extras.berUpgrade) ? gfa * (extrasData.ber.rate * inflationFactor) : 0;
-
-    // Custom Items
-    let customItemsTotal = 0;
-    const inflatedCustomItems = customItems.map(item => {
-      const baseVal = parseFloat(item.cost) || 0;
-      const inflatedVal = baseVal * inflationFactor;
-      customItemsTotal += inflatedVal;
-      return { ...item, inflatedCost: inflatedVal };
-    });
-
-    const totalConstruction = constructionCost + doorCost + generatorCost + roofCost + berCost + customItemsTotal;
-
-    // On-Costs
-    const contingencyValue = totalConstruction * onCosts.contingency[intervention];
-    const feesValue = totalConstruction * onCosts.fees;
-    
-    // VAT
-    const taxableBuild = totalConstruction + contingencyValue;
-    const vatBuildValue = taxableBuild * onCosts.vatBuild;
-    const vatFeesValue = feesValue * onCosts.vatFees;
-    const totalVat = vatBuildValue + vatFeesValue;
-
-    setResults({
-      rawRate, adjustedRate, inflationFactor, regionalIndex, liveFactor,
-      constructionCost,
-      doorCount: finalDoorCount, autoDoorCount, doorCost,
-      extras: { generator: generatorCost, roof: roofCost, roofArea, ber: berCost },
-      customItems: inflatedCustomItems, customItemsTotal,
-      contingencyValue, feesValue, vatBuildValue, vatFeesValue,
-      totalVat, totalExVat: taxableBuild + feesValue,
-      totalProjectCost: taxableBuild + feesValue + totalVat
-    });
-
-  }, [assetType, intervention, gfa, region, year, complexity, duration, extras, customItems, customDoorCount, isLiveSite]);
-
-  const formatCurrency = (val) => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val || 0);
-  const formatNumber = (val) => new Intl.NumberFormat('en-IE').format(val || 0);
-
-  return (/* JSX unchanged */);
-}
-
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
-    </script>
-  </body>
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
 </html>
