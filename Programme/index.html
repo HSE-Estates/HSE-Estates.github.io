@@ -128,16 +128,35 @@
         /* Print Optimisations */
         @media print {
             .no-print { display: none !important; }
-            body { background: white; padding: 0; font-size: 10px; }
-            .max-w-7xl { max-width: 100% !important; box-shadow: none !important; border: none; margin: 0; padding: 0; }
+            body { 
+                background: white; 
+                padding: 0; 
+                font-size: 10px;
+                /* Allow body to expand horizontally */
+                width: fit-content; 
+                overflow-x: visible;
+            }
+            .max-w-7xl { 
+                max-width: none !important; 
+                width: fit-content !important;
+                box-shadow: none !important; 
+                border: none; 
+                margin: 0; 
+                padding: 0; 
+            }
             .gantt-chart-container { 
+                /* Crucial for horizontal printing */
                 overflow: visible !important; 
                 display: block !important;
                 height: auto !important;
+                width: max-content !important; /* Force container to be full width of content */
+                min-width: 100%;
             }
-            header { background: #006858 !important; -webkit-print-color-adjust: exact; padding: 10px !important; }
-            /* Force horizontal fit if possible, or allow natural overflow */
-            #gantt-chart-container { min-width: 100%; }
+            #gantt-chart {
+                width: max-content !important;
+            }
+            header { background: #006858 !important; -webkit-print-color-adjust: exact; padding: 10px !important; width: 100%; }
+            
             .gantt-bar-wrapper { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-shadow: none !important; border: 1px solid #000; }
             
             /* Handle Page Breaks */
@@ -149,10 +168,11 @@
                 page-break-after: avoid; 
                 break-after: avoid;
             }
-            /* Repeat header on new pages */
             .sticky.top-0 {
-                position: static !important; /* Sticky doesn't work well in print, we rely on browser table-header-group behavior if this were a table, but for flex divs we just let it be static at top */
+                position: static !important;
             }
+            /* Hide scrollbars in print */
+            ::-webkit-scrollbar { display: none; }
         }
     </style>
 </head>
@@ -210,7 +230,7 @@
                     </svg>
                 </button>
 
-                <button id="new-project-btn" title="Delete & New Project" class="p-2 bg-red-500/80 hover:bg-red-600 rounded-xl transition-all border border-white/10 ml-1">
+                <button id="new-project-btn" title="Clear Project (Start Empty)" class="p-2 bg-red-500/80 hover:bg-red-600 rounded-xl transition-all border border-white/10 ml-1">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
@@ -359,39 +379,29 @@
         document.addEventListener('DOMContentLoaded', () => {
             // --- STATE & CONFIG ---
             const CONFIG = {
-                // Scales for different view modes
                 scales: {
-                    day: { px: 40 },
-                    week: { px: 20 },
-                    month: { px: 10 },
-                    year: { px: 2 } // Extremely condensed for yearly view
+                    day: { px: 40, unit: 'day' },
+                    week: { px: 50, unit: 'week' },
+                    month: { px: 60, unit: 'month' },
+                    year: { px: 100, unit: 'year' }
                 }
             };
             
-            // Dynamic list width based on screen size to show extra columns
             const getListWidth = () => window.innerWidth < 768 ? 160 : 420;
-
-            // Check for injected state (Carbon Copy)
             const cachedState = window.CACHED_STATE || {};
 
-            // Hospital Template
             const hospitalTemplate = [
                 { id: 1, name: "Site Clearance & Excavation", group: "1. Site Preparation", start: "2026-03-01", end: "2026-04-15", progress: 100, color: "#8b5cf6", dependencies: [] },
                 { id: 2, name: "Deep Foundation Piling", group: "1. Site Preparation", start: "2026-04-16", end: "2026-06-30", progress: 60, color: "#8b5cf6", dependencies: [1] },
-                
                 { id: 3, name: "Structural Steel Frame", group: "2. Structure", start: "2026-07-01", end: "2026-11-15", progress: 20, color: "#0ea5e9", dependencies: [2] },
                 { id: 4, name: "Concrete Floor Slabs", group: "2. Structure", start: "2026-08-01", end: "2026-12-01", progress: 10, color: "#0ea5e9", dependencies: [3] },
-                
                 { id: 5, name: "Roofing & Weatherproofing", group: "3. Exterior", start: "2026-11-01", end: "2027-02-01", progress: 0, color: "#10b981", dependencies: [3] },
                 { id: 6, name: "Window & Façade Install", group: "3. Exterior", start: "2027-01-15", end: "2027-04-01", progress: 0, color: "#10b981", dependencies: [5] },
-                
                 { id: 7, name: "HVAC & Ductwork", group: "4. MEP Systems", start: "2026-12-01", end: "2027-06-01", progress: 0, color: "#f59e0b", dependencies: [4] },
                 { id: 8, name: "Medical Gas Plumbing", group: "4. MEP Systems", start: "2027-02-01", end: "2027-05-15", progress: 0, color: "#f59e0b", dependencies: [4] },
                 { id: 9, name: "Electrical Wiring (ICU)", group: "4. MEP Systems", start: "2027-03-01", end: "2027-07-01", progress: 0, color: "#f59e0b", dependencies: [7] },
-                
                 { id: 10, name: "Internal Partitions", group: "5. Interior Fit-out", start: "2027-04-01", end: "2027-08-01", progress: 0, color: "#ec4899", dependencies: [7,8] },
                 { id: 11, name: "Operating Theatre Install", group: "5. Interior Fit-out", start: "2027-07-01", end: "2027-10-01", progress: 0, color: "#ec4899", dependencies: [10] },
-                
                 { id: 12, name: "Final Commissioning", group: "6. Handover", start: "2027-10-01", end: "2027-12-01", progress: 0, color: "#64748b", dependencies: [9,11] }
             ];
 
@@ -409,10 +419,8 @@
                 listWidth: getListWidth()
             };
 
-            // Set UI elements to match restored state
             document.getElementById('view-mode').value = state.viewMode;
 
-            // --- UI REFS ---
             const refs = {
                 chart: document.getElementById('gantt-chart'),
                 container: document.getElementById('gantt-chart-container'),
@@ -421,14 +429,69 @@
                 form: document.getElementById('task-form')
             };
 
-            // --- DATE UTILS ---
             const parseDate = (d) => new Date(d);
             const formatDate = (d) => d.toISOString().split('T')[0];
             const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
-            const dayDiff = (s, e) => Math.round((parseDate(e) - parseDate(s)) / (1000 * 60 * 60 * 24));
+            const dayDiff = (s, e) => (parseDate(e) - parseDate(s)) / (1000 * 60 * 60 * 24);
             const getColWidth = () => CONFIG.scales[state.viewMode].px;
 
-            // --- CORE FUNCTIONS ---
+            const getX = (dateStr, minDate) => {
+                const date = parseDate(dateStr);
+                const min = parseDate(minDate);
+                const cw = getColWidth();
+                
+                if (state.viewMode === 'day') {
+                    const diff = Math.round((date - min) / (1000*60*60*24));
+                    return diff * cw;
+                } else if (state.viewMode === 'week') {
+                    const diff = (date - min) / (1000*60*60*24*7);
+                    return diff * cw;
+                } else if (state.viewMode === 'month') {
+                    // Approximate month diff for smoother drawing
+                    const yearDiff = date.getFullYear() - min.getFullYear();
+                    const monthDiff = date.getMonth() - min.getMonth();
+                    const dayRatio = date.getDate() / new Date(date.getFullYear(), date.getMonth()+1, 0).getDate();
+                    return ((yearDiff * 12) + monthDiff + dayRatio - (min.getDate()/30)) * cw; 
+                } else if (state.viewMode === 'year') {
+                    const yearDiff = date.getFullYear() - min.getFullYear();
+                    const dayRatio = (date - new Date(date.getFullYear(), 0, 1)) / (1000*60*60*24*365);
+                    return (yearDiff + dayRatio) * cw;
+                }
+            };
+
+            const getWidth = (start, end, minDate) => {
+                const x1 = getX(start, minDate);
+                const x2 = getX(end, minDate);
+                // Ensure at least a sliver is visible
+                return Math.max(x2 - x1, 4);
+            };
+
+            // Calculate start/end based on x position (Inverse of getX)
+            const getDateFromX = (x, minDate) => {
+                const cw = getColWidth();
+                const min = parseDate(minDate);
+                let result = new Date(min);
+
+                if (state.viewMode === 'day') {
+                    const days = Math.round(x / cw);
+                    result.setDate(min.getDate() + days);
+                } else if (state.viewMode === 'week') {
+                    const days = Math.round((x / cw) * 7);
+                    result.setDate(min.getDate() + days);
+                } else if (state.viewMode === 'month') {
+                    // Roughly map back
+                    const totalMonths = x / cw;
+                    result.setMonth(min.getMonth() + Math.floor(totalMonths));
+                    const fraction = totalMonths % 1;
+                    result.setDate(Math.floor(fraction * 30));
+                } else if (state.viewMode === 'year') {
+                    const totalYears = x / cw;
+                    result.setFullYear(min.getFullYear() + Math.floor(totalYears));
+                    const fraction = totalYears % 1;
+                    result.setMonth(Math.floor(fraction * 12));
+                }
+                return formatDate(result);
+            };
 
             const saveState = () => {
                 localStorage.setItem('gantt-pro-data', JSON.stringify(state.tasks));
@@ -438,24 +501,16 @@
             const calculateCriticalPath = () => {
                 state.tasks.forEach(t => t.isCritical = false);
                 if (!state.showCriticalPath) return;
-
                 let maxEnd = new Date(0);
-                state.tasks.forEach(t => {
-                    const end = parseDate(t.end);
-                    if (end > maxEnd) maxEnd = end;
-                });
-
+                state.tasks.forEach(t => { const end = parseDate(t.end); if (end > maxEnd) maxEnd = end; });
                 const isLinkedToEnd = (task) => {
                     const taskEnd = parseDate(task.end);
                     if (Math.abs(maxEnd - taskEnd) < 86400000) return true; 
                     const children = state.tasks.filter(c => c.dependencies && c.dependencies.includes(task.id));
                     return children.some(child => child.isCritical && parseDate(child.start) <= addDays(parseDate(task.end), 1));
                 };
-
                 const sorted = [...state.tasks].sort((a,b) => parseDate(b.end) - parseDate(a.end));
-                sorted.forEach(t => {
-                    if (isLinkedToEnd(t)) t.isCritical = true;
-                });
+                sorted.forEach(t => { if (isLinkedToEnd(t)) t.isCritical = true; });
             };
 
             const cascadeDates = (rootId) => {
@@ -474,9 +529,9 @@
                         }, new Date(0));
                         const nextStart = addDays(maxParentEnd, 1);
                         if (parseDate(child.start) < nextStart) {
-                            const dur = dayDiff(child.start, child.end);
+                            const dur = dayDiff(child.start, child.end); // Raw days
                             child.start = formatDate(nextStart);
-                            child.end = formatDate(addDays(nextStart, dur));
+                            child.end = formatDate(addDays(nextStart, Math.round(dur)));
                             q.push(child.id);
                         }
                     });
@@ -494,22 +549,14 @@
                 document.getElementById('stat-progress-bar').style.width = avg + '%';
             };
 
-            // --- SORTING ---
             window.toggleSort = (mode) => {
-                if (state.sortBy === mode && mode !== 'group') {
-                    state.sortBy = 'group';
-                } else {
-                    state.sortBy = mode;
-                }
+                if (state.sortBy === mode && mode !== 'group') state.sortBy = 'group';
+                else state.sortBy = mode;
                 render();
             };
 
-            const getSortIcon = (mode) => {
-                if (state.sortBy === mode) return '▼';
-                return '';
-            }
+            const getSortIcon = (mode) => state.sortBy === mode ? '▼' : '';
 
-            // --- RENDER ---
             const render = () => {
                 const filtered = state.tasks.filter(t => t.name.toLowerCase().includes(state.filterTerm.toLowerCase()));
                 if (!filtered.length) {
@@ -520,88 +567,97 @@
 
                 calculateCriticalPath();
 
-                // Sort Logic: Always primary by group, then secondary by selected criteria
                 const sorted = [...filtered].sort((a,b) => {
                     const gA = (a.group || 'General').toLowerCase();
                     const gB = (b.group || 'General').toLowerCase();
-                    
-                    // Primary Sort: Group
                     if (gA !== gB) return gA.localeCompare(gB);
-
-                    // Secondary Sort (Within Group)
-                    if (state.sortBy === 'start') {
-                        return parseDate(a.start) - parseDate(b.start);
-                    } else if (state.sortBy === 'end') {
-                        return parseDate(a.end) - parseDate(b.end);
-                    } else if (state.sortBy === 'duration') {
-                        const dA = dayDiff(a.start, a.end);
-                        const dB = dayDiff(b.start, b.end);
-                        return dB - dA; // Descending duration
-                    }
-                    // Default fallback secondary: Start Date
+                    if (state.sortBy === 'start') return parseDate(a.start) - parseDate(b.start);
+                    if (state.sortBy === 'end') return parseDate(a.end) - parseDate(b.end);
+                    if (state.sortBy === 'duration') return dayDiff(b.start, b.end) - dayDiff(a.start, a.end);
                     return parseDate(a.start) - parseDate(b.start);
                 });
 
-                // Calculate timeline bounds
+                // --- Calculate Timeline Bounds ---
                 const allDates = state.tasks.flatMap(t => [parseDate(t.start), parseDate(t.end)]);
-                state.minDate = addDays(new Date(Math.min(...allDates)), -7);
-                state.maxDate = addDays(new Date(Math.max(...allDates)), 14);
+                let minT = new Date(Math.min(...allDates));
+                let maxT = new Date(Math.max(...allDates));
                 
-                const totalDays = dayDiff(formatDate(state.minDate), formatDate(state.maxDate)) + 1;
+                // Add padding based on view mode
+                minT.setDate(minT.getDate() - 15);
+                maxT.setDate(maxT.getDate() + 30);
+
+                // Align Grid Start
+                if (state.viewMode === 'week') {
+                    const day = minT.getDay() || 7;
+                    if(day !== 1) minT.setHours(-24 * (day - 1));
+                } else if (state.viewMode === 'month') {
+                    minT.setDate(1);
+                } else if (state.viewMode === 'year') {
+                    minT.setMonth(0, 1);
+                }
+                
+                state.minDate = formatDate(minT);
+                state.maxDate = formatDate(maxT);
+
+                // Determine Grid Columns
+                let gridCols = [];
+                let curr = new Date(minT);
+                const end = new Date(maxT);
+                
+                while(curr <= end) {
+                    let label = '';
+                    let subLabel = '';
+                    let isWeekend = false;
+                    let isMajor = false;
+
+                    if (state.viewMode === 'day') {
+                        label = curr.getDate();
+                        subLabel = curr.toLocaleString('en-GB', {weekday:'narrow'});
+                        isWeekend = curr.getDay() === 0 || curr.getDay() === 6;
+                        if(curr.getDate() === 1) isMajor = true; // Start of month
+                        curr.setDate(curr.getDate() + 1);
+                    } else if (state.viewMode === 'week') {
+                        label = `W${getWeekNumber(curr)}`;
+                        if(curr.getDate() <= 7) isMajor = true; // Roughly start of month
+                        curr.setDate(curr.getDate() + 7);
+                    } else if (state.viewMode === 'month') {
+                        label = curr.toLocaleString('en-GB', {month:'short'});
+                        if(curr.getMonth() === 0) isMajor = true; // Start of year
+                        curr.setMonth(curr.getMonth() + 1);
+                    } else if (state.viewMode === 'year') {
+                        label = curr.getFullYear();
+                        curr.setFullYear(curr.getFullYear() + 1);
+                    }
+                    gridCols.push({ label, subLabel, isWeekend, isMajor });
+                }
+
                 const colW = getColWidth();
+                const gridWidth = gridCols.length * colW;
 
                 let html = '';
                 
-                // 1. Timeline Header
+                // 1. Header
                 html += `<div class="flex sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm print-header">
                     <div class="flex-none bg-slate-50 text-[11px] text-slate-500 uppercase flex items-center border-r border-slate-200" style="width: ${state.listWidth}px">
                         <div class="flex-1 px-4 font-bold cursor-pointer hover:text-emerald-600" onclick="toggleSort('group')">Task Name ${getSortIcon('group')}</div>
                         <div class="w-24 px-2 hidden md:block font-bold border-l border-slate-100 sort-header" onclick="toggleSort('start')">Start ${getSortIcon('start')}</div>
                         <div class="w-24 px-2 hidden md:block font-bold border-l border-slate-100 sort-header" onclick="toggleSort('end')">Finish ${getSortIcon('end')}</div>
-                        <div class="w-14 text-center hidden md:block font-bold border-l border-slate-100 sort-header" onclick="toggleSort('duration')">Dur. ${getSortIcon('duration')}</div>
+                        <div class="w-14 text-center hidden md:block font-bold border-l border-slate-100 sort-header" onclick="toggleSort('duration')">Dur.</div>
                     </div>
-                    <div class="flex relative">`;
+                    <div class="flex relative" style="width: ${gridWidth}px">`;
                 
-                for(let i=0; i<totalDays; i++) {
-                    const d = addDays(state.minDate, i);
-                    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                    const dateNum = d.getDate();
-                    let cellContent = '';
-                    let borderClass = 'grid-line';
-                    
-                    if (state.viewMode === 'day') {
-                        cellContent = `<div class="text-[9px] text-slate-400 leading-none">${d.toLocaleString('en-GB',{weekday:'narrow'})}</div>
-                                      <div class="text-[11px] font-bold text-slate-600">${dateNum}</div>`;
-                    } else if (state.viewMode === 'week') {
-                        if (d.getDay() === 1) { // Monday
-                            cellContent = `<div class="text-[10px] text-slate-500 font-bold pl-1">W${getWeekNumber(d)}</div>`;
-                            borderClass = 'grid-line border-l border-slate-400';
-                        }
-                    } else if (state.viewMode === 'month') {
-                         if (d.getDate() === 1) {
-                            cellContent = `<div class="text-[10px] text-slate-700 font-bold pl-1 sticky left-0">${d.toLocaleString('en-GB',{month:'short'})}</div>`;
-                            borderClass = 'grid-line border-l border-slate-500';
-                        }
-                    } else if (state.viewMode === 'year') {
-                         if (d.getDate() === 1) {
-                            cellContent = `<div class="text-[9px] text-slate-700 font-bold pl-1 sticky left-0 overflow-visible whitespace-nowrap">${d.toLocaleString('en-GB',{month:'narrow'})}</div>`;
-                            borderClass = 'border-l border-slate-300';
-                         }
-                         if (d.getMonth() === 0 && d.getDate() === 1) {
-                             cellContent = `<div class="text-[10px] text-emerald-700 font-bold pl-1 sticky left-0 border-l-2 border-emerald-500 bg-emerald-50">${d.getFullYear()}</div>`;
-                         }
-                    }
-
-                    if (state.viewMode === 'year' && d.getDate() !== 1) borderClass = '';
-
-                    html += `<div class="flex-none flex flex-col justify-end pb-1 text-center ${borderClass} ${isWeekend && state.viewMode !== 'year' ? 'weekend' : ''}" style="width: ${colW}px; height: 36px; overflow:hidden;">${cellContent}</div>`;
-                }
+                gridCols.forEach(col => {
+                    const borderClass = col.isMajor ? 'border-l-2 border-slate-400' : 'border-r border-slate-100';
+                    html += `<div class="flex-none flex flex-col justify-end pb-1 text-center ${borderClass} ${col.isWeekend ? 'bg-slate-50/50' : ''}" style="width: ${colW}px; height: 36px; overflow:hidden;">
+                        <div class="text-[9px] text-slate-400 leading-none">${col.subLabel}</div>
+                        <div class="text-[11px] font-bold text-slate-600">${col.label}</div>
+                    </div>`;
+                });
                 html += `</div></div>`;
 
-                // 2. Task Rows
+                // 2. Rows
                 let currentGroup = null;
                 sorted.forEach(t => {
-                    // Always show group header since we force Sort-By-Group first
                     if (t.group !== currentGroup) {
                         currentGroup = t.group || 'General';
                         html += `<div class="flex group-header sticky left-0 z-20">
@@ -609,47 +665,33 @@
                         </div>`;
                     }
 
-                    const startOffset = dayDiff(formatDate(state.minDate), t.start);
-                    const duration = dayDiff(t.start, t.end) + 1;
-                    const widthPx = duration * colW;
-                    const leftPx = startOffset * colW;
+                    // Calculate bar position using new unified getX
+                    const leftPx = getX(t.start, state.minDate);
+                    const widthPx = getWidth(t.start, t.end, state.minDate);
+                    const duration = Math.round(dayDiff(t.start, t.end)) + 1;
                     const criticalClass = t.isCritical && state.showCriticalPath ? 'critical-path-highlight' : '';
                     
                     html += `<div class="flex hover:bg-white border-b border-slate-100 transition-colors h-10 relative">
-                        <!-- Left Panel (Task List) -->
                         <div class="flex-none flex items-center border-r border-slate-200 bg-white sticky left-0 z-20 group cursor-pointer" 
                              style="width: ${state.listWidth}px" onclick="app.editTask(${t.id})">
-                             
                             <div class="flex-1 px-4 text-xs font-semibold text-slate-700 truncate group-hover:text-emerald-700 transition-colors" title="${t.name}">${t.name}</div>
-                            
-                            <!-- Desktop Columns -->
                             <div class="w-24 px-2 text-[10px] text-slate-500 border-l border-slate-100 hidden md:block truncate">${t.start}</div>
                             <div class="w-24 px-2 text-[10px] text-slate-500 border-l border-slate-100 hidden md:block truncate">${t.end}</div>
                             <div class="w-14 text-center text-[10px] font-mono text-slate-400 border-l border-slate-100 hidden md:block">${duration}d</div>
                         </div>
 
-                        <!-- Right Panel (Timeline) -->
-                        <div class="flex relative flex-1 h-full items-center">
+                        <div class="flex relative flex-1 h-full items-center" style="width: ${gridWidth}px">
                              <div class="absolute inset-0 flex pointer-events-none">`;
                              
-                             if (state.viewMode !== 'year') {
-                                 for(let i=0; i<totalDays; i++) {
-                                     const d = addDays(state.minDate, i);
-                                     const isWk = d.getDay() === 0 || d.getDay() === 6;
-                                     html += `<div class="flex-none grid-line ${isWk ? 'weekend' : ''}" style="width: ${colW}px"></div>`;
-                                 }
-                             } else {
-                                 for(let i=0; i<totalDays; i++) {
-                                     const d = addDays(state.minDate, i);
-                                     const isMonthStart = d.getDate() === 1;
-                                     html += `<div class="flex-none ${isMonthStart ? 'border-l border-slate-300' : ''}" style="width: ${colW}px"></div>`;
-                                 }
-                             }
+                             gridCols.forEach(col => {
+                                 const border = col.isMajor ? 'border-l border-slate-300' : 'border-r border-slate-50';
+                                 html += `<div class="flex-none ${border} ${col.isWeekend ? 'bg-slate-50/30' : ''}" style="width: ${colW}px"></div>`;
+                             });
 
                     html += `</div>
                             <div class="gantt-bar-wrapper absolute h-6 rounded shadow-sm flex items-center overflow-hidden ${criticalClass}"
                                  data-id="${t.id}"
-                                 style="left: ${leftPx}px; width: ${Math.max(widthPx, 4)}px; background-color: ${t.color}">
+                                 style="left: ${leftPx}px; width: ${widthPx}px; background-color: ${t.color}">
                                 <div class="h-full bg-black/10 pointer-events-none" style="width: ${t.progress}%"></div>
                                 ${widthPx > 60 ? `<span class="absolute px-2 text-[10px] font-bold text-white drop-shadow-md truncate w-full pointer-events-none">${t.progress}%</span>` : ''}
                                 <div class="gantt-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-800 text-white text-xs p-2 rounded shadow-xl whitespace-nowrap z-50">
@@ -662,7 +704,7 @@
                 });
 
                 refs.chart.innerHTML = html;
-                refs.chart.style.width = `${state.listWidth + (totalDays * colW)}px`;
+                refs.chart.style.width = `${state.listWidth + gridWidth}px`;
                 
                 setTimeout(() => drawDependencies(sorted), 0);
                 setupDragEvents();
@@ -712,16 +754,13 @@
                         if (e.button !== 0) return;
                         e.stopPropagation();
                         e.preventDefault();
-                        
                         const id = parseInt(el.dataset.id);
                         state.dragTarget = id;
                         state.dragStartX = e.clientX;
                         state.originalTask = {...state.tasks.find(t => t.id === id)};
-                        state.initialLeft = parseInt(el.style.left);
-                        
+                        state.initialLeft = parseFloat(el.style.left);
                         el.classList.add('dragging');
                         document.body.style.cursor = 'grabbing';
-                        
                         window.addEventListener('mousemove', handleDragMove);
                         window.addEventListener('mouseup', handleDragEnd);
                     };
@@ -730,46 +769,41 @@
 
             const handleDragMove = (e) => {
                 if (!state.dragTarget) return;
-                
                 const el = document.querySelector(`.gantt-bar-wrapper[data-id="${state.dragTarget}"]`);
                 if (!el) return;
-
                 const dx = e.clientX - state.dragStartX;
-                const newLeft = state.initialLeft + dx;
-                
-                el.style.left = `${newLeft}px`;
+                el.style.left = `${state.initialLeft + dx}px`;
             };
 
             const handleDragEnd = (e) => {
                 window.removeEventListener('mousemove', handleDragMove);
                 window.removeEventListener('mouseup', handleDragEnd);
-                
                 const id = state.dragTarget;
                 const el = document.querySelector(`.gantt-bar-wrapper[data-id="${id}"]`);
-                
                 if (el) {
                     el.classList.remove('dragging');
                     document.body.style.cursor = 'default';
-                    
                     const dx = e.clientX - state.dragStartX;
-                    const daysMoved = Math.round(dx / getColWidth());
                     
-                    if (daysMoved !== 0) {
+                    if (Math.abs(dx) > 5) {
                         const t = state.tasks.find(x => x.id === id);
-                        const newStart = addDays(parseDate(state.originalTask.start), daysMoved);
-                        const newEnd = addDays(parseDate(state.originalTask.end), daysMoved);
+                        const initialDateX = getX(state.originalTask.start, state.minDate);
+                        const newX = initialDateX + dx;
                         
-                        t.start = formatDate(newStart);
-                        t.end = formatDate(newEnd);
+                        const newStartDateStr = getDateFromX(newX, state.minDate);
+                        const durationDays = dayDiff(state.originalTask.start, state.originalTask.end);
+                        
+                        t.start = newStartDateStr;
+                        t.end = formatDate(addDays(parseDate(newStartDateStr), Math.round(durationDays)));
                         
                         cascadeDates(t.id);
                         saveState();
                         render();
                     } else {
+                        // Snap back if barely moved
                         el.style.left = `${state.initialLeft}px`;
                     }
                 }
-                
                 state.dragTarget = null;
             };
 
@@ -818,7 +852,7 @@
             document.getElementById('new-project-btn').onclick = () => {
                 if(confirm("Are you sure you want to delete this project? This cannot be undone.")) {
                     localStorage.removeItem('gantt-pro-data');
-                    state.tasks = hospitalTemplate;
+                    state.tasks = []; // Set to empty array, NOT template
                     state.sortBy = 'group';
                     state.viewMode = 'day';
                     saveState();
@@ -926,7 +960,7 @@
                     sortBy: state.sortBy
                 };
 
-                // Remove any existing saved data script
+                // Remove any existing saved data script to avoid duplicates
                 html = html.replace(/<script id="gantt-data-state">[\s\S]*?<\/script>/gi, '');
                 
                 // Inject new data script safely
