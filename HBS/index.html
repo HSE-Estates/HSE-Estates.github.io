@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HSE Capital Projects Assessment Tool</title>
+  
+  <!-- Favicons -->
+  <link rel="icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* Print Specific Styles */
+    @media print {
+      @page { 
+        size: A4 landscape; 
+        margin: 10mm;
+      }
+      
+      body { 
+        background-color: #ffffff !important; 
+        color: #000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      /* Hide interactive elements */
+      .no-print, header button, .input-field, input[type="text"], input[type="date"], input[type="number"], select, button { display: none !important; }
+      .print-only { display: block !important; }
+      
+      /* Ensure Main Container Fits */
+      main {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      
+      /* Force backgrounds */
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+      /* Hide layout columns that are input-only */
+      .input-column { display: none !important; }
+      .report-column { width: 100% !important; grid-column: span 12 !important; }
+    }
+    
+    .print-only { display: none; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // --- ICONS (Embedded SVGs) ---
+    const IconBase = ({ children, className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
+    );
+
+    const Building = (props) => <IconBase {...props}><rect x="4" y="2" width="16" height="20" rx="2" ry="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M8 10h.01" /><path d="M16 10h.01" /><path d="M8 14h.01" /><path d="M16 14h.01" /><path d="M8 18h.01" /><path d="M16 18h.01" /></IconBase>;
+    const Euro = (props) => <IconBase {...props}><path d="M4 10h12"/><path d="M4 14h9"/><path d="M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2"/></IconBase>;
+    const ClipboardCheck = (props) => <IconBase {...props}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></IconBase>;
+    const FileText = (props) => <IconBase {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></IconBase>;
+    const Save = (props) => <IconBase {...props}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></IconBase>;
+    const Printer = (props) => <IconBase {...props}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></IconBase>;
+    const AlertTriangle = (props) => <IconBase {...props}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></IconBase>;
+    const CheckCircle = (props) => <IconBase {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></IconBase>;
+    const ArrowRight = (props) => <IconBase {...props}><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></IconBase>;
+
+    // --- SHARED COMPONENTS ---
+
+    const Card = ({ children, className = "" }) => (
+      <div className={`bg-white rounded-xl shadow-sm border border-slate-200 ${className}`}>
+        {children}
+      </div>
+    );
+
+    const SectionHeader = ({ title, icon: Icon, color = "text-emerald-800" }) => (
+      <div className={`flex items-center gap-2 mb-4 pb-2 border-b border-slate-100 ${color}`}>
+        {Icon && <Icon className="w-5 h-5" />}
+        <h3 className="font-bold text-slate-800 uppercase tracking-tight text-sm">{title}</h3>
+      </div>
+    );
+
+    const Badge = ({ children, color = "bg-slate-100 text-slate-600" }) => (
+      <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${color}`}>
+        {children}
+      </span>
+    );
+
+    // Updated CheckItem to support links
+    const CheckItem = ({ label, subtext, link }) => (
+      <li className="flex items-start gap-2">
+        <CheckCircle className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+        <div className="flex flex-col">
+            <span className="text-sm font-medium text-slate-700">{label}</span>
+            {subtext && (
+              link ? (
+                <a href={link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1">
+                  {subtext} ↗
+                </a>
+              ) : (
+                <span className="text-xs text-slate-500">{subtext}</span>
+              )
+            )}
+        </div>
+      </li>
+    );
+
+    const SummaryLine = ({ label, value, highlight }) => (
+      <div className="flex justify-between border-b border-slate-100 pb-1 mb-1">
+        <span className="text-slate-500 uppercase font-bold text-[10px] tracking-wider">{label}</span>
+        <span className={`font-bold text-sm ${highlight ? 'text-emerald-700' : 'text-slate-700'}`}>{value}</span>
+      </div>
+    );
+
+    // --- LOGIC DATA FROM MANUAL ---
+
+    const BAND_A_LIMIT = 500000;
+    const BAND_B_LIMIT = 5000000;
+    const BAND_C_LIMIT = 20000000;
+
+    const projectBands = {
+      A: { 
+        id: 'A', 
+        label: 'Band A: Minor Capital', 
+        range: '< €500k', 
+        description: 'Minor Capital Works / Infrastructural Risk',
+        appraisal: 'Simple Assessment (Appendix 3.1)',
+        approvalAuthority: 'Estates Manager (EM) / ANDE',
+        color: 'bg-emerald-600'
+      },
+      B: { 
+        id: 'B', 
+        label: 'Band B: Intermediate', 
+        range: '€500k - €5m', 
+        description: 'Single Appraisal (Preliminary & Detailed)',
+        appraisal: 'Single Appraisal (Appendix 3.2)',
+        approvalAuthority: 'Head of Estates (HoE) for Initiation',
+        color: 'bg-blue-600'
+      },
+      C: { 
+        id: 'C', 
+        label: 'Band C: Major Project', 
+        range: '€5m - €20m', 
+        description: 'Multi Criteria Analysis Required',
+        appraisal: 'Multi Criteria Analysis (Appendix 3.3)',
+        approvalAuthority: 'HoE (Board Approval >€10m for Tender)',
+        color: 'bg-amber-600'
+      },
+      D: { 
+        id: 'D', 
+        label: 'Band D: Strategic Project', 
+        range: '> €20m', 
+        description: 'Cost Benefit Analysis (CBA) Required',
+        appraisal: 'Full CBA / CEA (Public Spending Code)',
+        approvalAuthority: 'HSE Directorate / Board',
+        color: 'bg-purple-700'
+      }
+    };
+
+    // Table E Data from Manual (Summary of Approvals)
+    const getApprovalWorkflow = (band) => {
+      const workflow = [
+        { id: 'init', stage: 'Initiation Approval', authority: 'Head of Estates (HoE)' },
+        { id: 'pr1', stage: 'PR1: Engage Design Team', authority: band === 'A' ? 'Estates Manager (Recommendation)' : (band === 'B' ? 'ANDE' : 'HoE') },
+        { id: 'pr2', stage: 'PR2: Preliminary Design', authority: band === 'A' ? 'Estates Manager' : (band === 'B' ? 'ANDE' : (band === 'C' ? 'ANDE/HoE' : 'HoE')) },
+        { id: 'pr3', stage: 'PR3: Scheme Design', authority: band === 'A' ? 'Estates Manager' : (band === 'B' ? 'ANDE' : (band === 'C' ? 'HoE' : 'HoE')) },
+        { id: 'pr4', stage: 'PR4: Statutory Conditions', authority: band === 'A' ? 'Estates Manager' : 'ANDE' },
+        { id: 'pr5', stage: 'PR5: Detailed Design & Tender', authority: band === 'A' ? 'Estates Manager' : (band === 'B' ? 'ANDE' : 'HoE') },
+        { id: 'pr6', stage: 'PR6: Approval to Accept Tender', authority: band === 'A' ? 'Estates Manager' : (band === 'B' ? 'ANDE' : (band === 'C' ? 'HoE (>10m Board)' : 'Board')) },
+        { id: 'pr7', stage: 'PR7: Final Account', authority: band === 'A' ? 'Estates Manager' : (band === 'B' ? 'ANDE' : (band === 'C' ? 'HoE' : 'HoE')) }
+      ];
+      return workflow;
+    };
+
+    // --- MAIN APP ---
+
+    function CapitalProjectsApp() {
+      // --- STATE ---
+      
+      const [details, setDetails] = useState({
+        name: '',
+        location: '',
+        manager: '',
+        cost: '', // Stored as raw number string "10000"
+        description: '',
+        date: new Date().toISOString().split('T')[0],
+      });
+
+      const [calculatedBand, setCalculatedBand] = useState(null);
+      const [workflowStatus, setWorkflowStatus] = useState({});
+
+      // --- HELPERS ---
+      
+      // Add commas for display: 1000000 -> 1,000,000
+      const formatNumber = (val) => {
+        if (!val) return '';
+        // Split decimal part if exists
+        const parts = val.split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        return parts.join('.');
+      };
+
+      const handleCostChange = (e) => {
+        // Strip commas to get the raw value for state/calculations
+        const rawValue = e.target.value.replace(/,/g, '');
+        
+        // Only update if it's a valid number (or empty/incomplete number like "10.")
+        if (rawValue === '' || /^\d*\.?\d*$/.test(rawValue)) {
+          setDetails({ ...details, cost: rawValue });
+        }
+      };
+
+      // --- EFFECT: CALCULATION ENGINE ---
+      useEffect(() => {
+        const cost = parseFloat(details.cost);
+        if (!isNaN(cost) && cost > 0) {
+          if (cost < BAND_A_LIMIT) setCalculatedBand('A');
+          else if (cost < BAND_B_LIMIT) setCalculatedBand('B');
+          else if (cost < BAND_C_LIMIT) setCalculatedBand('C');
+          else setCalculatedBand('D');
+        } else {
+          setCalculatedBand(null);
+        }
+      }, [details.cost]);
+
+      const handleWorkflowToggle = (id) => {
+        setWorkflowStatus(prev => ({
+          ...prev,
+          [id]: !prev[id]
+        }));
+      };
+
+      // --- ACTIONS ---
+
+      const handlePrint = () => window.print();
+
+      const handleSave = () => {
+        const data = {
+          projectDetails: details,
+          classification: { 
+            band: calculatedBand, 
+            info: calculatedBand ? projectBands[calculatedBand] : null 
+          },
+          workflow: workflowStatus,
+          meta: { createdBy: details.manager, date: new Date().toISOString() }
+        };
+        
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${details.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'capital_project'}_assessment.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
+      return (
+        <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20 print:pb-0 print:bg-white">
+          
+          {/* HEADER */}
+          <header className="bg-emerald-900 text-white p-4 shadow-md sticky top-0 z-50 print:hidden">
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="bg-white p-1.5 rounded-lg shadow-sm">
+                  <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-8 w-auto" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold tracking-tight">HBS Estates Assessment Tool</h1>
+                  <div className="flex gap-2">
+                     <Badge color="bg-emerald-800 text-emerald-100">Capital Projects Manual 2018</Badge>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-3 w-full md:w-auto">
+                <input 
+                  type="text" 
+                  placeholder="Project Name..." 
+                  value={details.name}
+                  onChange={(e) => setDetails({...details, name: e.target.value})}
+                  className="px-3 py-1.5 rounded text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white/90 w-full md:w-64"
+                />
+                <button onClick={handleSave} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm font-medium transition-colors">
+                  <Save className="w-4 h-4" /> Save
+                </button>
+                <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-white text-emerald-900 hover:bg-emerald-50 rounded text-sm font-bold transition-colors shadow-sm">
+                  <Printer className="w-4 h-4" /> Print
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-7xl mx-auto p-4 md:p-6">
+            
+            {/* PRINT ONLY HEADER */}
+            <div className="hidden print:flex justify-between items-start mb-8 border-b-4 border-emerald-600 pb-4">
+               <div className="flex items-center gap-6">
+                  <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-16 w-auto" />
+                  <div>
+                     <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tight">Capital Project Assessment</h1>
+                     <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">{details.name || 'Draft Project'}</p>
+                  </div>
+               </div>
+               <div className="text-right">
+                  <p className="text-xs font-black text-slate-400 uppercase">Assessment Date</p>
+                  <p className="text-lg font-bold">{new Date(details.date).toLocaleDateString('en-GB')}</p>
+               </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* LEFT COLUMN: INPUTS */}
+              <div className="lg:col-span-4 space-y-6 input-column">
+                
+                <Card className="p-5">
+                  <SectionHeader title="Project Details" icon={Building} />
+                  <div className="space-y-4">
+                    <div>
+                      <label className="label-text">Project Name</label>
+                      <input type="text" className="input-field" value={details.name} onChange={(e) => setDetails({...details, name: e.target.value})} placeholder="e.g. Ward Block Ext..." />
+                    </div>
+                    <div>
+                      <label className="label-text">Project Location</label>
+                      <input type="text" className="input-field" value={details.location} onChange={(e) => setDetails({...details, location: e.target.value})} placeholder="e.g. Cork University Hospital" />
+                    </div>
+                    <div>
+                      <label className="label-text">Estates Manager / PM</label>
+                      <input type="text" className="input-field" value={details.manager} onChange={(e) => setDetails({...details, manager: e.target.value})} placeholder="Manager Name" />
+                    </div>
+                    <div>
+                      <label className="label-text">Project Date</label>
+                      <input type="date" className="input-field" value={details.date} onChange={(e) => setDetails({...details, date: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="label-text">Brief Description</label>
+                        <textarea className="input-field h-24" value={details.description} onChange={(e) => setDetails({...details, description: e.target.value})} placeholder="Scope of works..."></textarea>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="p-5 border-emerald-200 ring-4 ring-emerald-50">
+                  <SectionHeader title="Financial Input" icon={Euro} color="text-emerald-700" />
+                  <div className="space-y-2">
+                    <label className="label-text">Estimated Total Project Cost (Ex VAT)</label>
+                    <div className="relative">
+                        <input 
+                            type="text" 
+                            className="input-field pl-10 font-bold text-lg" 
+                            value={formatNumber(details.cost)} 
+                            onChange={handleCostChange} 
+                            placeholder="0.00" 
+                        />
+                        <span className="absolute left-3 top-2.5 text-slate-500 font-bold pointer-events-none z-10">€</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 italic mt-1">
+                        Includes: Construction, Enabling Works, Design Fees, Equipping, Site Costs, etc.
+                    </p>
+                  </div>
+                </Card>
+              </div>
+
+              {/* RIGHT COLUMN: REPORT & WORKFLOW */}
+              <div className="lg:col-span-8 report-column space-y-6">
+                
+                {/* Risk Class Banner */}
+                {calculatedBand ? (
+                  <div className={`p-6 rounded-2xl shadow-lg flex flex-col md:flex-row justify-between items-center text-white ${projectBands[calculatedBand].color}`}>
+                    <div>
+                      <span className="text-xs font-black uppercase tracking-widest opacity-80 mb-1">Project Classification</span>
+                      <div className="text-4xl font-black tracking-tight flex items-center gap-3">
+                        <AlertTriangle className="w-10 h-10 opacity-80" />
+                        {projectBands[calculatedBand].label.split(':')[0]}
+                      </div>
+                      <div className="text-sm font-bold opacity-90 mt-1">{projectBands[calculatedBand].range}</div>
+                      <div className="text-xs font-medium opacity-80 mt-1">{projectBands[calculatedBand].description}</div>
+                    </div>
+                    <div className="mt-4 md:mt-0 bg-white/10 p-4 rounded-lg backdrop-blur-sm border border-white/20 max-w-xs text-xs font-medium">
+                      <strong>Appraisal Requirement:</strong><br/>
+                      {projectBands[calculatedBand].appraisal}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-slate-100 border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center text-slate-400 no-print">
+                    <Euro className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p className="font-bold">
+                        Enter Total Project Cost to Determine Band & Workflow
+                    </p>
+                  </div>
+                )}
+
+                {/* Workflow Dashboard */}
+                {calculatedBand && (
+                  <div className="space-y-6">
+                    
+                    {/* 1. Procedural Checks */}
+                    <Card className="p-6 border-l-4 border-l-blue-500">
+                      <SectionHeader title="Appraisal & Governance Requirements" icon={ClipboardCheck} color="text-blue-700" />
+                      <ul className="grid md:grid-cols-2 gap-4 text-sm text-slate-700">
+                          <CheckItem label="Project Brief" subtext="Define objectives, scope, constraints." />
+                          
+                          {/* LINKS TO APPENDICES - PLACEHOLDERS ADDED */}
+                          {calculatedBand === 'A' && <CheckItem label="Simple Assessment" subtext="Appendix 3.1 Template required." link="#" />}
+                          {calculatedBand === 'B' && <CheckItem label="Single Appraisal" subtext="Preliminary & Detailed combined (Appendix 3.2)." link="#" />}
+                          {calculatedBand === 'C' && <CheckItem label="Multi-Criteria Analysis" subtext="Detailed analysis required (Appendix 3.3)." link="#" />}
+                          {calculatedBand === 'D' && <CheckItem label="Cost Benefit Analysis (CBA)" subtext="Required. Submit to DPER for review." link="#" />}
+                          
+                          <CheckItem label="Q-Cost Estimate" subtext="Projected final project costs." />
+                          <CheckItem label="Revenue Costs Template" subtext="Appendix 3.6 (Staffing/Running costs)." link="#" />
+                      </ul>
+                    </Card>
+
+                    {/* 2. Interactive Workflow */}
+                    <Card className="p-6 border-l-4 border-l-emerald-500">
+                      <SectionHeader title="Project Review (PR) & Approval Protocol" icon={ArrowRight} color="text-emerald-700" />
+                      
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                    <th className="px-4 py-3">Stage</th>
+                                    <th className="px-4 py-3">Approval Authority</th>
+                                    <th className="px-4 py-3 text-center no-print">Complete</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {getApprovalWorkflow(calculatedBand).map((step, idx) => (
+                                    <tr key={step.id} className={`border-b border-slate-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                                        <td className="px-4 py-3 font-medium text-slate-800">{step.stage}</td>
+                                        <td className="px-4 py-3 text-slate-600">
+                                            <Badge>{step.authority}</Badge>
+                                        </td>
+                                        <td className="px-4 py-3 text-center no-print">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={!!workflowStatus[step.id]} 
+                                                onChange={() => handleWorkflowToggle(step.id)}
+                                                className="w-5 h-5 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer" 
+                                            />
+                                        </td>
+                                        {/* Print checkmark equivalent */}
+                                        <td className="hidden print:table-cell px-4 py-3 text-center">
+                                            <div className="w-4 h-4 border border-slate-400 inline-block rounded-sm">
+                                                {workflowStatus[step.id] ? '✓' : ''}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                      </div>
+                      <div className="mt-4 p-3 bg-emerald-50 text-emerald-800 text-xs rounded border border-emerald-100">
+                        <strong>Note:</strong> All contractual commitments must be preceded by a Purchase Order on the Capital Management System. 
+                        Approvals above reflect the specific thresholds for Band {calculatedBand} projects.
+                      </div>
+                    </Card>
+
+                    {/* Final Summary Card */}
+                    <Card className="p-6 bg-slate-50 border-slate-100">
+                        <SectionHeader title="Assessment Summary" icon={FileText} />
+                        <div className="text-xs space-y-2">
+                          <SummaryLine label="Project Name" value={details.name} />
+                          <SummaryLine label="Estimated Cost" value={`€${parseFloat(details.cost || 0).toLocaleString('en-GB')}`} />
+                          <SummaryLine label="Project Band" value={`${projectBands[calculatedBand].label}`} highlight />
+                          <div className="pt-2 border-t border-slate-200 mt-2"></div>
+                          <SummaryLine label="Initiation Approval" value={projectBands[calculatedBand].approvalAuthority} />
+                          <SummaryLine label="Tender Approval" value={calculatedBand === 'D' || (calculatedBand === 'C' && parseFloat(details.cost) > 10000000) ? 'HSE Board' : 'Head of Estates'} />
+                        </div>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Signature Block (Print Only) */}
+                <div className="hidden print:block mt-12 pt-8 border-t border-slate-200">
+                   <div className="grid grid-cols-2 gap-12">
+                      <div>
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8">Estates Manager / Project Manager</p>
+                         <div className="h-px bg-slate-300 w-full"></div>
+                         <p className="text-xs mt-1 text-slate-500">Signature</p>
+                      </div>
+                      <div>
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8">Assistant National Director (Estates)</p>
+                         <div className="h-px bg-slate-300 w-full"></div>
+                         <p className="text-xs mt-1 text-slate-500">Signature</p>
+                      </div>
+                   </div>
+                </div>
+
+              </div>
+            </div>
+           
+            {/* FOOTER */}
+            <footer className="mt-12 text-center text-slate-400 print:hidden">
+               <p className="text-xs font-medium">HBS Estates Capital Projects Manual</p>
+               <p className="text-[10px] mt-1 opacity-60 mb-4">Based on June 2018 Protocol</p>
+               
+               <div className="pt-4 border-t border-slate-200/50 mx-auto max-w-lg">
+                 <p className="text-xs font-bold text-slate-500">Created by Dave Maher</p>
+                 <p className="text-[10px] mt-1 leading-relaxed opacity-70">
+                   All intellectual property rights associated with this application, its calculation logic, 
+                   and its interface design belong to Dave Maher. &copy; 2026
+                 </p>
+               </div>
+            </footer>
+
+          </main>
+
+          <style>{`
+            .label-text { display: block; font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 0.25rem; }
+            .input-field { width: 100%; padding: 0.5rem; font-size: 0.875rem; border: 1px solid #e2e8f0; border-radius: 0.375rem; outline: none; transition: border-color 0.2s; }
+            .input-field:focus { border-color: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1); }
+            @media print {
+              body { background: white; }
+              .print\\:hidden { display: none !important; }
+              .print\\:block { display: block !important; }
+              .print\\:table-cell { display: table-cell !important; }
+            }
+          `}</style>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<CapitalProjectsApp />);
+  </script>
+</body>
+</html>
