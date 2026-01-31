@@ -77,6 +77,24 @@
         const getHoursArray = () => Array.from({length: 11}, (_, i) => i + 8); 
         const isOverlapping = (startA, endA, startB, endB) => startA < endB && endA > startB;
 
+        // New Helper for Relative Time
+        const getRelativeTime = (date) => {
+            const now = new Date();
+            const diff = date - now;
+            if (diff <= 0) return 'now';
+            
+            const mins = Math.floor(diff / 60000);
+            const hrs = Math.floor(mins / 60);
+            const days = Math.floor(hrs / 24);
+
+            if (mins < 60) return `in ${mins} mins`;
+            if (hrs < 24) {
+                const remMins = mins % 60;
+                return `in ${hrs} hrs${remMins > 0 ? ` ${remMins} mins` : ''}`;
+            }
+            return `in ${days} day${days !== 1 ? 's' : ''}`;
+        };
+
         const generateICS = (booking, roomName) => {
             const formatDateICS = (date) => date.toISOString().replace(/-|:|\.\d+/g, "");
             const icsContent = [
@@ -243,7 +261,7 @@
             );
         };
 
-        // --- NEW COMPONENT: Meeting Room Status Box ---
+        // --- UPDATED COMPONENT: Meeting Room Status Box ---
         const MeetingRoomWidget = ({ bookings }) => {
             const now = new Date();
             const mrId = 'mr1'; // Hardcoded for Meeting Room 01
@@ -266,7 +284,9 @@
                     <div className="mt-4 pt-4 border-t border-black/5">
                         {current ? (
                             <div className="text-sm text-orange-800">
-                                <div className="font-bold flex items-center gap-1"><Icon name="clock" size={14}/> Free at: {formatTime(current.end)}</div>
+                                <div className="font-bold flex items-center gap-1">
+                                    <Icon name="clock" size={14}/> Free at: {formatTime(current.end)} ({getRelativeTime(current.end)})
+                                </div>
                                 <div className="text-xs opacity-75 mt-1 truncate">Current: {current.title}</div>
                             </div>
                         ) : (
@@ -274,9 +294,9 @@
                                 {next ? (
                                     <>
                                         <div className="font-bold flex items-center gap-1">
-                                            <Icon name="calendar-clock" size={14}/> Next: {formatTime(next.start)}
-                                            {new Date(next.start).toDateString() !== now.toDateString() && <span className="text-xs font-normal ml-1 opacity-80">({new Date(next.start).toLocaleDateString('en-GB', {weekday:'short'})})</span>}
+                                            <Icon name="calendar-clock" size={14}/> Next booking: {formatTime(next.start)}
                                         </div>
+                                        <div className="text-xs font-bold mt-0.5 mb-1 ml-5 opacity-90">({getRelativeTime(next.start)})</div>
                                         <div className="text-xs opacity-75 mt-1 truncate">{next.title}</div>
                                     </>
                                 ) : (
@@ -408,6 +428,7 @@
             const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
             const [searchQuery, setSearchQuery] = useState('');
             const [typeFilter, setTypeFilter] = useState('All');
+            const [currentTime, setCurrentTime] = useState(new Date()); // Live Clock State
             
             const [newBooking, setNewBooking] = useState({
                 title: '', organiser: '', roomId: '',
@@ -438,6 +459,12 @@
                     (err) => { setIsLoading(false); setLoadingError(err.message); }
                 );
                 return () => unsubscribe();
+            }, []);
+
+            // 30-Second Refresh Timer (Updates Clock & Relative Times)
+            useEffect(() => {
+                const timer = setInterval(() => setCurrentTime(new Date()), 30000);
+                return () => clearInterval(timer);
             }, []);
 
             // Helper to generate recurrence dates
@@ -568,14 +595,24 @@
                 <div className="min-h-screen flex flex-col">
                     {/* NAV */}
                     <nav className="bg-hse-primary text-white shadow-lg sticky top-0 z-50">
-                        <div className="px-6 py-4 flex justify-between items-center">
-                            <div className="flex items-center gap-4">
-                                <div className="bg-white p-1.5 rounded-lg">
-                                    <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-8" />
+                        <div className="px-4 py-3 md:px-6 md:py-4 flex justify-between items-center">
+                            <div className="flex items-center gap-3 md:gap-4">
+                                <div className="bg-white p-1 md:p-1.5 rounded-lg shrink-0">
+                                    <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-6 md:h-8" />
                                 </div>
                                 <div>
-                                    <h1 className="text-xl font-bold leading-tight">HSE Capital & Estates</h1>
-                                    <p className="text-xs text-emerald-100 opacity-80 uppercase tracking-widest">Resource Booking</p>
+                                    <h1 className="text-sm md:text-xl font-bold leading-tight">HSE Capital & Estates</h1>
+                                    <p className="text-[10px] md:text-xs text-emerald-100 opacity-80 uppercase tracking-widest hidden sm:block">Resource Booking</p>
+                                </div>
+                            </div>
+                            
+                            {/* LIVE CLOCK DISPLAY - Made visible on mobile */}
+                            <div className="text-right">
+                                <div className="text-lg md:text-2xl font-bold leading-none">
+                                    {currentTime.toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'})}
+                                </div>
+                                <div className="text-[10px] md:text-xs text-emerald-100 opacity-80 uppercase tracking-widest">
+                                    {currentTime.toLocaleDateString('en-GB', {weekday: 'short', day: 'numeric', month: 'short'})}
                                 </div>
                             </div>
                         </div>
