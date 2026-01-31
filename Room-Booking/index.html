@@ -5,20 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HSE Resource Booking</title>
     
-    <!-- Tailwind CSS (Styling) -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- React & ReactDOM (The Engine) -->
+    <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    <!-- Babel (Translates code for browser) -->
+    <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- HSE Styling Overrides -->
+    <!-- HSE Styling -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
@@ -26,26 +26,22 @@
         .text-hse-primary { color: #006858; }
         .border-hse-primary { border-color: #006858; }
         .hover-bg-hse-dark:hover { background-color: #005548; }
-        .animate-fade-in-up { animation: fadeInUp 0.5s ease-out; }
-        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        /* Custom Scrollbar */
         .custom-scroll::-webkit-scrollbar { width: 6px; }
         .custom-scroll::-webkit-scrollbar-track { background: transparent; }
         .custom-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
+        .animate-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
 
-    <!-- MAIN APP SCRIPT -->
     <script type="text/babel" data-type="module">
-        // Import Firebase from CDN
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // --- FIREBASE CONFIGURATION (From your provided keys) ---
+        // --- FIREBASE CONFIGURATION ---
         const firebaseConfig = {
           apiKey: "AIzaSyA5V4lsX8yk8y9e6XmSDHzKrOn8xJS44Uo",
           authDomain: "bookingapp-7195d.firebaseapp.com",
@@ -56,17 +52,14 @@
           measurementId: "G-SB6NB7JWKB"
         };
 
-        // Initialize Firebase
         let app, auth, db;
         try {
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
-            
-            // Silent handshake to ensure database access (runs in background)
-            signInAnonymously(auth).catch(e => console.log("Silent connection mode", e));
+            signInAnonymously(auth).catch(console.error);
         } catch (e) {
-            console.error("Firebase init failed:", e);
+            console.error("Firebase Init Error", e);
         }
         
         const appId = 'hse-estates-main'; 
@@ -81,25 +74,320 @@
         // --- UTILS ---
         const formatTime = (date) => date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
         const formatDate = (date) => date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
-        const getHoursArray = () => Array.from({length: 11}, (_, i) => i + 8); // 8 to 18
+        const getHoursArray = () => Array.from({length: 11}, (_, i) => i + 8); 
         const isOverlapping = (startA, endA, startB, endB) => startA < endB && endA > startB;
 
-        // --- DATA ---
+        const generateICS = (booking, roomName) => {
+            const formatDateICS = (date) => date.toISOString().replace(/-|:|\.\d+/g, "");
+            const icsContent = [
+                "BEGIN:VCALENDAR",
+                "VERSION:2.0",
+                "BEGIN:VEVENT",
+                `DTSTART:${formatDateICS(booking.start)}`,
+                `DTEND:${formatDateICS(booking.end)}`,
+                `SUMMARY:${booking.title}`,
+                `DESCRIPTION:Organiser: ${booking.organiser}`,
+                `LOCATION:${roomName}`,
+                "END:VEVENT",
+                "END:VCALENDAR"
+            ].join("\n");
+            const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.setAttribute('download', `${booking.title}.ics`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        const getDurationOptions = () => {
+            const options = [];
+            for(let i = 30; i <= 480; i += 30) {
+                const hours = Math.floor(i / 60);
+                const mins = i % 60;
+                let label = "";
+                if(hours > 0) label += `${hours} hr${hours > 1 ? 's' : ''}`;
+                if(mins > 0) label += ` ${mins} mins`;
+                options.push({ value: i.toString(), label: label.trim() });
+            }
+            return options;
+        };
+
         const INITIAL_ROOMS = [
-            { id: 'mr1', name: 'Meeting Room 01', capacity: 8, amenities: ['Projector', 'Video Conf', 'Whiteboard'], type: 'Room', floor: '1st Floor', color: 'bg-hse-primary text-white' },
-            { id: 'hd1', name: 'Hot Desk 01', capacity: 1, amenities: ['Dual Monitor', 'Docking Station'], type: 'Desk', floor: 'Ground Floor', color: 'bg-emerald-50 text-hse-primary' },
-            { id: 'hd2', name: 'Hot Desk 02', capacity: 1, amenities: ['Dual Monitor', 'Docking Station'], type: 'Desk', floor: 'Ground Floor', color: 'bg-emerald-50 text-hse-primary' },
-            { id: 'hd3', name: 'Hot Desk 03', capacity: 1, amenities: ['Single Monitor', 'Standing Desk'], type: 'Desk', floor: 'Ground Floor', color: 'bg-emerald-50 text-hse-primary' },
+            { id: 'mr1', name: 'Meeting Room 01', capacity: 8, amenities: ['Projector', 'Video Conf'], type: 'Room', floor: '1st Floor', color: 'bg-hse-primary text-white' },
+            { id: 'hd1', name: 'Hot Desk 01', capacity: 1, amenities: ['Dual Monitor'], type: 'Desk', floor: 'Ground Floor', color: 'bg-emerald-50 text-hse-primary' },
+            { id: 'hd2', name: 'Hot Desk 02', capacity: 1, amenities: ['Dual Monitor'], type: 'Desk', floor: 'Ground Floor', color: 'bg-emerald-50 text-hse-primary' },
+            { id: 'hd3', name: 'Hot Desk 03', capacity: 1, amenities: ['Single Monitor'], type: 'Desk', floor: 'Ground Floor', color: 'bg-emerald-50 text-hse-primary' },
             { id: 'hd4', name: 'Hot Desk 04', capacity: 1, amenities: ['Single Monitor'], type: 'Desk', floor: 'Ground Floor', color: 'bg-emerald-50 text-hse-primary' },
-            { id: 'hd5', name: 'Hot Desk 05', capacity: 1, amenities: ['Quiet Zone', 'Laptop Only'], type: 'Desk', floor: 'Ground Floor', color: 'bg-emerald-50 text-hse-primary' },
+            { id: 'hd5', name: 'Hot Desk 05', capacity: 1, amenities: ['Quiet Zone'], type: 'Desk', floor: 'Ground Floor', color: 'bg-emerald-50 text-hse-primary' },
         ];
+
+        // --- CHART COMPONENTS (DASHBOARD) ---
+        
+        const OccupancyHeatmap = ({ bookings, rooms }) => {
+            const [filter, setFilter] = useState('All');
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+            const hours = [8, 10, 12, 14, 16];
+            
+            const targetRooms = rooms.filter(r => filter === 'All' || r.type === filter);
+            const totalCapacity = targetRooms.length;
+
+            const getHeatmapColor = (bookingsForSlot) => {
+                const count = bookingsForSlot.length;
+                const ratio = count / totalCapacity;
+                if (ratio === 0) return 'bg-slate-50 border-slate-100';
+                if (ratio < 0.3) return 'bg-emerald-100 border-emerald-200'; 
+                if (ratio < 0.6) return 'bg-[#00bfa5] border-[#009688] text-white';
+                return 'bg-hse-primary border-[#004d40] text-white';
+            };
+
+            const getSlotData = (dayIndex, hour) => {
+                const curr = new Date();
+                const first = curr.getDate() - curr.getDay() + 1;
+                const dayDate = new Date(curr.setDate(first + dayIndex));
+                dayDate.setHours(0,0,0,0);
+
+                const slotStart = new Date(dayDate); slotStart.setHours(hour);
+                const slotEnd = new Date(dayDate); slotEnd.setHours(hour + 2);
+
+                const count = bookings.filter(b => {
+                    if (filter !== 'All') {
+                         const roomType = rooms.find(r => r.id === b.roomId)?.type;
+                         if (roomType !== filter) return false;
+                    }
+                    const bStart = new Date(b.start);
+                    const bEnd = new Date(b.end);
+                    return isOverlapping(slotStart, slotEnd, bStart, bEnd);
+                }).length;
+
+                return { count, pct: Math.round((count/totalCapacity)*100) };
+            };
+
+            return (
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                            <Icon name="grid" size={18} className="text-hse-primary" /> Weekly Heatmap
+                        </h3>
+                        <div className="flex bg-slate-100 rounded-lg p-1">
+                            {['All', 'Room', 'Desk'].map(f => (
+                                <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${filter === f ? 'bg-white text-hse-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{f}s</button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <div className="min-w-[400px]">
+                            <div className="flex mb-2">
+                                <div className="w-16"></div>
+                                {hours.map(h => (<div key={h} className="flex-1 text-center text-xs font-bold text-slate-400 uppercase">{h}:00</div>))}
+                            </div>
+                            {days.map((day, dIdx) => (
+                                <div key={day} className="flex gap-2 mb-2 items-center h-10">
+                                    <div className="w-16 text-xs font-bold text-slate-600">{day}</div>
+                                    {hours.map(h => {
+                                        const data = getSlotData(dIdx, h);
+                                        return (
+                                            <div key={h} title={`${data.pct}% Utilisation`} className={`flex-1 h-full rounded-md border flex items-center justify-center text-xs font-bold transition-all hover:opacity-80 cursor-default ${getHeatmapColor(Array(data.count))}`}>
+                                                {data.count > 0 ? `${data.pct}%` : ''}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const UtilisationStats = ({ bookings, totalResources }) => {
+            const curr = new Date();
+            const first = curr.getDate() - curr.getDay() + 1;
+            const weekStart = new Date(curr.setDate(first)); weekStart.setHours(0,0,0,0);
+            const weekEnd = new Date(curr.setDate(first + 6)); weekEnd.setHours(23,59,59,999);
+
+            const weeklyBookings = bookings.filter(b => b.start >= weekStart && b.start <= weekEnd);
+            const totalCapacityHours = totalResources * 40; 
+            const bookedHours = weeklyBookings.reduce((acc, b) => acc + ((b.end - b.start) / 3600000), 0);
+            const weeklyUtil = Math.round((bookedHours / totalCapacityHours) * 100) || 0;
+            const avgUtil = Math.max(Math.round(weeklyUtil * 0.8), 10); 
+            const diff = weeklyUtil - avgUtil;
+
+            return (
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-full flex flex-col justify-between">
+                    <div>
+                        <h3 className="font-bold text-slate-800 mb-1 flex items-center gap-2"><Icon name="trending-up" size={18} className="text-hse-primary" /> Weekly Trend</h3>
+                        <p className="text-xs text-slate-500 mb-6">Utilisation vs running average</p>
+                    </div>
+                    <div className="flex items-end justify-between mb-4">
+                        <div>
+                            <div className="text-4xl font-bold text-slate-800">{weeklyUtil}%</div>
+                            <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-1">Current Week</div>
+                        </div>
+                        <div className={`text-right ${diff >= 0 ? 'text-emerald-600' : 'text-amber-500'}`}>
+                            <div className="text-lg font-bold flex items-center justify-end gap-1">{diff > 0 ? '+' : ''}{diff}% <Icon name={diff >= 0 ? 'arrow-up-right' : 'arrow-down-right'} size={16} /></div>
+                            <div className="text-xs font-medium">vs {avgUtil}% Average</div>
+                        </div>
+                    </div>
+                    <div className="space-y-3">
+                        <div>
+                            <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1"><span>THIS WEEK</span><span>TARGET: 80%</span></div>
+                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-hse-primary rounded-full transition-all duration-500" style={{ width: `${Math.min(weeklyUtil, 100)}%` }}></div></div>
+                        </div>
+                        <div>
+                             <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1"><span>RUNNING AVG</span></div>
+                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-300 rounded-full transition-all duration-500" style={{ width: `${Math.min(avgUtil, 100)}%` }}></div></div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- NEW COMPONENT: Meeting Room Status Box ---
+        const MeetingRoomWidget = ({ bookings }) => {
+            const now = new Date();
+            const mrId = 'mr1'; // Hardcoded for Meeting Room 01
+            
+            const current = bookings.find(b => b.roomId === mrId && now >= b.start && now <= b.end);
+            // Get next booking that starts in the future
+            const next = bookings.filter(b => b.roomId === mrId && b.start > now).sort((a,b) => a.start - b.start)[0];
+            
+            return (
+                <div className={`p-6 rounded-xl border shadow-sm flex flex-col justify-between h-full transition-colors ${current ? 'bg-orange-50 border-orange-100' : 'bg-emerald-50 border-emerald-100'}`}>
+                    <div>
+                        <h3 className={`font-bold text-sm uppercase tracking-wider mb-1 flex items-center gap-2 ${current ? 'text-orange-800' : 'text-emerald-800'}`}>
+                            <Icon name="presentation" size={16}/> Meeting Room 01
+                        </h3>
+                        <div className={`text-2xl font-bold ${current ? 'text-orange-600' : 'text-emerald-600'}`}>
+                            {current ? 'Occupied' : 'Available'}
+                        </div>
+                    </div>
+                    
+                    <div className="mt-4 pt-4 border-t border-black/5">
+                        {current ? (
+                            <div className="text-sm text-orange-800">
+                                <div className="font-bold flex items-center gap-1"><Icon name="clock" size={14}/> Free at: {formatTime(current.end)}</div>
+                                <div className="text-xs opacity-75 mt-1 truncate">Current: {current.title}</div>
+                            </div>
+                        ) : (
+                            <div className="text-sm text-emerald-800">
+                                {next ? (
+                                    <>
+                                        <div className="font-bold flex items-center gap-1">
+                                            <Icon name="calendar-clock" size={14}/> Next: {formatTime(next.start)}
+                                            {new Date(next.start).toDateString() !== now.toDateString() && <span className="text-xs font-normal ml-1 opacity-80">({new Date(next.start).toLocaleDateString('en-GB', {weekday:'short'})})</span>}
+                                        </div>
+                                        <div className="text-xs opacity-75 mt-1 truncate">{next.title}</div>
+                                    </>
+                                ) : (
+                                    <span className="opacity-75 flex items-center gap-1"><Icon name="check-circle" size={14}/> No upcoming meetings</span>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const TopOrganisersChart = ({ bookings }) => {
+            const organisers = {};
+            bookings.forEach(b => { 
+                if(b.organiser) organisers[b.organiser] = (organisers[b.organiser] || 0) + 1; 
+            });
+            const topList = Object.entries(organisers).sort((a,b) => b[1] - a[1]).slice(0, 5);
+
+            return (
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-full">
+                    <h4 className="font-bold text-slate-700 text-sm mb-4 flex items-center gap-2">
+                        <Icon name="crown" size={16} className="text-hse-primary"/> Top Organisers
+                    </h4>
+                    <div className="space-y-3">
+                        {topList.map(([name, count], i) => (
+                            <div key={i} className="flex items-center gap-3">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${i===0 ? 'bg-yellow-100 text-yellow-700' : i===1 ? 'bg-slate-200 text-slate-600' : i===2 ? 'bg-orange-100 text-orange-700' : 'bg-slate-50 text-slate-400'}`}>
+                                    {i+1}
+                                </div>
+                                <div className="flex-1">
+                                    <div className="flex justify-between text-xs font-medium text-slate-700">
+                                        <span className="truncate max-w-[120px]">{name}</span>
+                                        <span className="font-bold">{count}</span>
+                                    </div>
+                                    <div className="w-full bg-slate-50 h-1.5 rounded-full mt-1">
+                                        <div className="bg-hse-primary h-full rounded-full opacity-60" style={{width: `${(count/Math.max(topList[0][1], 1))*100}%`}}></div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        {topList.length === 0 && <p className="text-xs text-slate-400 italic">No data available.</p>}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- CHART COMPONENTS (SCHEDULE) ---
+
+        const ScheduleAnalytics = ({ bookings }) => {
+            const now = new Date();
+            const weekAheadDaily = [];
+            for (let i=0; i<7; i++) {
+                const d = new Date(); d.setDate(d.getDate() + i); d.setHours(0,0,0,0);
+                const count = bookings.filter(b => {
+                    const bDate = new Date(b.start); bDate.setHours(0,0,0,0);
+                    return bDate.getTime() === d.getTime();
+                }).length;
+                weekAheadDaily.push({ day: d.toLocaleDateString('en-GB', {weekday:'short'}), count });
+            }
+
+            const total = bookings.length || 1;
+            const internal = bookings.filter(b => b.type === 'Internal').length;
+            const external = bookings.filter(b => b.type === 'External').length;
+
+            return (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 pt-6 border-t border-slate-100">
+                    {/* Internal Split */}
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <h4 className="font-bold text-slate-700 text-sm mb-4 flex items-center gap-2">
+                            <Icon name="pie-chart" size={16} className="text-hse-primary"/> Booking Type Split
+                        </h4>
+                        <div className="flex h-6 rounded-full overflow-hidden w-full bg-slate-100 mb-2">
+                            <div className="bg-hse-primary h-full transition-all" style={{width: `${(internal/total)*100}%`}}></div>
+                            <div className="bg-amber-400 h-full transition-all" style={{width: `${(external/total)*100}%`}}></div>
+                        </div>
+                        <div className="flex justify-between text-xs font-bold">
+                            <span className="text-hse-primary flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-hse-primary"></div> {Math.round((internal/total)*100)}% Internal</span>
+                            <span className="text-amber-500 flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-amber-400"></div> {Math.round((external/total)*100)}% External</span>
+                        </div>
+                    </div>
+
+                    {/* Volume */}
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <h4 className="font-bold text-slate-700 text-sm mb-4 flex items-center gap-2">
+                            <Icon name="bar-chart-2" size={16} className="text-hse-primary"/> Volume: Next 7 Days
+                        </h4>
+                        <div className="flex items-end justify-between h-24 gap-2">
+                            {weekAheadDaily.map((d, i) => (
+                                <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
+                                    <div className="w-full bg-emerald-100 rounded-t-sm relative transition-all group-hover:bg-emerald-200" style={{height: `${Math.max((d.count/8)*100, 10)}%`}}>
+                                        {d.count > 0 && <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] font-bold text-hse-primary">{d.count}</span>}
+                                    </div>
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase">{d.day}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Reuse Top Organisers Logic */}
+                    <TopOrganisersChart bookings={bookings} />
+                </div>
+            )
+        };
 
         // --- COMPONENTS ---
         const Modal = ({ isOpen, onClose, title, children }) => {
             if (!isOpen) return null;
             return (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border-t-4 border-hse-primary animate-fade-in-up">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border-t-4 border-hse-primary animate-in">
                         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                             <h3 className="font-bold text-lg text-hse-primary">{title}</h3>
                             <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><Icon name="x" /></button>
@@ -110,7 +398,7 @@
             );
         };
 
-        // --- MAIN APPLICATION ---
+        // --- MAIN APP ---
         function App() {
             const [activeTab, setActiveTab] = useState('dashboard');
             const [selectedDate, setSelectedDate] = useState(new Date());
@@ -124,16 +412,17 @@
             const [newBooking, setNewBooking] = useState({
                 title: '', organiser: '', roomId: '',
                 date: new Date().toISOString().split('T')[0],
-                startTime: '09:00', duration: '60', type: 'Internal'
+                startTime: '09:00', duration: '60', type: 'Internal',
+                recurrence: 'None', // None, Daily, Weekly, BiWeekly, Monthly
+                repeatUntil: ''
             });
 
             const [conflict, setConflict] = useState(null);
             const [notification, setNotification] = useState(null);
 
-            // DATA FETCHING (Immediate, no login required)
+            // Fetch Data
             useEffect(() => {
-                const unsubscribeData = onSnapshot(
-                    collection(db, 'artifacts', appId, 'public', 'data', 'bookings'), 
+                const unsubscribe = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'bookings'), 
                     (snapshot) => {
                         const loaded = snapshot.docs.map(doc => {
                             const data = doc.data();
@@ -145,44 +434,75 @@
                         });
                         setBookings(loaded);
                         setIsLoading(false);
-                        setLoadingError(null);
                     },
-                    (err) => {
-                        console.error("Data Error:", err);
-                        // Friendly error if permission denied
-                        let msg = err.message;
-                        if (msg.includes("permission-denied")) {
-                             msg = "Database access denied. Please ensure your Firestore Rules are set to 'Test Mode' or 'Allow Public Read/Write'.";
-                        }
-                        setLoadingError(msg);
-                        setIsLoading(false);
-                    }
+                    (err) => { setIsLoading(false); setLoadingError(err.message); }
                 );
-                return () => unsubscribeData();
+                return () => unsubscribe();
             }, []);
 
-            // Conflict Detection
+            // Helper to generate recurrence dates
+            const getRecurringDates = () => {
+                if (!newBooking.date) return [];
+                const dates = [];
+                const start = new Date(newBooking.date);
+                if (newBooking.recurrence === 'None' || !newBooking.repeatUntil) {
+                    return [start];
+                }
+
+                const endRepeat = new Date(newBooking.repeatUntil);
+                endRepeat.setHours(23, 59, 59);
+                
+                let curr = new Date(start);
+                
+                while (curr <= endRepeat) {
+                    if (newBooking.recurrence === 'Daily') {
+                        const day = curr.getDay();
+                        if (day !== 0 && day !== 6) dates.push(new Date(curr));
+                        curr.setDate(curr.getDate() + 1);
+                    } else if (newBooking.recurrence === 'Weekly') {
+                        dates.push(new Date(curr));
+                        curr.setDate(curr.getDate() + 7);
+                    } else if (newBooking.recurrence === 'BiWeekly') {
+                        dates.push(new Date(curr));
+                        curr.setDate(curr.getDate() + 14);
+                    } else if (newBooking.recurrence === 'Monthly') {
+                        dates.push(new Date(curr));
+                        curr.setMonth(curr.getMonth() + 1);
+                    } else {
+                        break; 
+                    }
+                    if (dates.length > 50) break; 
+                }
+                return dates;
+            };
+
+            // Conflict Check - OPTIMIZED
             useEffect(() => {
                 if (!newBooking.roomId || !newBooking.date || !newBooking.startTime) {
                     setConflict(null); return;
                 }
-                const [h, m] = newBooking.startTime.split(':').map(Number);
-                const start = new Date(newBooking.date); start.setHours(h, m, 0, 0);
-                const end = new Date(start.getTime() + parseInt(newBooking.duration) * 60000);
                 
-                const found = bookings.find(b => b.roomId === newBooking.roomId && isOverlapping(start, end, b.start, b.end));
-                setConflict(found || null);
-            }, [newBooking, bookings]);
+                const proposedDates = getRecurringDates();
+                const [h, m] = newBooking.startTime.split(':').map(Number);
+                const durationMs = parseInt(newBooking.duration) * 60000;
 
-            // Notifications timer
-            useEffect(() => {
-                if(notification) {
-                    const t = setTimeout(() => setNotification(null), 3000);
-                    return () => clearTimeout(t);
+                for (let d of proposedDates) {
+                    const start = new Date(d); start.setHours(h, m, 0, 0);
+                    const end = new Date(start.getTime() + durationMs);
+                    
+                    const found = bookings.find(b => b.roomId === newBooking.roomId && isOverlapping(start, end, b.start, b.end));
+                    if (found) {
+                        setConflict({ ...found, conflictDate: d });
+                        return;
+                    }
                 }
-            }, [notification]);
+                setConflict(null);
+            }, [newBooking.roomId, newBooking.date, newBooking.startTime, newBooking.duration, newBooking.recurrence, newBooking.repeatUntil, bookings]);
 
-            // Derived Data
+            // Notification Timer
+            useEffect(() => { if(notification) { const t = setTimeout(() => setNotification(null), 3000); return () => clearTimeout(t); } }, [notification]);
+
+            // Stats Logic
             const filteredRooms = useMemo(() => INITIAL_ROOMS.filter(r => 
                 (r.name.toLowerCase().includes(searchQuery.toLowerCase()) || r.amenities.some(a => a.toLowerCase().includes(searchQuery.toLowerCase()))) &&
                 (typeFilter === 'All' || r.type === typeFilter)
@@ -192,67 +512,57 @@
                 const today = new Date().toDateString();
                 const todayBookings = bookings.filter(b => b.start.toDateString() === today);
                 const activeRes = new Set(todayBookings.map(b => b.roomId)).size;
+                const deskBookings = todayBookings.filter(b => INITIAL_ROOMS.find(r => r.id === b.roomId)?.type === 'Desk').length;
                 return {
                     total: todayBookings.length,
                     util: Math.round((activeRes / INITIAL_ROOMS.length) * 100),
-                    desk: todayBookings.filter(b => INITIAL_ROOMS.find(r => r.id === b.roomId)?.type === 'Desk').length,
+                    desk: deskBookings,
                     avail: INITIAL_ROOMS.length - activeRes
                 };
             }, [bookings]);
 
             const handleCreate = async (e) => {
                 e.preventDefault();
-                if (conflict) return setNotification({ type: 'error', message: 'Time unavailable.' });
-
+                if (conflict) return;
+                
+                const proposedDates = getRecurringDates();
                 const [h, m] = newBooking.startTime.split(':').map(Number);
-                const start = new Date(newBooking.date); start.setHours(h, m, 0, 0);
-                const end = new Date(start.getTime() + parseInt(newBooking.duration) * 60000);
+                const durationMs = parseInt(newBooking.duration) * 60000;
 
                 try {
-                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'bookings'), {
-                        roomId: newBooking.roomId, title: newBooking.title || 'Desk Booking',
-                        organiser: newBooking.organiser, type: newBooking.type,
-                        start: Timestamp.fromDate(start), end: Timestamp.fromDate(end),
-                        createdAt: Timestamp.now(), 
-                        createdBy: 'public_user' 
+                    const promises = proposedDates.map(date => {
+                        const start = new Date(date); start.setHours(h, m, 0, 0);
+                        const end = new Date(start.getTime() + durationMs);
+                        
+                        return addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'bookings'), {
+                            roomId: newBooking.roomId, title: newBooking.title || 'Desk Booking',
+                            organiser: newBooking.organiser, type: newBooking.type,
+                            start: Timestamp.fromDate(start), end: Timestamp.fromDate(end),
+                            createdAt: Timestamp.now(), createdBy: 'public'
+                        });
                     });
+
+                    await Promise.all(promises);
+                    
                     setIsBookingModalOpen(false);
-                    setNotification({ type: 'success', message: 'Booking Confirmed' });
-                    setNewBooking(prev => ({ ...prev, title: '', organiser: '' }));
+                    setNotification({ type: 'success', message: `${proposedDates.length} Booking(s) Confirmed` });
+                    setNewBooking(prev => ({ ...prev, title: '', organiser: '', recurrence: 'None', repeatUntil: '' }));
                 } catch(err) {
-                    console.error(err);
-                    setNotification({ type: 'error', message: 'Save Failed: ' + err.message });
+                    setNotification({ type: 'error', message: 'Error saving booking' });
                 }
             };
 
-            const getExistingBookingsForModal = () => {
-                if (!newBooking.roomId || !newBooking.date) return [];
-                return bookings.filter(b => b.roomId === newBooking.roomId && b.start.toDateString() === new Date(newBooking.date).toDateString()).sort((a,b) => a.start - b.start);
+            const handleDelete = async (id) => {
+                if(!confirm("Are you sure you want to cancel this booking?")) return;
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'bookings', id));
+                    setNotification({ type: 'success', message: 'Booking Cancelled' });
+                } catch(err) {
+                    setNotification({ type: 'error', message: 'Could not delete' });
+                }
             };
 
-            // LOADING STATE
-            if (isLoading) {
-                return (
-                    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-                        <div className="w-12 h-12 border-4 border-hse-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-                        <div className="text-hse-primary font-bold animate-pulse">Loading HSE Estates System...</div>
-                    </div>
-                );
-            }
-
-            // ERROR STATE
-            if (loadingError) {
-                return (
-                    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 text-center">
-                        <div className="bg-white p-8 rounded-xl shadow-lg max-w-md border border-red-200">
-                            <Icon name="alert-circle" size={48} className="text-red-500 mx-auto mb-4" />
-                            <h2 className="text-xl font-bold text-slate-800 mb-2">Connection Failed</h2>
-                            <p className="text-slate-600 mb-4">{loadingError}</p>
-                            <button onClick={() => window.location.reload()} className="px-6 py-2 bg-slate-200 hover:bg-slate-300 rounded font-bold text-slate-700">Retry</button>
-                        </div>
-                    </div>
-                );
-            }
+            if (isLoading) return <div className="min-h-screen flex items-center justify-center text-hse-primary font-bold animate-pulse">Loading HSE Estates...</div>;
 
             return (
                 <div className="min-h-screen flex flex-col">
@@ -283,90 +593,121 @@
 
                         {/* MAIN */}
                         <main className="flex-1 overflow-auto bg-slate-50/50 p-6">
-                            {/* ACTIONS BAR */}
+                            {/* ACTION BAR */}
                             <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                                 <h2 className="text-xl font-bold text-slate-800 hidden md:block">{activeTab === 'dashboard' ? 'Overview' : activeTab === 'schedule' ? 'Schedule' : 'Directory'}</h2>
-                                <div className="flex items-center gap-4 w-full md:w-auto">
-                                    <div className="relative flex-1 md:w-64">
-                                        <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                        <input type="text" placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-hse-primary" />
-                                    </div>
-                                    <button onClick={() => setIsBookingModalOpen(true)} className="bg-hse-primary hover-bg-hse-dark text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition transform active:scale-95 shrink-0">
-                                        <Icon name="plus" /> <span className="hidden sm:inline">New Booking</span>
-                                    </button>
-                                </div>
+                                <button onClick={() => setIsBookingModalOpen(true)} className="bg-hse-primary hover-bg-hse-dark text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition transform active:scale-95 shrink-0 ml-auto">
+                                    <Icon name="plus" /> <span className="hidden sm:inline">New Booking</span>
+                                </button>
                             </div>
 
                             {/* DASHBOARD */}
                             {activeTab === 'dashboard' && (
-                                <div className="space-y-6 animate-fade-in">
+                                <div className="space-y-6 animate-in">
+                                    {/* ROW 1: STATS */}
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400 uppercase">Bookings</p><h3 className="text-2xl font-bold">{stats.total}</h3></div>
+                                        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400 uppercase">Bookings Today</p><h3 className="text-2xl font-bold">{stats.total}</h3></div>
                                         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400 uppercase">Utilisation</p><h3 className="text-2xl font-bold">{stats.util}%</h3></div>
                                         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400 uppercase">Desks Used</p><h3 className="text-2xl font-bold">{stats.desk}</h3></div>
                                         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><p className="text-xs font-bold text-slate-400 uppercase">Free Now</p><h3 className="text-2xl font-bold">{stats.avail}</h3></div>
                                     </div>
-                                    
-                                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                                        <h3 className="font-bold text-slate-800 mb-4">Upcoming Schedule</h3>
-                                        <div className="space-y-2">
-                                            {bookings.sort((a,b) => a.start - b.start).slice(0, 5).map(b => (
-                                                <div key={b.id} className="flex gap-4 items-center p-2 hover:bg-slate-50 rounded">
-                                                    <div className="bg-emerald-50 text-hse-primary px-2 py-1 rounded text-xs font-bold min-w-[80px] text-center">{formatTime(b.start)} - {formatTime(b.end)}</div>
-                                                    <div>
-                                                        <div className="font-bold text-sm text-slate-800">{b.title}</div>
-                                                        <div className="text-xs text-slate-500">{INITIAL_ROOMS.find(r => r.id === b.roomId)?.name} • {b.organiser}</div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {bookings.length === 0 && <p className="text-slate-400 italic text-sm">No upcoming bookings today.</p>}
+
+                                    {/* ROW 2: HEATMAP & TREND */}
+                                    <div className="grid md:grid-cols-3 gap-6">
+                                        <div className="md:col-span-2">
+                                            <OccupancyHeatmap bookings={bookings} rooms={INITIAL_ROOMS} />
                                         </div>
+                                        <div>
+                                            <UtilisationStats bookings={bookings} totalResources={INITIAL_ROOMS.length} />
+                                        </div>
+                                    </div>
+
+                                    {/* ROW 3: MEETING ROOM STATUS + UPCOMING + LEADERBOARD */}
+                                    <div className="grid md:grid-cols-3 gap-6">
+                                        {/* Meeting Room Widget */}
+                                        <MeetingRoomWidget bookings={bookings} />
+
+                                        {/* Upcoming List */}
+                                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-full flex flex-col">
+                                            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Icon name="calendar" size={18} className="text-hse-primary" /> Upcoming Schedule</h3>
+                                            <div className="space-y-2 flex-1 overflow-y-auto custom-scroll pr-2 max-h-60">
+                                                {bookings.filter(b => b.start >= new Date(new Date().setHours(0,0,0,0))).sort((a,b) => a.start - b.start).map(b => (
+                                                    <div key={b.id} className="flex gap-4 items-center p-2 hover:bg-slate-50 rounded border-b border-slate-50 last:border-0 group">
+                                                        <div className="bg-emerald-50 text-hse-primary px-2 py-1 rounded text-xs font-bold min-w-[80px] text-center">
+                                                            {formatTime(b.start)}
+                                                            {/* UPDATED DATE FORMAT */}
+                                                            <div className="text-[10px] font-normal opacity-75">{new Date(b.start).toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'})}</div>
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <div className="font-bold text-sm text-slate-800">{b.title}</div>
+                                                            <div className="text-xs text-slate-500">{INITIAL_ROOMS.find(r => r.id === b.roomId)?.name} • {b.organiser}</div>
+                                                        </div>
+                                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button onClick={() => generateICS(b, INITIAL_ROOMS.find(r => r.id === b.roomId)?.name)} className="p-1 hover:bg-blue-50 text-blue-600 rounded" title="Add to Calendar"><Icon name="calendar-plus" size={16}/></button>
+                                                            <button onClick={() => handleDelete(b.id)} className="p-1 hover:bg-red-50 text-red-600 rounded" title="Delete Booking"><Icon name="trash-2" size={16}/></button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {bookings.length === 0 && <p className="text-slate-400 italic text-sm">No upcoming bookings.</p>}
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Leaderboard */}
+                                        <TopOrganisersChart bookings={bookings} />
                                     </div>
                                 </div>
                             )}
 
                             {/* SCHEDULE */}
                             {activeTab === 'schedule' && (
-                                <div className="h-[calc(100vh-200px)] flex flex-col">
-                                    <div className="flex justify-between items-center mb-4 bg-white p-2 rounded-lg border border-slate-200">
+                                <div className="animate-in flex flex-col space-y-6">
+                                    <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-200">
                                         <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()-1); setSelectedDate(d); }} className="p-1 hover:bg-slate-100 rounded"><Icon name="chevron-left" /></button>
                                         <span className="font-bold text-slate-700">{formatDate(selectedDate)}</span>
                                         <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()+1); setSelectedDate(d); }} className="p-1 hover:bg-slate-100 rounded"><Icon name="chevron-right" /></button>
                                     </div>
-                                    <div className="bg-white rounded-xl border border-slate-200 flex-1 overflow-auto relative custom-scroll">
-                                        <div className="min-w-[800px]">
-                                            <div className="grid grid-cols-[200px_1fr] border-b border-slate-200 sticky top-0 bg-white z-10">
-                                                <div className="p-4 font-bold text-sm text-slate-600 bg-slate-50">Resource</div>
-                                                <div className="grid grid-cols-11 bg-slate-50">{getHoursArray().map(h => <div key={h} className="p-4 text-xs font-bold text-slate-400 border-l border-slate-200 text-center">{h}:00</div>)}</div>
-                                            </div>
-                                            <div className="divide-y divide-slate-100">
-                                                {filteredRooms.map(r => (
-                                                    <div key={r.id} className="grid grid-cols-[200px_1fr] hover:bg-emerald-50/30 min-h-[70px]">
-                                                        <div className="p-4 text-sm font-bold text-slate-700 border-r border-slate-200 flex flex-col justify-center">{r.name}<span className="text-xs text-slate-400 font-normal">Cap: {r.capacity}</span></div>
-                                                        <div className="relative h-full">
-                                                            <div className="absolute inset-0 grid grid-cols-11 pointer-events-none">{getHoursArray().map(h => <div key={h} className="border-l border-slate-100 h-full"></div>)}</div>
-                                                            {bookings.filter(b => b.roomId === r.id && b.start.toDateString() === selectedDate.toDateString()).map(b => {
-                                                                const startH = b.start.getHours() + b.start.getMinutes()/60;
-                                                                const dur = (b.end - b.start)/3600000;
-                                                                return (
-                                                                    <div key={b.id} className="absolute top-2 bottom-2 rounded bg-hse-primary/10 border border-hse-primary/20 text-hse-primary text-[10px] font-bold p-1 overflow-hidden" 
-                                                                         style={{ left: `${((startH-8)/11)*100}%`, width: `${(dur/11)*100}%` }} title={b.title}>
-                                                                        {b.title}
-                                                                    </div>
-                                                                );
-                                                            })}
+                                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden relative min-h-[300px]">
+                                        <div className="overflow-x-auto">
+                                            <div className="min-w-[800px]">
+                                                <div className="grid grid-cols-[200px_1fr] border-b border-slate-200 bg-slate-50">
+                                                    <div className="p-4 font-bold text-sm text-slate-600">Resource</div>
+                                                    <div className="grid grid-cols-11">{getHoursArray().map(h => <div key={h} className="p-4 text-xs font-bold text-slate-400 border-l border-slate-200 text-center">{h}:00</div>)}</div>
+                                                </div>
+                                                <div className="divide-y divide-slate-100">
+                                                    {filteredRooms.map(r => (
+                                                        <div key={r.id} className="grid grid-cols-[200px_1fr] hover:bg-emerald-50/30 min-h-[70px]">
+                                                            <div className="p-4 text-sm font-bold text-slate-700 border-r border-slate-200 flex flex-col justify-center">{r.name}<span className="text-xs text-slate-400 font-normal">Cap: {r.capacity}</span></div>
+                                                            <div className="relative h-full">
+                                                                <div className="absolute inset-0 grid grid-cols-11 pointer-events-none">{getHoursArray().map(h => <div key={h} className="border-l border-slate-100 h-full"></div>)}</div>
+                                                                {bookings.filter(b => b.roomId === r.id && b.start.toDateString() === selectedDate.toDateString()).map(b => {
+                                                                    const startH = b.start.getHours() + b.start.getMinutes()/60;
+                                                                    const dur = (b.end - b.start)/3600000;
+                                                                    return (
+                                                                        <div key={b.id} className="absolute top-2 bottom-2 rounded bg-hse-primary/10 border border-hse-primary/20 text-hse-primary text-[10px] font-bold p-1 overflow-hidden group cursor-pointer hover:z-20 hover:scale-105 transition-all shadow-sm" 
+                                                                             style={{ left: `${((startH-8)/11)*100}%`, width: `${(dur/11)*100}%` }} title={b.title}>
+                                                                            <div className="truncate">{b.title}</div>
+                                                                            <div className="hidden group-hover:flex absolute top-0 right-0 bottom-0 bg-white/90 items-center px-1">
+                                                                                <button onClick={(e) => {e.stopPropagation(); handleDelete(b.id)}} className="text-red-600 p-1 hover:bg-red-100 rounded"><Icon name="trash-2" size={12}/></button>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
+                                    
+                                    {/* ANALYTICS SECTION */}
+                                    <ScheduleAnalytics bookings={bookings} />
                                 </div>
                             )}
 
                             {/* ROOMS */}
                             {activeTab === 'rooms' && (
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in">
                                     {filteredRooms.map(room => (
                                         <div key={room.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden group">
                                             <div className={`h-24 ${room.color.replace('text', 'bg').split(' ')[0]} flex items-center justify-center relative`}>
@@ -389,8 +730,12 @@
                     {/* MODAL */}
                     <Modal isOpen={isBookingModalOpen} onClose={() => setIsBookingModalOpen(false)} title="New Booking">
                         <form onSubmit={handleCreate} className="space-y-4">
-                            {conflict && <div className="bg-red-50 border-l-4 border-red-500 p-3 text-red-800 text-xs font-bold rounded animate-in fade-in">Conflict: Overlaps with "{conflict.title}"</div>}
+                            {conflict && <div className="bg-red-50 border-l-4 border-red-500 p-3 text-red-800 text-xs font-bold rounded animate-in">
+                                Conflict on {conflict.conflictDate ? new Date(conflict.conflictDate).toLocaleDateString('en-GB') : ''}: Overlaps with "{conflict.title}"
+                            </div>}
+                            
                             <div><label className="text-xs font-bold uppercase text-slate-500">Title</label><input required className="w-full p-2 border rounded font-medium focus:ring-2 ring-hse-primary outline-none" value={newBooking.title} onChange={e => setNewBooking({...newBooking, title: e.target.value})} placeholder="e.g. Team Sync" /></div>
+                            
                             <div><label className="text-xs font-bold uppercase text-slate-500">Resource</label>
                                 <select required className="w-full p-2 border rounded font-medium bg-white focus:ring-2 ring-hse-primary outline-none" value={newBooking.roomId} onChange={e => setNewBooking({...newBooking, roomId: e.target.value})}>
                                     <option value="">-- Select --</option>
@@ -398,25 +743,40 @@
                                     <optgroup label="Desks">{INITIAL_ROOMS.filter(r => r.type === 'Desk').map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</optgroup>
                                 </select>
                             </div>
+                            
                             <div className="grid grid-cols-2 gap-4">
                                 <div><label className="text-xs font-bold uppercase text-slate-500">Organiser</label><input required className="w-full p-2 border rounded font-medium focus:ring-2 ring-hse-primary outline-none" value={newBooking.organiser} onChange={e => setNewBooking({...newBooking, organiser: e.target.value})} /></div>
                                 <div><label className="text-xs font-bold uppercase text-slate-500">Type</label><select className="w-full p-2 border rounded font-medium bg-white" value={newBooking.type} onChange={e => setNewBooking({...newBooking, type: e.target.value})}><option>Internal</option><option>External</option></select></div>
                             </div>
+                            
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className="text-xs font-bold uppercase text-slate-500">Date</label><input required type="date" className="w-full p-2 border rounded font-medium focus:ring-2 ring-hse-primary outline-none" value={newBooking.date} onChange={e => setNewBooking({...newBooking, date: e.target.value})} /></div>
+                                <div><label className="text-xs font-bold uppercase text-slate-500">Start Date</label><input required type="date" className="w-full p-2 border rounded font-medium focus:ring-2 ring-hse-primary outline-none" value={newBooking.date} onChange={e => setNewBooking({...newBooking, date: e.target.value})} /></div>
                                 <div><label className="text-xs font-bold uppercase text-slate-500">Time</label><input required type="time" className="w-full p-2 border rounded font-medium focus:ring-2 ring-hse-primary outline-none" value={newBooking.startTime} onChange={e => setNewBooking({...newBooking, startTime: e.target.value})} /></div>
                             </div>
-                            <div><label className="text-xs font-bold uppercase text-slate-500">Duration (Mins)</label><div className="flex gap-2">{[30,60,90,120,480].map(m => <button type="button" key={m} onClick={() => setNewBooking({...newBooking, duration: m.toString()})} className={`flex-1 py-1 border rounded text-xs font-bold ${newBooking.duration === m.toString() ? 'bg-hse-primary text-white' : 'bg-white'}`}>{m}</button>)}</div></div>
                             
-                            {/* Visual Schedule Helper */}
-                            {newBooking.roomId && newBooking.date && (
-                                <div className="bg-slate-50 p-2 rounded border border-slate-200 mt-2">
-                                    <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Booked times for selected resource:</p>
-                                    <div className="flex flex-wrap gap-1">
-                                        {getExistingBookingsForModal().length > 0 ? getExistingBookingsForModal().map(b => (
-                                            <span key={b.id} className="text-[10px] bg-white border px-1 rounded text-slate-600">{formatTime(b.start)}-{formatTime(b.end)}</span>
-                                        )) : <span className="text-[10px] text-emerald-600">No bookings yet.</span>}
-                                    </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold uppercase text-slate-500">Duration</label>
+                                    <select className="w-full p-2 border rounded font-medium bg-white focus:ring-2 ring-hse-primary outline-none" value={newBooking.duration} onChange={e => setNewBooking({...newBooking, duration: e.target.value})}>
+                                        {getDurationOptions().map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold uppercase text-slate-500">Repeat?</label>
+                                    <select className="w-full p-2 border rounded font-medium bg-white focus:ring-2 ring-hse-primary outline-none" value={newBooking.recurrence} onChange={e => setNewBooking({...newBooking, recurrence: e.target.value})}>
+                                        <option value="None">No Repeat</option>
+                                        <option value="Daily">Daily (Mon-Fri)</option>
+                                        <option value="Weekly">Weekly</option>
+                                        <option value="BiWeekly">Bi-Weekly</option>
+                                        <option value="Monthly">Monthly</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {newBooking.recurrence !== 'None' && (
+                                <div className="animate-in">
+                                    <label className="text-xs font-bold uppercase text-slate-500">Repeat Until</label>
+                                    <input required type="date" className="w-full p-2 border rounded font-medium focus:ring-2 ring-hse-primary outline-none" value={newBooking.repeatUntil} onChange={e => setNewBooking({...newBooking, repeatUntil: e.target.value})} />
                                 </div>
                             )}
 
@@ -427,10 +787,8 @@
                         </form>
                     </Modal>
 
-                    {/* TOAST */}
-                    {notification && <div className={`fixed bottom-4 right-4 px-4 py-3 rounded shadow-lg text-white text-sm font-bold z-50 animate-fade-in-up ${notification.type === 'success' ? 'bg-hse-primary' : 'bg-red-500'}`}>{notification.message}</div>}
+                    {notification && <div className={`fixed bottom-4 right-4 px-4 py-3 rounded shadow-lg text-white text-sm font-bold z-50 animate-in ${notification.type === 'success' ? 'bg-hse-primary' : 'bg-red-500'}`}>{notification.message}</div>}
                     
-                    {/* FOOTER */}
                     <footer className="py-6 text-center border-t border-slate-200">
                         <p className="text-slate-600 font-bold text-sm">Created by Dave Maher</p>
                         <p className="text-[10px] text-slate-400 mt-1">HSE Capital & Estates • &copy; 2026</p>
