@@ -11,12 +11,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- React & Babel -->
-    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <!-- Icons -->
-    <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
@@ -211,14 +211,12 @@
             ];
 
             useEffect(() => {
-                // Defensive loading for icons
-                if (window.lucide && typeof window.lucide.createIcons === 'function') {
-                    window.lucide.createIcons();
-                } else {
-                    // Fallback retry if script loads slightly later
-                    setTimeout(() => {
-                        if (window.lucide) window.lucide.createIcons();
-                    }, 500);
+                if (window.lucide) {
+                    try {
+                        window.lucide.createIcons();
+                    } catch (e) {
+                        console.warn("Lucide icons failed to load:", e);
+                    }
                 }
             }, []);
 
