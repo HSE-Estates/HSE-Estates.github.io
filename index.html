@@ -11,237 +11,59 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- React & Babel -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <!-- Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
         
         body { 
             font-family: 'Inter', system-ui, -apple-system, sans-serif; 
             -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+            background-color: #f8fafc;
             color: #1e293b;
-            overflow-x: hidden;
         }
         
         :root {
             --hse-primary: #006858;
             --hse-secondary: #00bfa5;
             --hse-dark: #004d42;
-            --hse-light: #e6f7f5;
         }
 
-        /* Premium Background Pattern */
-        .pattern-bg {
-            background-image: 
-                radial-gradient(circle at 20% 80%, rgba(0, 104, 88, 0.03) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(0, 191, 165, 0.04) 0%, transparent 50%);
-        }
-
-        /* Gradient Header */
         .hse-gradient {
-            background: linear-gradient(135deg, #004d42 0%, #006858 50%, #00836f 100%);
-            position: relative;
-            overflow: hidden;
+            background: linear-gradient(135deg, var(--hse-primary) 0%, var(--hse-dark) 100%);
         }
 
-        .hse-gradient::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: radial-gradient(circle at 80% 20%, rgba(0, 191, 165, 0.15) 0%, transparent 60%);
-            pointer-events: none;
-        }
-
-        /* Premium Card Styling */
         .app-card {
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            background: white;
-            backdrop-filter: blur(10px);
-        }
-
-        .app-card::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border-radius: 1rem;
-            padding: 1px;
-            background: linear-gradient(135deg, rgba(0, 104, 88, 0.1), rgba(0, 191, 165, 0.1));
-            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            -webkit-mask-composite: xor;
-            mask-composite: exclude;
-            opacity: 0;
-            transition: opacity 0.4s;
-        }
-
-        .app-card:hover::before {
-            opacity: 1;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .app-card:hover {
-            transform: translateY(-8px) scale(1.02);
-            box-shadow: 
-                0 25px 50px -12px rgba(0, 104, 88, 0.15),
-                0 0 0 1px rgba(0, 191, 165, 0.1),
-                0 0 40px rgba(0, 191, 165, 0.1);
-            z-index: 10;
-        }
-
-        .app-card:hover .card-icon {
-            transform: scale(1.1) rotate(5deg);
-        }
-
-        .card-icon {
-            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-
-        /* Icon Glow Effect */
-        .icon-glow {
-            box-shadow: 0 4px 14px rgba(0, 104, 88, 0.15);
-        }
-
-        /* Premium Button */
-        .launch-button {
-            position: relative;
-            overflow: hidden;
-            font-weight: 700;
-            letter-spacing: 0.025em;
-        }
-
-        .launch-button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(0, 104, 88, 0.1), transparent);
-            transition: left 0.5s;
-        }
-
-        .launch-button:hover::before {
-            left: 100%;
-        }
-
-        /* Status Indicator Animation */
-        @keyframes statusPulse {
-            0%, 100% { 
-                opacity: 1;
-                transform: scale(1);
-            }
-            50% { 
-                opacity: 0.5;
-                transform: scale(1.2);
-            }
-        }
-
-        .status-dot {
-            animation: statusPulse 2s ease-in-out infinite;
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
         }
 
         /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 10px; }
-        ::-webkit-scrollbar-track { 
-            background: #f1f5f9; 
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb { 
-            background: linear-gradient(180deg, #006858, #00bfa5);
-            border-radius: 10px;
-            border: 2px solid #f1f5f9;
-        }
-        ::-webkit-scrollbar-thumb:hover { 
-            background: linear-gradient(180deg, #004d42, #006858);
-        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-        /* Staggered Fade In */
         .animate-fade-in {
-            animation: fadeInUp 0.6s ease-out forwards;
-            opacity: 0;
+            animation: fadeIn 0.6s ease-out forwards;
         }
 
-        .animate-fade-in:nth-child(1) { animation-delay: 0.1s; }
-        .animate-fade-in:nth-child(2) { animation-delay: 0.2s; }
-        .animate-fade-in:nth-child(3) { animation-delay: 0.3s; }
-        .animate-fade-in:nth-child(4) { animation-delay: 0.4s; }
-        .animate-fade-in:nth-child(5) { animation-delay: 0.5s; }
-        .animate-fade-in:nth-child(6) { animation-delay: 0.6s; }
-
-        @keyframes fadeInUp {
-            from { 
-                opacity: 0; 
-                transform: translateY(30px);
-            }
-            to { 
-                opacity: 1; 
-                transform: translateY(0);
-            }
-        }
-
-        /* Floating Animation for Header Elements */
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-        }
-
-        .float-animation {
-            animation: float 6s ease-in-out infinite;
-        }
-
-        /* Shine Effect on Hover */
-        .shine-effect {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .shine-effect::after {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            bottom: -50%;
-            left: -50%;
-            background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.5), transparent);
-            transform: rotate(45deg) translateX(-100%);
-            transition: transform 0.6s;
-        }
-
-        .shine-effect:hover::after {
-            transform: rotate(45deg) translateX(100%);
-        }
-
-        /* Tag Badge Enhancement */
-        .tag-badge {
-            background: linear-gradient(135deg, rgba(148, 163, 184, 0.1), rgba(148, 163, 184, 0.05));
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            backdrop-filter: blur(10px);
-        }
-
-        /* Info Section Enhancement */
-        .info-section {
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.95));
-            box-shadow: 
-                0 10px 40px -10px rgba(0, 104, 88, 0.1),
-                0 0 0 1px rgba(0, 104, 88, 0.05);
-        }
-
-        /* Footer Enhancement */
-        .footer-gradient {
-            background: linear-gradient(180deg, transparent 0%, rgba(0, 104, 88, 0.02) 100%);
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
-<body class="pattern-bg">
+<body>
     <div id="root"></div>
 
     <script type="text/babel">
@@ -252,53 +74,50 @@
         };
 
         const AppCard = ({ app }) => {
+            // Logic to determine icon style based on app type
             const getIconStyle = (category) => {
                 switch(category) {
-                    case 'Financial': return 'bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600';
-                    case 'Risk': return 'bg-gradient-to-br from-amber-50 to-amber-100 text-amber-600';
-                    case 'Operations': return 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-600';
-                    case 'Productivity': return 'bg-gradient-to-br from-purple-50 to-purple-100 text-purple-600';
-                    case 'Clinical Strategy': return 'bg-gradient-to-br from-rose-50 to-rose-100 text-rose-600';
-                    default: return 'bg-gradient-to-br from-slate-50 to-slate-100 text-slate-600';
+                    case 'Financial': return 'bg-emerald-50 text-emerald-600';
+                    case 'Risk': return 'bg-amber-50 text-amber-600';
+                    case 'Operations': return 'bg-blue-50 text-blue-600';
+                    case 'Productivity': return 'bg-purple-50 text-purple-600';
+                    case 'Clinical Strategy': return 'bg-rose-50 text-rose-600';
+                    default: return 'bg-slate-50 text-slate-600';
                 }
             };
             
             return (
-                <div className="app-card bg-white rounded-2xl border border-slate-200/50 overflow-hidden flex flex-col h-full animate-fade-in shine-effect">
+                <div className="app-card bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col h-full animate-fade-in">
                     <div className="p-6 flex-1">
-                        <div className="flex justify-between items-start mb-5">
-                            <div className={`card-icon p-3.5 rounded-xl icon-glow ${getIconStyle(app.category)}`}>
-                                <Icon name={app.icon} size={26} />
+                        <div className="flex justify-between items-start mb-4">
+                            <div className={`p-3 rounded-xl ${getIconStyle(app.category)}`}>
+                                <Icon name={app.icon} size={24} />
                             </div>
-                            <span className="tag-badge text-[10px] font-black uppercase tracking-widest text-slate-500 px-3 py-1.5 rounded-lg">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-50 px-2 py-1 rounded">
                                 {app.tag}
                             </span>
                         </div>
                         
-                        <h3 className="text-xl font-bold text-slate-900 mb-2.5 tracking-tight">
+                        <h3 className="text-xl font-bold text-slate-800 mb-2">
                             {app.title}
                         </h3>
                         
-                        <p className="text-slate-600 text-sm leading-relaxed">
+                        <p className="text-slate-600 text-sm leading-relaxed mb-4">
                             {app.description}
                         </p>
                     </div>
                     
-                    <div className="px-6 py-4 bg-gradient-to-r from-slate-50/50 to-slate-50/30 border-t border-slate-100/50 flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                             <div className="relative">
-                                 <div className="w-2 h-2 rounded-full bg-emerald-500 status-dot"></div>
-                                 <div className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-400 animate-ping"></div>
-                             </div>
-                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Live System</span>
+                    <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                             <span className="text-[10px] font-bold text-slate-500 uppercase">Live System</span>
                         </div>
                         <a 
                             href={app.url}
                             target="_blank"
-                            className="launch-button flex items-center gap-2 text-sm font-bold text-[#006858] hover:text-[#00bfa5] transition-all duration-300 group"
+                            className="flex items-center gap-2 text-sm font-bold text-[#006858] hover:text-[#00bfa5] transition-colors"
                         >
-                            Launch App 
-                            <Icon name="external-link" size={14} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-300" />
+                            Launch App <Icon name="external-link" size={14} />
                         </a>
                     </div>
                 </div>
@@ -306,6 +125,7 @@
         };
 
         function App() {
+            // --- EDIT YOUR APPS HERE ---
             const myApps = [
                 {
                     id: 1,
@@ -356,76 +176,105 @@
                     id: 6,
                     title: "Waiting List Strategist",
                     url: "https://waitinglist.streamlit.app/",
-                    description: "Strategic command centre using 'Prophet' Machine Learning to forecast patient influx, simulate staffing scenarios, and re-rank priorities.",
+                    description: "Strategic command centre using 'Prophet' AI to forecast patient influx, simulate staffing scenarios, and re-rank priorities.",
                     category: "Clinical Strategy",
                     tag: "Patient Flow",
                     icon: "activity"
+                },
+                {
+                    id: 7,
+                    title: "Project Programme Planner",
+                    url: "https://hse-estates.github.io/Programme/",
+                    description: "Digital Gantt chart tool for planning capital works. Tracks timelines, dependencies, and critical path milestones.",
+                    category: "Operations",
+                    tag: "Scheduling",
+                    icon: "calendar-range"
+                },
+                {
+                    id: 8,
+                    title: "Aspergillus Risk Assessment",
+                    url: "https://hse-estates.github.io/aspergillus/",
+                    description: "Digital workflow for infection control risk assessments during construction, ensuring compliance with clinical safety standards.",
+                    category: "Risk",
+                    tag: "Infection Control",
+                    icon: "shield-alert"
+                },
+                {
+                    id: 9,
+                    title: "Room & Desk Booking",
+                    url: "https://hse-estates.github.io/Room-Booking/",
+                    description: "Internal resource management dashboard. Facilitates booking of meeting rooms and hot desks with usage analytics.",
+                    category: "Productivity",
+                    tag: "Facilities Mgmt",
+                    icon: "calendar-check"
                 }
             ];
 
             useEffect(() => {
-                if (window.lucide) window.lucide.createIcons();
+                // Defensive loading for icons
+                if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                    window.lucide.createIcons();
+                } else {
+                    // Fallback retry if script loads slightly later
+                    setTimeout(() => {
+                        if (window.lucide) window.lucide.createIcons();
+                    }, 500);
+                }
             }, []);
 
             return (
                 <div className="min-h-screen flex flex-col">
-                    {/* Header - RESTORED GREEN GRADIENT */}
-                    <header className="hse-gradient text-white pt-10 pb-24 px-6 shadow-xl relative z-10">
-                        <div className="max-w-6xl mx-auto relative z-20">
-                            <nav className="flex justify-between items-center mb-14">
-                                <div className="flex items-center gap-5">
-                                    <div className="bg-white p-2.5 rounded-xl shadow-lg float-animation">
+                    {/* Header */}
+                    <header className="hse-gradient text-white pt-8 pb-16 px-6">
+                        <div className="max-w-6xl mx-auto">
+                            <nav className="flex justify-between items-center mb-12">
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-white p-2 rounded-xl">
                                         <img 
                                             src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" 
                                             alt="HSE Logo" 
-                                            className="h-11"
+                                            className="h-10"
                                         />
                                     </div>
-                                    <div className="border-l-2 border-white/20 pl-5">
-                                        <h1 className="text-xl font-black tracking-tight">HSE Capital & Estates</h1>
-                                        <p className="text-xs text-emerald-200 font-bold uppercase tracking-widest mt-0.5">Digital Infrastructure Hub</p>
+                                    <div className="border-l border-white/20 pl-4">
+                                        <h1 className="text-xl font-extrabold tracking-tight">HSE Capital & Estates</h1>
+                                        <p className="text-xs text-emerald-200 font-medium uppercase tracking-widest">Digital Infrastructure Hub</p>
                                     </div>
                                 </div>
                                 <div className="hidden md:block text-right">
-                                    <p className="text-xs font-bold text-emerald-300 uppercase tracking-wider">Principal Developer</p>
-                                    <p className="text-base font-bold mt-0.5">Dave Maher</p>
+                                    <p className="text-xs font-bold text-emerald-300 uppercase">Principal Developer</p>
+                                    <p className="text-sm font-semibold">Dave Maher</p>
                                 </div>
                             </nav>
 
                             <div className="max-w-2xl">
-                                <h2 className="text-5xl md:text-6xl font-black mb-5 leading-[1.1] tracking-tight text-white drop-shadow-sm">
-                                    Specialist Apps & <br/>
-                                    <span className="text-emerald-100">
-                                        Decision Support Tools
-                                    </span>
+                                <h2 className="text-4xl md:text-5xl font-black mb-4 leading-tight">
+                                    Specialist Apps & <br/>Decision Support Tools
                                 </h2>
-                                <p className="text-emerald-50 text-lg leading-relaxed font-medium max-w-xl">
+                                <p className="text-emerald-100/80 text-lg leading-relaxed">
                                     A central directory of custom-built applications designed to support strategic planning, 
                                     financial oversight, and capital project delivery within the HSE.
                                 </p>
                             </div>
                         </div>
-                        
-                        {/* Decorative Bottom Fade */}
-                        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-emerald-900/10 to-transparent pointer-events-none"></div>
                     </header>
 
                     {/* Main Content */}
-                    <main className="max-w-6xl mx-auto px-6 -mt-16 flex-1 w-full relative z-20">
-                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-7">
+                    <main className="max-w-6xl mx-auto px-6 -mt-8 flex-1 w-full">
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {myApps.map(app => (
                                 <AppCard key={app.id} app={app} />
                             ))}
                         </div>
 
                         {/* Additional Info Section */}
-                        <div className="mt-20 info-section p-10 rounded-3xl border border-slate-200/50 flex flex-col md:flex-row items-center gap-10 backdrop-blur-xl">
-                            <div className="p-5 bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600 rounded-2xl shadow-lg border border-emerald-100">
-                                <Icon name="shield-check" size={44} />
+                        <div className="mt-16 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center gap-8">
+                            <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl">
+                                <Icon name="shield-check" size={40} />
                             </div>
                             <div>
-                                <h4 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">Governance & Reliability</h4>
-                                <p className="text-slate-600 leading-relaxed text-base font-medium">
+                                <h4 className="text-xl font-bold text-slate-800 mb-2">Governance & Reliability</h4>
+                                <p className="text-slate-600 leading-relaxed text-sm">
                                     These tools use client-side logic for maximum security and performance. 
                                     Data is stored locally on your device or via project file exports, ensuring no 
                                     sensitive financial data is transmitted to external servers.
@@ -435,21 +284,21 @@
                     </main>
 
                     {/* Footer */}
-                    <footer className="mt-24 border-t border-slate-200/50 footer-gradient py-14 px-6">
+                    <footer className="mt-20 border-t border-slate-200 bg-white py-12 px-6">
                         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
                             <div>
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className="w-7 h-7 bg-gradient-to-br from-[#006858] to-[#004d42] rounded-lg flex items-center justify-center shadow-md">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-6 h-6 bg-[#006858] rounded flex items-center justify-center">
                                         <img src="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico" className="w-4 h-4 brightness-0 invert" alt=""/>
                                     </div>
-                                    <span className="font-black text-slate-900 text-lg">HSE Capital & Estates</span>
+                                    <span className="font-extrabold text-slate-800">HSE Capital & Estates</span>
                                 </div>
-                                <p className="text-xs text-slate-500 font-medium">&copy; 2026 Health Service Executive. All rights reserved.</p>
+                                <p className="text-xs text-slate-500">&copy; 2026 Health Service Executive. All rights reserved.</p>
                             </div>
 
                             <div className="text-center md:text-right">
-                                <p className="text-sm font-bold text-slate-800">Digital Solutions Developed by Dave Maher</p>
-                                <p className="text-[10px] text-slate-400 mt-1.5 uppercase tracking-widest font-bold">HSE Estates Infrastructure Intelligence</p>
+                                <p className="text-sm font-bold text-slate-700">Digital Solutions Developed by Dave Maher</p>
+                                <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-widest font-medium">HSE Estates Infrastructure Intelligence</p>
                             </div>
                         </div>
                     </footer>
@@ -460,5 +309,8 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
+    
+    <!-- JotForm Agent Script -->
+    <script src='https://cdn.jotfor.ms/agent/embedjs/0195f58039287fc6a76cc1cbe9e780762664/embed.js'></script>
 </body>
 </html>
