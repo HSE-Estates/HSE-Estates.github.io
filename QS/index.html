@@ -2,643 +2,484 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Healthcare Infrastructure QS</title>
+  <title>Healthcare Infrastructure QS - Strategic Estimate</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <!-- Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- React + ReactDOM -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
   <!-- Babel for JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Import map for lucide-react -->
-  <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@18",
-        "react-dom": "https://esm.sh/react-dom@18",
-        "lucide-react": "https://esm.sh/lucide-react@0.344.0"
-      }
+  <style>
+    .label-text { display: block; font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 0.25rem; }
+    .input-field { width: 100%; padding: 0.5rem; font-size: 0.875rem; border: 1px solid #e2e8f0; border-radius: 0.375rem; outline: none; transition: border-color 0.2s; }
+    .input-field:focus { border-color: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1); }
+    
+    @media print {
+      body { background: white !important; }
+      .print-hidden { display: none !important; }
+      .print-block { display: block !important; }
+      .print-shadow-none { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
+      .print-border-none { border: none !important; }
+      main { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
     }
-  </script>
+  </style>
 </head>
 
-<body class="bg-slate-100">
+<body class="bg-slate-50">
   <div id="root"></div>
 
-  <!-- YOUR APP CODE -->
-  <script type="text/babel" data-type="module">
-    import React, { useState, useEffect } from 'react';
-    import {
-      Calculator, Building, Timer, Plus, Trash2,
-      ToggleLeft, ToggleRight, Printer, Save,
-      FileText, Euro, DoorOpen, Zap,
-      Hammer, Leaf, Siren, MapPin
-    } from 'lucide-react';
+  <script type="text/babel">
+    const { useState, useEffect } = React;
 
-    // --- UI COMPONENTS ---
+    // --- ICON COMPONENTS (INLINE SVG FOR STABILITY) ---
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const paths = {
+        calculator: "M16 3H8C6.89543 3 6 3.89543 6 5V19C6 20.1046 6.89543 21 8 21H16C17.1046 21 18 20.1046 18 19V5C18 3.89543 17.1046 3 16 3Z M9 7H15 M9 11H15 M9 15H10 M12 15H15",
+        timer: "M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z M12 6V12L16 14",
+        plus: "M12 5V19 M5 12H19",
+        trash: "M3 6H21 M19 6V20C19 21.1046 18.1046 22 17 22H7C5.89543 22 5 21.1046 5 20V6 M8 6V4C8 2.89543 8.89543 2 10 2H14C15.1046 2 16 2.89543 16 4V6",
+        printer: "M6 9V2H18V9 M6 18H4C2.89543 18 2 17.1046 2 16V11C2 9.89543 2.89543 9 4 9H20C21.1046 9 22 9.89543 22 11V16C22 17.1046 21.1046 18 20 18H18 M18 14H6V22H18V14Z",
+        save: "M19 21H5C3.89543 21 3 20.1046 3 19V5C3 3.89543 3.89543 3 5 3H16L21 8V19C21 20.1046 20.1046 21 19 21Z M17 21V13H7V21 M7 3V8H15",
+        file: "M13 2H6C4.89543 2 4 2.89543 4 4V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V9L13 2Z M13 2V9H20",
+        euro: "M12 12H5 M12 15H5 M19 5.58a8 8 0 1 0 0 12.84",
+        door: "M13 4h3a2 2 0 0 1 2 2v14M2 20h20M13 4H7a2 2 0 0 0-2 2v14M9 12v.01",
+        zap: "M13 2L3 14h9l-1 8 10-12h-9l1-8z",
+        hammer: "m15 12-8.5 8.5c-.83.83-2.17.83-3 0 0 0 0 0 0 0a2.12 2.12 0 0 1 0-3L12 9 M17.64 15 22 10.64 M20.91 11.7 12.32 3.11a2.4 2.4 0 1 0-3.4 3.4L10.5 8",
+        leaf: "M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 3.5 2 5.5 0 5-5.17 7-5.17 7",
+        siren: "M7 18v-6a5 5 0 1 1 10 0v6 M5 21h14 M9 21v1 M15 21v1",
+        toggleOn: "M8 9h8a3 3 0 0 1 0 6H8a3 3 0 0 1 0-6zm8 3a1 1 0 1 0 0 2 1 1 0 0 0 0-2z",
+        toggleOff: "M8 9h8a3 3 0 0 1 0 6H8a3 3 0 0 1 0-6zm0 3a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"
+      };
+
+      return (
+        <svg 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="currentColor" 
+          strokeWidth="2" 
+          strokeLinecap="round" 
+          strokeLinejoin="round" 
+          className={className}
+        >
+          <path d={paths[name] || ""} />
+          {name === 'leaf' && <path d="M11 20c0-3.5 1.5-5.5 3.5-5.5" />}
+          {name === 'leaf' && <path d="M17 14c.2-1 1-2 2-2" />}
+        </svg>
+      );
+    };
+
+    // --- UI SUB-COMPONENTS ---
     const Card = ({ children, className = "" }) => (
-      <div className={`bg-white rounded-xl shadow-sm border ${className}`}>
+      <div className={`bg-white rounded-xl shadow-sm border border-slate-200 ${className}`}>
         {children}
       </div>
     );
 
-    const SectionHeader = ({ title, icon: Icon }) => (
-      <div className="flex items-center gap-2 mb-4">
-        {Icon && <Icon className="w-4 h-4 text-emerald-700" />}
-        <h3 className="text-sm font-black uppercase tracking-wider text-slate-700">
-          {title}
-        </h3>
+    const SectionHeader = ({ title, iconName }) => (
+      <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100 text-emerald-800">
+        <Icon name={iconName} className="w-5 h-5" />
+        <h3 className="font-bold text-slate-800 uppercase tracking-tight text-sm">{title}</h3>
       </div>
     );
 
-    import React, { useState, useEffect } from 'react';
-import { Calculator, Building, Timer, Plus, Trash2, ToggleLeft, ToggleRight, Printer, Save, FileText, Euro, DoorOpen, Zap, Hammer, Leaf, Siren, MapPin } from 'lucide-react';
-
-// --- UI COMPONENTS ---
-const Card = ({ children, className = "" }) => (
-  <div className={`bg-white rounded-xl shadow-sm border border-slate-200 ${className}`}>
-    {children}
-  </div>
-);
-
-const SectionHeader = ({ title, icon: Icon }) => (
-  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100 text-emerald-800">
-    {Icon && <Icon className="w-5 h-5" />}
-    <h3 className="font-bold text-slate-800 uppercase tracking-tight text-sm">{title}</h3>
-  </div>
-);
-
-export default function App() {
-  // --- STATE ---
-  const [assetType, setAssetType] = useState('acute');
-  const [intervention, setIntervention] = useState('new');
-  const [gfa, setGfa] = useState(1000);
-  const [region, setRegion] = useState('hse_sw'); // Default to South West (Cork/Kerry)
-  const [year, setYear] = useState('2026');
-  const [complexity, setComplexity] = useState('med');
-  const [duration, setDuration] = useState(18);
-  const [includeVat, setIncludeVat] = useState(true);
-  
-  const [customDoorCount, setCustomDoorCount] = useState('');
-  const [projectName, setProjectName] = useState('');
-  
-  // New State for Live Environment
-  const [isLiveSite, setIsLiveSite] = useState(false);
-
-  const [extras, setExtras] = useState({
-    generator: false,
-    berUpgrade: false,
-    newRoof: false,
-  });
-
-  const [customItems, setCustomItems] = useState([]);
-  const [results, setResults] = useState(null);
-
-  // --- DATA CONSTANTS (CALIBRATED 2026) ---
-  const baseRates = {
-    acute: { 
-      // Uplifted for high-complexity blocks (ICU/Imaging)
-      new: { low: 6500, med: 8500, high: 10500 }, 
-      // Uplifted for deep clinical refurb
-      refurb: { low: 8000, med: 10500, high: 13000 } 
-    },
-    cnu: { 
-      // Solid benchmarks
-      new: { low: 3500, med: 4000, high: 4500 }, 
-      refurb: { low: 4000, med: 4750, high: 5500 } 
-    },
-    groupHome: { 
-      new: { low: 2800, med: 3150, high: 3500 }, 
-      // Increased refurb to reflect Fire/DAC/Retrofit reality
-      refurb: { low: 2200, med: 2600, high: 3000 } 
-    }
-  };
-
-  // UPDATED: 6 NEW HSE HEALTH REGIONS
-  // Indices calibrated: Dublin-based regions carry the capital premium (1.10)
-  // Provincial regions normalized (1.00) or slightly lower for remote (0.98)
-  const regionalIndices = {
-    hse_dne: 1.10, // Dublin and North East
-    hse_dm: 1.10,  // Dublin and Midlands
-    hse_dse: 1.10, // Dublin and South East
-    hse_mw: 1.00,  // Mid West (Limerick/Clare)
-    hse_sw: 1.00,  // South West (Cork/Kerry)
-    hse_wnw: 0.98  // West and North West (Galway/Mayo/Donegal)
-  };
-
-  const regionLabels = {
-    hse_dne: "HSE Dublin & North East",
-    hse_dm: "HSE Dublin & Midlands",
-    hse_dse: "HSE Dublin & South East",
-    hse_mw: "HSE Mid West",
-    hse_sw: "HSE South West",
-    hse_wnw: "HSE West & North West"
-  };
-
-  const annualInflation = 0.035;
-  const liveSitePremium = 0.15; // 15% for Logistics/Phasing/Infection Control
-
-  const fireDoorData = {
-    acute: { density: 15, rate: 1400 },
-    cnu: { density: 20, rate: 1100 },
-    groupHome: { density: 12, rate: 850 }
-  };
-
-  const onCosts = {
-    prelims: { new: 0.15, refurb: 0.25 },
-    contingency: { new: 0.10, refurb: 0.20 },
-    fees: 0.12,
-    vatBuild: 0.135,
-    vatFees: 0.23
-  };
-
-  const extrasData = {
-    generator: { acute: 350000, cnu: 85000, groupHome: 15000 },
-    roof: { rate: 180, storeyDivisor: { acute: 3.5, cnu: 1.2, groupHome: 1 } },
-    ber: { rate: 350 }
-  };
-
-  // --- ACTIONS ---
-  const addCustomItem = () => setCustomItems([...customItems, { id: Date.now(), name: '', cost: 0 }]);
-  
-  const updateCustomItem = (id, field, value) => {
-    setCustomItems(items => items.map(item => item.id === id ? { ...item, [field]: value } : item));
-  };
-
-  const removeCustomItem = (id) => setCustomItems(items => items.filter(item => item.id !== id));
-
-  const handlePrint = () => window.print();
-
-  const handleSave = () => {
-    const data = {
-      projectName, assetType, intervention, gfa, region, year, complexity, duration,
-      includeVat, customDoorCount, extras, customItems, isLiveSite, results,
-      meta: { createdBy: "Dave Maher", date: new Date().toISOString() }
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${projectName || 'HSE_Strategic_Estimate'}_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
-
-  // --- CALCULATION ENGINE ---
-  useEffect(() => {
-    const getSafeRate = () => {
-      try { return baseRates[assetType][intervention][complexity] || 0; } catch (e) { return 0; }
+    const Checkbox = ({ label, checked, onChange, iconName, color, subLabel }) => {
+      const colorClasses = { 
+        orange: 'text-orange-500', 
+        blue: 'text-blue-500', 
+        green: 'text-green-500', 
+        red: 'text-red-500' 
+      };
+      return (
+        <label className={`flex items-center gap-3 p-2 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors ${checked ? 'bg-slate-50 border-emerald-100' : ''}`}>
+          <input type="checkbox" checked={checked} onChange={onChange} className="w-4 h-4 text-emerald-600 rounded" />
+          <div className="flex-1">
+            <div className={`text-xs font-bold uppercase tracking-wide flex items-center gap-2 ${checked ? 'text-slate-800' : 'text-slate-400'}`}>
+              <Icon name={iconName} className={`w-3.5 h-3.5 ${checked ? colorClasses[color] : 'text-slate-300'}`} /> {label}
+            </div>
+            {subLabel && <div className="text-[9px] text-slate-400 ml-6">{subLabel}</div>}
+          </div>
+        </label>
+      );
     };
 
-    let rawRate = getSafeRate();
-    
-    // Inflation (Mid-Point)
-    const currentYear = 2026;
-    const startYearInt = parseInt(year);
-    const yearsUntilStart = Math.max(0, startYearInt - currentYear);
-    const midPointYears = yearsUntilStart + (duration / 24); 
-    const inflationFactor = Math.pow(1 + annualInflation, midPointYears);
-
-    // Regional
-    let regionalIndex = regionalIndices[region] || 1.0;
-    
-    // Live Site Factor
-    const liveFactor = isLiveSite ? (1 + liveSitePremium) : 1.0;
-
-    let adjustedRate = rawRate * regionalIndex * inflationFactor * liveFactor;
-
-    // Construction
-    const constructionCost = adjustedRate * gfa;
-
-    // Fire Doors
-    let doorCost = 0;
-    let finalDoorCount = 0;
-    let autoDoorCount = 0;
-    
-    if (intervention === 'refurb') {
-      const doorConfig = fireDoorData[assetType] || { density: 20, rate: 1000 };
-      autoDoorCount = Math.ceil(gfa / doorConfig.density);
-      finalDoorCount = customDoorCount !== '' ? parseInt(customDoorCount) : autoDoorCount;
-      if (isNaN(finalDoorCount)) finalDoorCount = 0;
-      doorCost = finalDoorCount * (doorConfig.rate * inflationFactor);
-    }
-
-    // Extras
-    let generatorCost = extras.generator ? extrasData.generator[assetType] * inflationFactor : 0;
-    let roofArea = (extras.newRoof && intervention === 'refurb') ? Math.ceil(gfa / extrasData.roof.storeyDivisor[assetType]) : 0;
-    let roofCost = roofArea * (extrasData.roof.rate * inflationFactor);
-    let berCost = (intervention === 'refurb' && extras.berUpgrade) ? gfa * (extrasData.ber.rate * inflationFactor) : 0;
-
-    // Custom Items
-    let customItemsTotal = 0;
-    const inflatedCustomItems = customItems.map(item => {
-      const baseVal = parseFloat(item.cost) || 0;
-      const inflatedVal = baseVal * inflationFactor;
-      customItemsTotal += inflatedVal;
-      return { ...item, inflatedCost: inflatedVal };
-    });
-
-    const totalConstruction = constructionCost + doorCost + generatorCost + roofCost + berCost + customItemsTotal;
-
-    // On-Costs
-    const contingencyValue = totalConstruction * onCosts.contingency[intervention];
-    const feesValue = totalConstruction * onCosts.fees;
-    
-    // VAT
-    const taxableBuild = totalConstruction + contingencyValue;
-    const vatBuildValue = taxableBuild * onCosts.vatBuild;
-    const vatFeesValue = feesValue * onCosts.vatFees;
-    const totalVat = vatBuildValue + vatFeesValue;
-
-    setResults({
-      rawRate, adjustedRate, inflationFactor, regionalIndex, liveFactor,
-      constructionCost,
-      doorCount: finalDoorCount, autoDoorCount, doorCost,
-      extras: { generator: generatorCost, roof: roofCost, roofArea, ber: berCost },
-      customItems: inflatedCustomItems, customItemsTotal,
-      contingencyValue, feesValue, vatBuildValue, vatFeesValue,
-      totalVat, totalExVat: taxableBuild + feesValue,
-      totalProjectCost: taxableBuild + feesValue + totalVat
-    });
-
-  }, [assetType, intervention, gfa, region, year, complexity, duration, extras, customItems, customDoorCount, isLiveSite]);
-
-  // --- HELPERS ---
-  const formatCurrency = (val) => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val || 0);
-  const formatNumber = (val) => new Intl.NumberFormat('en-IE').format(val || 0);
-
-  return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20 print:pb-0 print:bg-white">
-      
-      {/* HEADER */}
-      <header className="bg-emerald-900 text-white p-4 shadow-md sticky top-0 z-50 print:hidden">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="bg-white p-1.5 rounded-lg shadow-sm">
-              <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-8 w-auto" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">Healthcare Infrastructure QS</h1>
-              <div className="flex gap-2">
-                 <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest bg-emerald-800">Strategic Estimate</span>
-                 <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest bg-emerald-700">Dave Maher</span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex gap-3 w-full md:w-auto">
-            <input 
-              type="text" 
-              placeholder="Project Name..." 
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              className="px-3 py-1.5 rounded text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white/90 w-full md:w-64"
-            />
-            <button onClick={handleSave} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm font-medium transition-colors">
-              <Save className="w-4 h-4" /> Save
-            </button>
-            <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-white text-emerald-900 hover:bg-emerald-50 rounded text-sm font-bold transition-colors shadow-sm">
-              <Printer className="w-4 h-4" /> Print
-            </button>
-          </div>
+    const Row = ({ label, subLabel, val, sub, light, color }) => (
+      <div className={`grid grid-cols-12 items-center py-2 px-2 rounded hover:bg-slate-50 ${sub ? 'text-xs' : 'text-sm'} ${light ? 'text-slate-500' : 'text-slate-700'}`}>
+        <div className="col-span-8">
+          <span className={`font-medium ${color || ''}`}>{label}</span>
+          {subLabel && <span className="text-xs text-slate-400 ml-2 font-normal">{subLabel}</span>}
         </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto p-4 md:p-6">
-        
-        {/* PRINT ONLY HEADER */}
-        <div className="hidden print:flex justify-between items-start mb-8 border-b-4 border-emerald-600 pb-4">
-           <div className="flex items-center gap-6">
-              <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-16 w-auto" />
-              <div>
-                 <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tight">Strategic Cost Estimate</h1>
-                 <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">{projectName || 'Draft Estimate'}</p>
-              </div>
-           </div>
-           <div className="text-right">
-              <p className="text-xs font-black text-slate-400 uppercase">Date</p>
-              <p className="text-lg font-bold">{new Date().toLocaleDateString('en-GB')}</p>
-           </div>
+        <div className={`col-span-4 text-right font-mono font-medium ${sub ? '' : 'font-bold'}`}>
+          {new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val)}
         </div>
+      </div>
+    );
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* LEFT COLUMN: INPUTS (Hidden on Print) */}
-          <div className="lg:col-span-4 space-y-6 print:hidden">
-            
-            {/* VAT Toggle */}
-            <div className="flex items-center justify-between bg-white p-3 rounded-xl shadow-sm border border-emerald-100">
-              <span className="font-semibold text-emerald-900 text-sm">Include VAT in Totals?</span>
-              <button 
-                onClick={() => setIncludeVat(!includeVat)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${includeVat ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}`}
-              >
-                {includeVat ? <ToggleRight className="w-5 h-5"/> : <ToggleLeft className="w-5 h-5"/>}
-                {includeVat ? 'YES' : 'NO'}
-              </button>
-            </div>
+    // --- MAIN APP ---
+    function App() {
+      const [assetType, setAssetType] = useState('acute');
+      const [intervention, setIntervention] = useState('new');
+      const [gfa, setGfa] = useState(1000);
+      const [region, setRegion] = useState('hse_sw');
+      const [year, setYear] = useState('2026');
+      const [complexity, setComplexity] = useState('med');
+      const [duration, setDuration] = useState(18);
+      const [includeVat, setIncludeVat] = useState(true);
+      const [isLiveSite, setIsLiveSite] = useState(false);
+      const [customDoorCount, setCustomDoorCount] = useState('');
+      const [projectName, setProjectName] = useState('');
+      const [extras, setExtras] = useState({ generator: false, berUpgrade: false, newRoof: false });
+      const [customItems, setCustomItems] = useState([]);
+      const [results, setResults] = useState(null);
 
-            <Card className="p-5">
-              <SectionHeader title="Project Parameters" icon={Calculator} />
-              <div className="space-y-4">
-                <div>
-                  <label className="label-text">Asset Class</label>
-                  <select className="input-field" value={assetType} onChange={(e) => setAssetType(e.target.value)}>
-                    <option value="acute">Acute Hospital</option>
-                    <option value="cnu">Community Nursing Unit</option>
-                    <option value="groupHome">Community Dwelling</option>
-                  </select>
+      // --- DATA CONSTANTS ---
+      const baseRates = {
+        acute: { new: { low: 6500, med: 8500, high: 10500 }, refurb: { low: 8000, med: 10500, high: 13000 } },
+        cnu: { new: { low: 3500, med: 4000, high: 4500 }, refurb: { low: 4000, med: 4750, high: 5500 } },
+        groupHome: { new: { low: 2800, med: 3150, high: 3500 }, refurb: { low: 2200, med: 2600, high: 3000 } }
+      };
+
+      const regionalIndices = { hse_dne: 1.10, hse_dm: 1.10, hse_dse: 1.10, hse_mw: 1.00, hse_sw: 1.00, hse_wnw: 0.98 };
+      const regionLabels = {
+        hse_dne: "HSE Dublin & North East", hse_dm: "HSE Dublin & Midlands", hse_dse: "HSE Dublin & South East",
+        hse_mw: "HSE Mid West", hse_sw: "HSE South West", hse_wnw: "HSE West & North West"
+      };
+
+      const annualInflation = 0.035;
+      const liveSitePremium = 0.15;
+
+      const fireDoorData = {
+        acute: { density: 15, rate: 1400 },
+        cnu: { density: 20, rate: 1100 },
+        groupHome: { density: 12, rate: 850 }
+      };
+
+      const onCosts = {
+        prelims: { new: 0.15, refurb: 0.25 },
+        contingency: { new: 0.10, refurb: 0.20 },
+        fees: 0.12,
+        vatBuild: 0.135,
+        vatFees: 0.23
+      };
+
+      const extrasData = {
+        generator: { acute: 350000, cnu: 85000, groupHome: 15000 },
+        roof: { rate: 180, storeyDivisor: { acute: 3.5, cnu: 1.2, groupHome: 1 } },
+        ber: { rate: 350 }
+      };
+
+      // --- ACTIONS ---
+      const addCustomItem = () => setCustomItems([...customItems, { id: Date.now(), name: '', cost: 0 }]);
+      const updateCustomItem = (id, field, value) => {
+        setCustomItems(items => items.map(item => item.id === id ? { ...item, [field]: value } : item));
+      };
+      const removeCustomItem = (id) => setCustomItems(items => items.filter(item => item.id !== id));
+      const handlePrint = () => window.print();
+      const handleSave = () => {
+        const data = { projectName, assetType, intervention, gfa, region, year, complexity, duration, includeVat, customDoorCount, extras, customItems, isLiveSite, results, date: new Date().toISOString() };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${projectName || 'HSE_Estimate'}_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+      };
+
+      // --- ENGINE ---
+      useEffect(() => {
+        const rawRate = baseRates[assetType][intervention][complexity] || 0;
+        const currentYear = 2026;
+        const startYearInt = parseInt(year);
+        const yearsUntilStart = Math.max(0, startYearInt - currentYear);
+        const midPointYears = yearsUntilStart + (duration / 24); 
+        const inflationFactor = Math.pow(1 + annualInflation, midPointYears);
+        const regionalIndex = regionalIndices[region] || 1.0;
+        const liveFactor = isLiveSite ? (1 + liveSitePremium) : 1.0;
+
+        const adjustedRate = rawRate * regionalIndex * inflationFactor * liveFactor;
+        const constructionCost = adjustedRate * gfa;
+
+        let doorCost = 0, finalDoorCount = 0, autoDoorCount = 0;
+        if (intervention === 'refurb') {
+          const doorConfig = fireDoorData[assetType] || { density: 20, rate: 1000 };
+          autoDoorCount = Math.ceil(gfa / doorConfig.density);
+          finalDoorCount = customDoorCount !== '' ? parseInt(customDoorCount) : autoDoorCount;
+          doorCost = (finalDoorCount || 0) * (doorConfig.rate * inflationFactor);
+        }
+
+        const generatorCost = extras.generator ? extrasData.generator[assetType] * inflationFactor : 0;
+        const roofArea = (extras.newRoof && intervention === 'refurb') ? Math.ceil(gfa / extrasData.roof.storeyDivisor[assetType]) : 0;
+        const roofCost = roofArea * (extrasData.roof.rate * inflationFactor);
+        const berCost = (intervention === 'refurb' && extras.berUpgrade) ? gfa * (extrasData.ber.rate * inflationFactor) : 0;
+
+        let customItemsTotal = 0;
+        const inflatedCustomItems = customItems.map(item => {
+          const val = (parseFloat(item.cost) || 0) * inflationFactor;
+          customItemsTotal += val;
+          return { ...item, inflatedCost: val };
+        });
+
+        const totalConstruction = constructionCost + doorCost + generatorCost + roofCost + berCost + customItemsTotal;
+        const contingencyValue = totalConstruction * onCosts.contingency[intervention];
+        const feesValue = totalConstruction * onCosts.fees;
+        const taxableBuild = totalConstruction + contingencyValue;
+        const vatBuildValue = taxableBuild * onCosts.vatBuild;
+        const vatFeesValue = feesValue * onCosts.vatFees;
+        const totalVat = vatBuildValue + vatFeesValue;
+
+        setResults({
+          rawRate, adjustedRate, inflationFactor, regionalIndex, liveFactor,
+          constructionCost, doorCount: finalDoorCount, autoDoorCount, doorCost,
+          extras: { generator: generatorCost, roof: roofCost, roofArea, ber: berCost },
+          customItems: inflatedCustomItems, customItemsTotal,
+          contingencyValue, feesValue, vatBuildValue, vatFeesValue,
+          totalVat, totalExVat: taxableBuild + feesValue,
+          totalProjectCost: taxableBuild + feesValue + totalVat
+        });
+      }, [assetType, intervention, gfa, region, year, complexity, duration, extras, customItems, customDoorCount, isLiveSite]);
+
+      const formatCurrency = (val) => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val || 0);
+      const formatNumber = (val) => new Intl.NumberFormat('en-IE').format(val || 0);
+
+      return (
+        <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20 print:pb-0 print:bg-white">
+          <header className="bg-emerald-900 text-white p-4 shadow-md sticky top-0 z-50 print-hidden">
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="bg-white p-1.5 rounded-lg">
+                  <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-8 w-auto" />
                 </div>
                 <div>
-                  <label className="label-text">Intervention</label>
-                  <div className="flex bg-slate-100 p-1 rounded-lg">
-                    {['new', 'refurb'].map(type => (
-                      <button key={type} onClick={() => setIntervention(type)} className={`flex-1 py-1.5 text-xs font-bold uppercase rounded-md transition-all ${intervention === type ? 'bg-white shadow text-emerald-800' : 'text-slate-500'}`}>
-                        {type === 'new' ? 'New Build' : 'Refurbishment'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="label-text">Complexity</label>
-                  <select className="input-field" value={complexity} onChange={(e) => setComplexity(e.target.value)}>
-                    <option value="low">Standard / Low Acuity</option>
-                    <option value="med">Medium / General Clinical</option>
-                    <option value="high">High / Specialist (ICU/Theatre)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="flex justify-between label-text">
-                    <span>GFA (m²)</span>
-                    <span className="text-emerald-700 font-bold">{formatNumber(gfa)}</span>
-                  </label>
-                  <input type="range" min="100" max="20000" step="50" value={gfa} onChange={(e) => setGfa(Number(e.target.value))} className="w-full h-2 bg-emerald-100 rounded-lg appearance-none cursor-pointer accent-emerald-600" />
-                </div>
-                <div>
-                  <label className="label-text">HSE Health Region</label>
-                  <select className="input-field" value={region} onChange={(e) => setRegion(e.target.value)}>
-                    {Object.entries(regionLabels).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
+                  <h1 className="text-xl font-bold">Healthcare Infrastructure QS</h1>
+                  <p className="text-[10px] uppercase font-bold tracking-widest text-emerald-300">Strategic Estimate / Dave Maher</p>
                 </div>
               </div>
-            </Card>
-
-            <Card className="p-5">
-              <SectionHeader title="Programme & Allowances" icon={Timer} />
-              <div className="space-y-5">
-                <div>
-                   <div className="flex gap-2 mb-2">
-                     <div className="flex-1">
-                       <label className="label-text">Start Year</label>
-                       <select className="input-field" value={year} onChange={(e) => setYear(e.target.value)}>
-                         <option value="2026">2026</option>
-                         <option value="2027">2027</option>
-                         <option value="2028">2028</option>
-                       </select>
-                     </div>
-                     <div className="flex-1">
-                       <label className="label-text">Duration (Months)</label>
-                       <input type="number" value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="input-field" />
-                     </div>
-                   </div>
-                   <p className="text-[10px] text-slate-400 italic">Inflation applied to mid-point of construction.</p>
-                </div>
-
-                <div className="space-y-3 pt-3 border-t border-slate-100">
-                   <div className="pb-3 border-b border-slate-100">
-                     <Checkbox 
-                       label="Live Clinical Site" 
-                       checked={isLiveSite} 
-                       onChange={() => setIsLiveSite(!isLiveSite)} 
-                       icon={Siren} 
-                       color="red" 
-                       subLabel="+15% for infection control & phasing"
-                     />
-                   </div>
-
-                   <Checkbox label="Backup Generator" checked={extras.generator} onChange={() => setExtras(e => ({...e, generator: !e.generator}))} icon={Zap} color="orange" />
-
-                   {intervention === 'refurb' && (
-                     <>
-                        <div className="bg-orange-50 p-3 rounded-lg border border-orange-100 mt-2">
-                           <div className="flex items-center gap-2 mb-2 text-orange-900 text-xs font-bold uppercase tracking-wider">
-                              <DoorOpen className="w-4 h-4"/> Fire Door Upgrade
-                           </div>
-                           <div>
-                              <label className="block text-[10px] text-orange-700 mb-1">Override Qty (Auto: {results?.autoDoorCount})</label>
-                              <input type="number" placeholder="Auto" value={customDoorCount} onChange={(e) => setCustomDoorCount(e.target.value)} className="w-full p-1.5 text-sm border border-orange-200 rounded focus:ring-2 focus:ring-orange-500 outline-none" />
-                           </div>
-                        </div>
-                        
-                        <div className="mt-2 space-y-3">
-                          <Checkbox label="New Roof Covering" checked={extras.newRoof} onChange={() => setExtras(e => ({...e, newRoof: !e.newRoof}))} icon={Hammer} color="blue" />
-                          <Checkbox label="BER 'A' Deep Retrofit" checked={extras.berUpgrade} onChange={() => setExtras(e => ({...e, berUpgrade: !e.berUpgrade}))} icon={Leaf} color="green" />
-                        </div>
-                     </>
-                   )}
-                </div>
-
-                <div className="pt-3 border-t border-slate-100">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-bold text-slate-500 uppercase">Custom Items</span>
-                    <button onClick={addCustomItem} className="p-1 bg-emerald-50 text-emerald-600 rounded hover:bg-emerald-100"><Plus className="w-4 h-4" /></button>
-                  </div>
-                  <div className="space-y-2">
-                    {customItems.map((item) => (
-                      <div key={item.id} className="flex gap-2">
-                        <input type="text" placeholder="Item Name" value={item.name} onChange={(e) => updateCustomItem(item.id, 'name', e.target.value)} className="flex-1 text-sm p-1.5 border border-slate-200 rounded" />
-                        <input type="number" placeholder="€" value={item.cost || ''} onChange={(e) => updateCustomItem(item.id, 'cost', parseFloat(e.target.value) || 0)} className="w-20 text-sm p-1.5 border border-slate-200 rounded" />
-                        <button onClick={() => removeCustomItem(item.id)} className="text-slate-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* RIGHT COLUMN: REPORT */}
-          <div className="lg:col-span-8 print:col-span-12 space-y-6">
-            
-            {/* Summary Banner */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-emerald-900 text-white p-6 rounded-2xl shadow-lg flex flex-col justify-center">
-                <span className="text-xs font-black uppercase tracking-widest opacity-60 mb-1">Total Estimate</span>
-                <span className="text-xs font-bold uppercase tracking-widest opacity-80 mb-2">{includeVat ? '(Incl. VAT)' : '(Excl. VAT)'}</span>
-                <span className="text-4xl font-black tracking-tight">
-                  {results && formatCurrency(includeVat ? results.totalProjectCost : results.totalExVat)}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <Card className="p-3 flex flex-col justify-center bg-emerald-50 border-emerald-100">
-                   <span className="text-[9px] font-black uppercase text-emerald-600 tracking-wider mb-1">Cost/m²</span>
-                   <span className="text-lg font-bold text-slate-800">{results && formatCurrency(results.adjustedRate)}</span>
-                </Card>
-                <Card className="p-3 flex flex-col justify-center bg-emerald-50 border-emerald-100">
-                   <span className="text-[9px] font-black uppercase text-emerald-600 tracking-wider mb-1">Region Index</span>
-                   <span className="text-lg font-bold text-slate-800">{results && results.regionalIndex.toFixed(2)}</span>
-                </Card>
-                <Card className="p-3 flex flex-col justify-center bg-emerald-50 border-emerald-100">
-                   <span className="text-[9px] font-black uppercase text-emerald-600 tracking-wider mb-1">Live Site</span>
-                   <span className="text-lg font-bold text-slate-800">{results && (results.liveFactor > 1 ? '+15%' : '-')}</span>
-                </Card>
+              <div className="flex gap-3 w-full md:w-auto">
+                <input type="text" placeholder="Project Name..." value={projectName} onChange={(e) => setProjectName(e.target.value)} className="px-3 py-1.5 rounded text-slate-800 text-sm focus:outline-none bg-white/90 w-full md:w-64" />
+                <button onClick={handleSave} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-sm transition-colors flex items-center gap-2"><Icon name="save" className="w-4 h-4"/> Save</button>
+                <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-white text-emerald-900 hover:bg-emerald-50 rounded text-sm font-bold shadow-sm transition-colors flex items-center gap-2"><Icon name="printer" className="w-4 h-4"/> Print</button>
               </div>
             </div>
+          </header>
 
-            {/* Main Breakdown */}
-            <Card className="p-8 print:shadow-none print:border-none">
-              <div className="flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-                <Euro className="w-6 h-6 text-emerald-700" />
-                <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight">Cost Plan Breakdown</h2>
-              </div>
-              
-              {results && (
-                <div className="space-y-1">
-                  {/* Header Row */}
-                  <div className="grid grid-cols-12 text-[10px] uppercase font-black text-slate-400 mb-2 px-2">
-                    <div className="col-span-8">Item Description</div>
-                    <div className="col-span-4 text-right">Cost (€)</div>
-                  </div>
-
-                  {/* Rows */}
-                  <Row label="Base Construction Works" val={results.constructionCost} />
-                  
-                  {/* Extras Group */}
-                  {(results.doorCost > 0 || results.extras.generator > 0 || results.extras.roof > 0 || results.extras.ber > 0 || results.customItemsTotal > 0) && (
-                    <div className="my-4 py-2 bg-slate-50 rounded-lg px-2 border border-slate-100">
-                      <div className="text-[10px] uppercase font-bold text-slate-400 mb-2 tracking-wider">Specific Allowances (Extra Over)</div>
-                      {results.doorCost > 0 && <Row sub label={`Fire Door Upgrade (Qty: ${results.doorCount})`} val={results.doorCost} color="text-orange-700" />}
-                      {results.extras.generator > 0 && <Row sub label="Backup Generator (Resilience)" val={results.extras.generator} color="text-slate-600" />}
-                      {results.extras.roof > 0 && <Row sub label={`New Roof Covering (~${results.extras.roofArea}m²)`} val={results.extras.roof} color="text-slate-600" />}
-                      {results.extras.ber > 0 && <Row sub label="Deep Retrofit (BER A)" val={results.extras.ber} color="text-green-700" />}
-                      {results.customItems.map(item => (
-                        <Row key={item.id} sub label={item.name || 'Custom Item'} val={item.inflatedCost} color="text-purple-700" />
-                      ))}
+          <main className="max-w-7xl mx-auto p-4 md:p-6">
+            <div className="hidden print-block mb-8 border-b-4 border-emerald-600 pb-4">
+               <div className="flex justify-between items-start">
+                 <div className="flex items-center gap-6">
+                    <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-16 w-auto" />
+                    <div>
+                       <h1 className="text-3xl font-black text-slate-800 uppercase">Strategic Cost Estimate</h1>
+                       <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">{projectName || 'Draft Estimate'}</p>
                     </div>
-                  )}
-
-                  <Row label="Contingency" subLabel={`@ ${onCosts.contingency[intervention]*100}% (Risk & Unforeseen)`} val={results.contingencyValue} />
-                  <Row label="Design Team Fees" subLabel="@ 12% (Arch, QS, Eng, PSDP)" val={results.feesValue} />
-
-                  {/* VAT */}
-                  {includeVat && (
-                    <div className="mt-4 pt-4 border-t border-slate-100">
-                      <Row label="VAT on Works" subLabel="@ 13.5%" val={results.vatBuildValue} light />
-                      <Row label="VAT on Fees" subLabel="@ 23%" val={results.vatFeesValue} light />
-                    </div>
-                  )}
-
-                  {/* Total */}
-                  <div className="mt-6 pt-6 border-t-2 border-slate-800">
-                    <div className="grid grid-cols-12 items-baseline">
-                      <div className="col-span-8 text-xl font-black text-slate-800 uppercase tracking-tight">
-                        Total Estimate {includeVat ? '(Incl. VAT)' : '(Excl. VAT)'}
-                      </div>
-                      <div className="col-span-4 text-right text-2xl font-black text-emerald-700">
-                        {formatCurrency(includeVat ? results.totalProjectCost : results.totalExVat)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </Card>
-            
-            {/* Notes */}
-            <Card className="p-6 bg-slate-50 border-slate-100 print:bg-white print:border print:border-slate-200">
-              <SectionHeader title="Strategic Notes & Method" icon={FileText} />
-              <div className="text-xs text-slate-600 space-y-2 leading-relaxed">
-                 <p><strong className="text-slate-800">Basis of Estimate:</strong> Costs are based on 2026 market benchmarks for <strong>{regionLabels[region]}</strong>. 
-                 Inflation is calculated on a compound basis to the mid-point of construction ({duration} months starting {year}).</p>
-                 <p><strong className="text-slate-800">Live Campus Factor:</strong> {isLiveSite ? `Includes a 15% premium for working in a live clinical environment (phasing, dust control, out-of-hours).` : `Assumes vacant possession (no clinical constraints).`}</p>
-                 <p><strong className="text-slate-800">Inclusions:</strong> Construction costs, mechanical & electrical services (aligned with complexity), Fixed Furniture & Equipment, Design Team Fees.</p>
-                 <p><strong className="text-slate-800">Exclusions:</strong> Land acquisition costs, loose medical equipment (Group 2/3/4), ICT active hardware. Refurbishment rates assume standard condition; removal of hazardous materials (asbestos, lead) or abnormal ground conditions are excluded.</p>
-              </div>
-            </Card>
-
-            {/* Signature Block (Print Only) */}
-            <div className="hidden print:block mt-12 pt-8 border-t border-slate-200">
-               <div className="grid grid-cols-2 gap-12">
-                  <div>
-                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8">Authorised By</p>
-                     <div className="h-px bg-slate-300 w-full"></div>
-                  </div>
-                  <div className="text-right">
-                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Created By</p>
-                     <p className="text-sm font-bold text-slate-800">Dave Maher</p>
-                     <p className="text-[10px] text-slate-400 uppercase mt-1">HSE Capital Projects</p>
-                  </div>
+                 </div>
+                 <div className="text-right">
+                    <p className="text-[10px] font-black text-slate-400 uppercase">Issue Date</p>
+                    <p className="text-lg font-bold">{new Date().toLocaleDateString('en-GB')}</p>
+                 </div>
                </div>
             </div>
 
-          </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-4 space-y-6 print-hidden">
+                <div className="flex items-center justify-between bg-white p-3 rounded-xl shadow-sm border border-emerald-100">
+                  <span className="font-semibold text-emerald-900 text-sm">Include VAT in Totals?</span>
+                  <button onClick={() => setIncludeVat(!includeVat)} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${includeVat ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}`}>
+                    <Icon name={includeVat ? "toggleOn" : "toggleOff"} className="w-5 h-5"/> {includeVat ? 'YES' : 'NO'}
+                  </button>
+                </div>
+
+                <Card className="p-5">
+                  <SectionHeader title="Project Parameters" iconName="calculator" />
+                  <div className="space-y-4">
+                    <div>
+                      <label className="label-text">Asset Class</label>
+                      <select className="input-field" value={assetType} onChange={(e) => setAssetType(e.target.value)}>
+                        <option value="acute">Acute Hospital</option>
+                        <option value="cnu">Community Nursing Unit</option>
+                        <option value="groupHome">Community Dwelling</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label-text">Intervention</label>
+                      <div className="flex bg-slate-100 p-1 rounded-lg">
+                        {['new', 'refurb'].map(type => (
+                          <button key={type} onClick={() => setIntervention(type)} className={`flex-1 py-1.5 text-xs font-bold uppercase rounded-md transition-all ${intervention === type ? 'bg-white shadow text-emerald-800' : 'text-slate-500'}`}>
+                            {type === 'new' ? 'New Build' : 'Refurb'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="label-text">Complexity</label>
+                      <select className="input-field" value={complexity} onChange={(e) => setComplexity(e.target.value)}>
+                        <option value="low">Standard / Low Acuity</option>
+                        <option value="med">Medium / General Clinical</option>
+                        <option value="high">High / Specialist (ICU/Theatre)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="flex justify-between label-text"><span>GFA (m²)</span><span className="text-emerald-700 font-bold">{formatNumber(gfa)}</span></label>
+                      <input type="range" min="100" max="20000" step="50" value={gfa} onChange={(e) => setGfa(Number(e.target.value))} className="w-full h-2 bg-emerald-100 rounded-lg appearance-none cursor-pointer accent-emerald-600" />
+                    </div>
+                    <div>
+                      <label className="label-text">HSE Health Region</label>
+                      <select className="input-field" value={region} onChange={(e) => setRegion(e.target.value)}>
+                        {Object.entries(regionLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="p-5">
+                  <SectionHeader title="Allowances" iconName="timer" />
+                  <div className="space-y-4">
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <label className="label-text">Start Year</label>
+                        <select className="input-field" value={year} onChange={(e) => setYear(e.target.value)}>
+                          {[2026, 2027, 2028, 2029].map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <label className="label-text">Duration (Months)</label>
+                        <input type="number" value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="input-field" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 border-t pt-3">
+                      <Checkbox label="Live Clinical Site" checked={isLiveSite} onChange={() => setIsLiveSite(!isLiveSite)} iconName="siren" color="red" subLabel="+15% Logistics Premium" />
+                      <Checkbox label="Backup Generator" checked={extras.generator} onChange={() => setExtras(e => ({...e, generator: !e.generator}))} iconName="zap" color="orange" />
+                      {intervention === 'refurb' && (
+                        <>
+                          <div className="bg-orange-50 p-2 rounded border border-orange-100">
+                             <label className="block text-[10px] text-orange-700 font-bold uppercase mb-1">Fire Door Qty (Auto: {results?.autoDoorCount})</label>
+                             <input type="number" placeholder="Manual Override" value={customDoorCount} onChange={(e) => setCustomDoorCount(e.target.value)} className="w-full p-1 text-sm border border-orange-200 rounded" />
+                          </div>
+                          <Checkbox label="New Roof" checked={extras.newRoof} onChange={() => setExtras(e => ({...e, newRoof: !e.newRoof}))} iconName="hammer" color="blue" />
+                          <Checkbox label="BER 'A' Upgrade" checked={extras.berUpgrade} onChange={() => setExtras(e => ({...e, berUpgrade: !e.berUpgrade}))} iconName="leaf" color="green" />
+                        </>
+                      )}
+                    </div>
+                    <div className="pt-3 border-t">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">Custom Items</span>
+                        <button onClick={addCustomItem} className="p-1 bg-emerald-50 text-emerald-600 rounded flex items-center justify-center"><Icon name="plus" className="w-3 h-3" /></button>
+                      </div>
+                      {customItems.map(item => (
+                        <div key={item.id} className="flex gap-1 mb-1">
+                          <input type="text" placeholder="Item..." value={item.name} onChange={(e) => updateCustomItem(item.id, 'name', e.target.value)} className="flex-1 text-xs p-1 border rounded" />
+                          <input type="number" placeholder="€" value={item.cost || ''} onChange={(e) => updateCustomItem(item.id, 'cost', e.target.value)} className="w-16 text-xs p-1 border rounded" />
+                          <button onClick={() => removeCustomItem(item.id)} className="text-slate-400 p-1 flex items-center justify-center"><Icon name="trash" className="w-3 h-3" /></button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              <div className="lg:col-span-8 print-col-span-12 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-emerald-900 text-white p-6 rounded-2xl shadow-lg">
+                    <span className="text-xs font-black uppercase tracking-widest opacity-60">Total Strategic Estimate</span>
+                    <p className="text-4xl font-black mt-2">{results && formatCurrency(includeVat ? results.totalProjectCost : results.totalExVat)}</p>
+                    <p className="text-[10px] font-bold uppercase mt-2 text-emerald-300">{includeVat ? 'Including VAT' : 'Excluding VAT'}</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-white p-3 rounded-xl border flex flex-col justify-center text-center">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">Cost/m²</span>
+                      <span className="text-sm font-bold text-slate-800">{results && formatCurrency(results.adjustedRate)}</span>
+                    </div>
+                    <div className="bg-white p-3 rounded-xl border flex flex-col justify-center text-center">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">Index</span>
+                      <span className="text-sm font-bold text-slate-800">{results && results.regionalIndex.toFixed(2)}</span>
+                    </div>
+                    <div className="bg-white p-3 rounded-xl border flex flex-col justify-center text-center">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">Live Site</span>
+                      <span className="text-sm font-bold text-slate-800">{results && results.liveFactor > 1 ? '+15%' : '0%'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <Card className="p-8 print-shadow-none">
+                  <div className="flex items-center gap-2 mb-6 pb-2 border-b">
+                    <Icon name="euro" className="w-5 h-5 text-emerald-700" />
+                    <h2 className="text-lg font-bold">Cost Breakdown</h2>
+                  </div>
+                  {results && (
+                    <div className="space-y-1">
+                      <div className="grid grid-cols-12 text-[10px] uppercase font-black text-slate-400 mb-2 px-2">
+                        <div className="col-span-8">Description</div>
+                        <div className="col-span-4 text-right">Cost (€)</div>
+                      </div>
+                      <Row label="Base Construction Works" subLabel={`@ ${formatCurrency(results.adjustedRate)} / m²`} val={results.constructionCost} />
+                      
+                      {(results.doorCost > 0 || results.extras.generator > 0 || results.extras.roof > 0 || results.extras.ber > 0 || results.customItemsTotal > 0) && (
+                        <div className="my-3 py-2 bg-slate-50 rounded-lg px-2 border border-slate-100">
+                          <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Specific Allowances (EO)</p>
+                          {results.doorCost > 0 && <Row sub label={`Fire Door Upgrades (${results.doorCount}nr)`} val={results.doorCost} color="text-orange-700" />}
+                          {results.extras.generator > 0 && <Row sub label="Backup Power Resilience" val={results.extras.generator} />}
+                          {results.extras.roof > 0 && <Row sub label="New Roof Covering" val={results.extras.roof} />}
+                          {results.extras.ber > 0 && <Row sub label="Deep Retrofit / BER A Works" val={results.extras.ber} color="text-green-700" />}
+                          {results.customItems.map(item => <Row key={item.id} sub label={item.name || 'Custom Item'} val={item.inflatedCost} color="text-purple-700" />)}
+                        </div>
+                      )}
+
+                      <Row label="Contingency" subLabel={`@ ${onCosts.contingency[intervention]*100}%`} val={results.contingencyValue} />
+                      <Row label="Design Team Fees" subLabel="@ 12%" val={results.feesValue} />
+
+                      {includeVat && (
+                        <div className="mt-4 pt-4 border-t border-slate-100">
+                          <Row label="VAT on Works" subLabel="@ 13.5%" val={results.vatBuildValue} light />
+                          <Row label="VAT on Fees" subLabel="@ 23%" val={results.vatFeesValue} light />
+                        </div>
+                      )}
+
+                      <div className="mt-6 pt-6 border-t-2 border-slate-800 flex justify-between items-baseline">
+                        <span className="text-xl font-black uppercase">Total Project Estimate</span>
+                        <span className="text-2xl font-black text-emerald-700">{formatCurrency(includeVat ? results.totalProjectCost : results.totalExVat)}</span>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+                
+                <Card className="p-6 bg-slate-50 print-bg-white border-slate-100">
+                  <SectionHeader title="Notes & Basis" iconName="file" />
+                  <div className="text-[11px] text-slate-600 space-y-2 leading-relaxed">
+                     <p><strong>1. Benchmark:</strong> Based on 2026 market benchmarks for <strong>{regionLabels[region]}</strong>. Inflation {annualInflation*100}% compounded to mid-point ({duration} months).</p>
+                     <p><strong>2. Live Campus:</strong> {isLiveSite ? 'Includes 15% allowance for clinical phasing, infection control, and logistics.' : 'Assumes greenfield/vacant possession.'}</p>
+                     <p><strong>3. Exclusions:</strong> Land costs, VAT (if toggled off), medical equipment (Group 2+), planning/levy fees, active IT hardware.</p>
+                  </div>
+                </Card>
+
+                <div className="hidden print-block mt-12 pt-12 border-t border-slate-200">
+                   <div className="grid grid-cols-2 gap-20">
+                      <div>
+                         <p className="text-[10px] font-black text-slate-400 uppercase mb-10">Approved for Issue</p>
+                         <div className="h-px bg-slate-300 w-full"></div>
+                         <p className="text-[9px] mt-2 text-slate-400">Date: ________________</p>
+                      </div>
+                      <div className="text-right">
+                         <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Author</p>
+                         <p className="text-sm font-bold text-slate-800">Dave Maher, QS</p>
+                         <p className="text-[10px] text-slate-400 uppercase">HSE Capital Projects</p>
+                      </div>
+                   </div>
+                </div>
+              </div>
+            </div>
+          </main>
         </div>
-        
-        {/* FOOTER */}
-        <footer className="mt-12 text-center text-slate-400 print:hidden">
-           <p className="text-xs font-medium">Created by Dave Maher &copy; 2026</p>
-           <p className="text-[10px] mt-1 opacity-60">Strategic Healthcare Infrastructure Cost Framework</p>
-        </footer>
+      );
+    }
 
-      </main>
-
-      <style>{`
-        .label-text { display: block; font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 0.25rem; }
-        .input-field { width: 100%; padding: 0.5rem; font-size: 0.875rem; border: 1px solid #e2e8f0; border-radius: 0.375rem; outline: none; transition: border-color 0.2s; }
-        .input-field:focus { border-color: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1); }
-        @media print {
-          body { background: white; }
-          .print\\:hidden { display: none !important; }
-          .print\\:block { display: block !important; }
-          .print\\:shadow-none { box-shadow: none !important; }
-          .print\\:border-none { border: none !important; }
-        }
-      `}</style>
-    </div>
-  );
-}
-
-// --- SUB COMPONENTS ---
-
-const Checkbox = ({ label, checked, onChange, icon: Icon, color, subLabel }) => {
-  const colors = { orange: 'text-orange-500', blue: 'text-blue-500', green: 'text-green-500', red: 'text-red-500' };
-  return (
-    <label className={`flex items-center gap-3 p-2 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors ${checked ? 'bg-slate-50 border-emerald-100' : ''}`}>
-      <input type="checkbox" checked={checked} onChange={onChange} className="w-4 h-4 text-emerald-600 rounded" />
-      <div className="flex-1">
-        <div className={`text-xs font-bold uppercase tracking-wide flex items-center gap-2 ${checked ? 'text-slate-800' : 'text-slate-400'}`}>
-          {Icon && <Icon className={`w-3.5 h-3.5 ${checked ? colors[color] : 'text-slate-300'}`} />} {label}
-        </div>
-        {subLabel && <div className="text-[9px] text-slate-400 ml-6">{subLabel}</div>}
-      </div>
-    </label>
-  );
-};
-
-const Row = ({ label, subLabel, val, sub, light, color }) => (
-  <div className={`grid grid-cols-12 items-center py-2 px-2 rounded hover:bg-slate-50 ${sub ? 'text-xs' : 'text-sm'} ${light ? 'text-slate-500' : 'text-slate-700'}`}>
-    <div className="col-span-8">
-      <span className={`font-medium ${color || ''}`}>{label}</span>
-      {subLabel && <span className="text-xs text-slate-400 ml-2 font-normal">{subLabel}</span>}
-    </div>
-    <div className={`col-span-4 text-right font-mono font-medium ${sub ? '' : 'font-bold'}`}>
-      {new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val)}
-    </div>
-  </div>
-);
-
-
-
-    // --- MOUNT ---
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
 </body>
 </html>
+
