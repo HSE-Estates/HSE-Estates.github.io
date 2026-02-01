@@ -56,7 +56,8 @@
         leaf: "M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 3.5 2 5.5 0 5-5.17 7-5.17 7",
         siren: "M7 18v-6a5 5 0 1 1 10 0v6 M5 21h14 M9 21v1 M15 21v1",
         toggleOn: "M8 9h8a3 3 0 0 1 0 6H8a3 3 0 0 1 0-6zm8 3a1 1 0 1 0 0 2 1 1 0 0 0 0-2z",
-        toggleOff: "M8 9h8a3 3 0 0 1 0 6H8a3 3 0 0 1 0-6zm0 3a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"
+        toggleOff: "M8 9h8a3 3 0 0 1 0 6H8a3 3 0 0 1 0-6zm0 3a1 1 0 1 1 0 2 1 1 0 0 1 0-2z",
+        info: "M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z M12 16V12 M12 8V8.01"
       };
 
       return (
@@ -455,6 +456,13 @@
                      <p><strong>1. Benchmark:</strong> Based on 2026 market benchmarks for <strong>{regionLabels[region]}</strong>. Inflation {annualInflation*100}% compounded to mid-point ({duration} months).</p>
                      <p><strong>2. Live Campus:</strong> {isLiveSite ? 'Includes 15% allowance for clinical phasing, infection control, and logistics.' : 'Assumes greenfield/vacant possession.'}</p>
                      <p><strong>3. Exclusions:</strong> Land costs, VAT (if toggled off), medical equipment (Group 2+), planning/levy fees, active IT hardware.</p>
+                     
+                     {/* ADDED DISCLAIMER HERE */}
+                     <div className="mt-4 pt-4 border-t border-slate-200">
+                       <p className="italic text-slate-500">
+                         <strong>Important Note:</strong> Figures are based on 2025/2026 data and subject to change per evolving guidelines and market conditions. This is a strategic estimate only and should not be relied upon as a fixed tender price.
+                       </p>
+                     </div>
                   </div>
                 </Card>
 
