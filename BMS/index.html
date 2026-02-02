@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HSE Regional BMS Master Dashboard</title>
+  <title>BMS Master Dashboard</title>
   
   <!-- Favicons -->
   <link rel="icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico">
@@ -83,7 +83,8 @@
       Server: (props) => <Icon {...props} path={<><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></>} />,
       Bell: (props) => <Icon {...props} path={<><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></>} />,
       Cloud: (props) => <Icon {...props} path={<><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></>} />,
-      Link: (props) => <Icon {...props} path={<><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></>} />
+      Link: (props) => <Icon {...props} path={<><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></>} />,
+      Filter: (props) => <Icon {...props} path={<><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></>} />
     };
 
     const Card = ({ children, className = '', noPad = false, onClick }) => (
@@ -205,6 +206,8 @@
       const [selectedHospital, setSelectedHospital] = useState(null);
       const [isLoading, setIsLoading] = useState(false);
       const [cloudUrl, setCloudUrl] = useState('');
+      const [filterMode, setFilterMode] = useState('all'); // 'all' or 'alerts' (Details View)
+      const [dashboardFilter, setDashboardFilter] = useState('all'); // 'all' or 'issues' (Dashboard View)
 
       // Parse CSV Logic
       useEffect(() => {
@@ -316,6 +319,7 @@
 
       const handleHospitalClick = (name) => {
           setSelectedHospital(name);
+          setFilterMode('all'); // Reset filter when entering details
           setView('details');
       };
 
@@ -363,7 +367,7 @@
                   <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE" className="h-8 w-auto" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold tracking-tight">Regional BMS Dashboard</h1>
+                  <h1 className="text-xl font-bold tracking-tight">BMS Dashboard</h1>
                   <div className="text-[10px] uppercase font-bold tracking-widest opacity-70">Cork North Region</div>
                 </div>
               </div>
@@ -418,11 +422,40 @@
 
                     {/* Hospital Grid */}
                     <div>
-                        <h2 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2">
-                            <Icons.Server className="w-5 h-5 text-emerald-600"/> Site Status
-                        </h2>
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                            <h2 className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                                <Icons.Server className="w-5 h-5 text-emerald-600"/> Site Status
+                            </h2>
+                            
+                            {/* DASHBOARD FILTER */}
+                            <div className="bg-slate-100 p-1 rounded-lg flex items-center self-start md:self-auto">
+                                <button 
+                                    onClick={() => setDashboardFilter('all')}
+                                    className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all ${dashboardFilter === 'all' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    All Sites
+                                </button>
+                                <button 
+                                    onClick={() => setDashboardFilter('issues')}
+                                    className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${dashboardFilter === 'issues' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    Sites with Alerts
+                                    {Object.keys(hospitalData).filter(h => hospitalData[h].some(d => d.Status !== 'OK' && d.Status !== 'Clear')).length > 0 && (
+                                         <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                                            {Object.keys(hospitalData).filter(h => hospitalData[h].some(d => d.Status !== 'OK' && d.Status !== 'Clear')).length}
+                                         </span>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {Object.keys(hospitalData).map(hName => (
+                            {Object.keys(hospitalData)
+                                .filter(hName => {
+                                    if (dashboardFilter === 'all') return true;
+                                    return hospitalData[hName].some(d => d.Status !== 'OK' && d.Status !== 'Clear');
+                                })
+                                .map(hName => (
                                 <HospitalCard 
                                     key={hName} 
                                     name={hName} 
@@ -430,6 +463,17 @@
                                     onClick={() => handleHospitalClick(hName)}
                                 />
                             ))}
+                            {Object.keys(hospitalData).filter(hName => {
+                                    if (dashboardFilter === 'all') return true;
+                                    return hospitalData[hName].some(d => d.Status !== 'OK' && d.Status !== 'Clear');
+                                }).length === 0 && (
+                                <div className="col-span-full p-8 text-center bg-white rounded-xl border border-dashed border-slate-300">
+                                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-50 text-emerald-500 mb-3">
+                                        <Icons.CheckCircle className="w-6 h-6" />
+                                    </div>
+                                    <p className="text-slate-500 font-medium">All systems operational. No active alerts across the region.</p>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -543,10 +587,33 @@
                         ← Back to Overview
                     </button>
                     
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-2xl font-bold text-slate-800">{selectedHospital}</h2>
-                        <div className="text-sm text-slate-500 bg-white px-3 py-1 rounded-full border shadow-sm">
-                            Last Updated: {parsedData[0]?.Timestamp || 'N/A'}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-800">{selectedHospital}</h2>
+                            <div className="text-sm text-slate-500 mt-1">
+                                Last Updated: <span className="font-mono">{parsedData[0]?.Timestamp || 'N/A'}</span>
+                            </div>
+                        </div>
+                        
+                        {/* VIEW TOGGLE */}
+                        <div className="bg-slate-100 p-1 rounded-lg flex items-center">
+                            <button 
+                                onClick={() => setFilterMode('all')}
+                                className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all ${filterMode === 'all' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Full System Log
+                            </button>
+                            <button 
+                                onClick={() => setFilterMode('alerts')}
+                                className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${filterMode === 'alerts' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Exceptions & Alerts
+                                {hospitalData[selectedHospital].filter(r => r.Status !== 'OK' && r.Status !== 'Clear').length > 0 && (
+                                    <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                                        {hospitalData[selectedHospital].filter(r => r.Status !== 'OK' && r.Status !== 'Clear').length}
+                                    </span>
+                                )}
+                            </button>
                         </div>
                     </div>
 
@@ -564,8 +631,10 @@
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {hospitalData[selectedHospital].map((row, idx) => (
-                                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                    {hospitalData[selectedHospital]
+                                        .filter(row => filterMode === 'all' || (row.Status !== 'OK' && row.Status !== 'Clear'))
+                                        .map((row, idx) => (
+                                        <tr key={idx} className={`hover:bg-slate-50 transition-colors ${row.Status === 'ALARM' ? 'bg-red-50/50' : ''}`}>
                                             <td className="px-6 py-4 font-mono text-slate-500 text-xs">{row.Timestamp.split(' ')[1]}</td>
                                             <td className="px-6 py-4 font-medium text-slate-700">{row.Building}</td>
                                             <td className="px-6 py-4 text-slate-600">{row.System}</td>
@@ -576,8 +645,10 @@
                                             <td className="px-6 py-4 text-right font-mono font-medium">{row.Value}</td>
                                         </tr>
                                     ))}
-                                    {hospitalData[selectedHospital].length === 0 && (
-                                        <tr><td colSpan="6" className="p-8 text-center text-slate-400">No data available for this site.</td></tr>
+                                    {hospitalData[selectedHospital].filter(row => filterMode === 'all' || (row.Status !== 'OK' && row.Status !== 'Clear')).length === 0 && (
+                                        <tr><td colSpan="6" className="p-8 text-center text-slate-400 italic">
+                                            {filterMode === 'alerts' ? 'No active alerts or faults found.' : 'No data available for this site.'}
+                                        </td></tr>
                                     )}
                                 </tbody>
                             </table>
