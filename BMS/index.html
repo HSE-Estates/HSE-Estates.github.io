@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HSE Regional BMS Master Dashboard</title>
+  
+  <!-- Favicons -->
+  <link rel="icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* Animations */
+    @keyframes pulse-red {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+    .status-critical {
+      animation: pulse-red 2s infinite;
+    }
+    
+    .loader {
+      border: 3px solid #f3f3f3;
+      border-radius: 50%;
+      border-top: 3px solid #10b981;
+      width: 20px;
+      height: 20px;
+      -webkit-animation: spin 1s linear infinite; /* Safari */
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    /* ========================================================================================
+       CONSTANTS & ICONS
+       ======================================================================================== */
+    
+    // Icons
+    const Icon = ({ path, className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        {path}
+      </svg>
+    );
+
+    const Icons = {
+      Activity: (props) => <Icon {...props} path={<><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></>} />,
+      AlertCircle: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></>} />,
+      CheckCircle: (props) => <Icon {...props} path={<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></>} />,
+      Thermometer: (props) => <Icon {...props} path={<><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path></>} />,
+      Upload: (props) => <Icon {...props} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></>} />,
+      Layout: (props) => <Icon {...props} path={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></>} />,
+      Server: (props) => <Icon {...props} path={<><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></>} />,
+      Bell: (props) => <Icon {...props} path={<><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></>} />,
+      Cloud: (props) => <Icon {...props} path={<><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></>} />,
+      Link: (props) => <Icon {...props} path={<><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></>} />
+    };
+
+    const Card = ({ children, className = '', noPad = false, onClick }) => (
+      <div 
+        onClick={onClick}
+        className={`bg-white rounded-xl border border-slate-200 shadow-sm transition-all duration-200 ${onClick ? 'cursor-pointer hover:shadow-md hover:border-emerald-300' : ''} ${className}`}
+      >
+        <div className={noPad ? '' : 'p-5'}>
+          {children}
+        </div>
+      </div>
+    );
+
+    /* ========================================================================================
+       DATA PROCESSING LOGIC
+       ======================================================================================== */
+
+    // Initial Dummy CSV Data - Updated with distinct hospitals
+    const INITIAL_CSV = `Timestamp,Hospital,Building,System,Status,Message,Value
+2023-10-27 08:30,Macroom Hospital,Main Block,HVAC,OK,System Running,22.5
+2023-10-27 08:35,Macroom Hospital,Pharmacy,Refrigeration,OK,Temp Normal,4.2
+2023-10-27 08:40,St. Marys Health Campus,East Wing,Fire Panel,FAULT,Detector Dirty L2,0
+2023-10-27 08:42,Youghal Community Hospital,Boiler House,Boiler 1,ALARM,Pressure Low,0.8
+2023-10-27 09:00,Mallow General Hospital,Unit 1,Lighting,OK,Schedule Active,100
+2023-10-27 09:15,St. Stephens Hospital,Plant Room,AHU 3,FAULT,Filter Blocked,0
+2023-10-27 09:20,Heather House,Kitchen,Gas Detection,OK,Levels Normal,0
+2023-10-27 09:22,St. Marys Health Campus,Main Block,HVAC,OK,Temp Normal,21.5
+2023-10-27 09:22,Youghal Community Hospital,Main Block,HVAC,OK,Temp Normal,20.5
+2023-10-27 09:22,St. Stephens Hospital,Main Block,HVAC,OK,Temp Normal,21.0
+2023-10-27 09:22,Mallow General Hospital,Main Block,HVAC,OK,Temp Normal,22.0
+2023-10-27 09:22,Heather House,Main Block,HVAC,OK,Temp Normal,21.8`;
+
+    /* ========================================================================================
+       COMPONENTS
+       ======================================================================================== */
+
+    const StatusBadge = ({ status }) => {
+        if (status === 'OK' || status === 'Clear') return <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 w-fit"><Icons.CheckCircle className="w-3 h-3"/> Clear</span>;
+        if (status === 'FAULT') return <span className="bg-orange-100 text-orange-800 text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 w-fit"><Icons.AlertCircle className="w-3 h-3"/> Fault</span>;
+        return <span className="bg-red-100 text-red-800 text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 w-fit"><Icons.Bell className="w-3 h-3"/> Alarm</span>;
+    };
+
+    const HospitalCard = ({ name, data, onClick }) => {
+        const faults = data.filter(d => d.Status === 'FAULT' || d.Status === 'ALARM');
+        const isCritical = faults.some(d => d.Status === 'ALARM');
+        
+        // Find latest valid HVAC reading for main temp display
+        const hvacReadings = data.filter(d => d.System === 'HVAC' && !isNaN(parseFloat(d.Value)));
+        
+        // Fallback: If no HVAC found, try finding ANY valid temp reading (Boiler, Fridge etc) just to show something, though HVAC is preferred
+        const fallbackReadings = data.filter(d => 
+            (d.System.includes('Temp') || d.System.includes('Boiler') || d.System.includes('Heating')) 
+            && !isNaN(parseFloat(d.Value))
+        );
+
+        let displayTemp = '--';
+        if (hvacReadings.length > 0) {
+            displayTemp = parseFloat(hvacReadings[hvacReadings.length-1].Value).toFixed(1);
+        } else if (fallbackReadings.length > 0) {
+            displayTemp = parseFloat(fallbackReadings[fallbackReadings.length-1].Value).toFixed(1);
+        }
+
+        return (
+            <Card onClick={onClick} className={`relative overflow-hidden ${isCritical ? 'border-l-4 border-l-red-500 status-critical' : 'border-l-4 border-l-emerald-500'}`}>
+                <div className="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 className="font-bold text-slate-800 text-lg">{name}</h3>
+                        <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mt-1">Building Management System</p>
+                    </div>
+                    {faults.length === 0 ? (
+                        <div className="h-10 w-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
+                            <Icons.CheckCircle className="w-6 h-6" />
+                        </div>
+                    ) : (
+                        <div className={`h-10 w-10 rounded-full flex items-center justify-center text-white ${isCritical ? 'bg-red-500' : 'bg-orange-500'}`}>
+                            <span className="font-bold text-lg">{faults.length}</span>
+                        </div>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mt-2">
+                    <div className="bg-slate-50 p-2 rounded border border-slate-100">
+                        <div className="text-xs text-slate-400 font-bold uppercase">Main Block Temp</div>
+                        <div className="flex items-center gap-1 text-slate-700 font-mono font-bold text-lg">
+                            <Icons.Thermometer className="w-4 h-4 text-emerald-500" /> {displayTemp}°C
+                        </div>
+                    </div>
+                    <div className="bg-slate-50 p-2 rounded border border-slate-100">
+                        <div className="text-xs text-slate-400 font-bold uppercase">System Status</div>
+                        <div className={`text-sm font-bold mt-1 ${faults.length > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                            {faults.length > 0 ? 'Attention Req.' : 'Optimal'}
+                        </div>
+                    </div>
+                </div>
+
+                {faults.length > 0 && (
+                     <div className="mt-4 pt-3 border-t border-slate-100">
+                        <p className="text-xs text-red-600 font-bold mb-2">Latest Alerts:</p>
+                        {faults.slice(0, 2).map((f, i) => (
+                            <div key={i} className="text-xs text-slate-600 truncate flex items-center gap-1 mb-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+                                {f.System}: {f.Message}
+                            </div>
+                        ))}
+                     </div>
+                )}
+            </Card>
+        );
+    };
+
+    /* ========================================================================================
+       MAIN APP COMPONENT
+       ======================================================================================== */
+
+    function App() {
+      const [view, setView] = useState('dashboard');
+      const [csvData, setCsvData] = useState(INITIAL_CSV);
+      const [parsedData, setParsedData] = useState([]);
+      const [selectedHospital, setSelectedHospital] = useState(null);
+      const [isLoading, setIsLoading] = useState(false);
+      const [cloudUrl, setCloudUrl] = useState('');
+
+      // Parse CSV Logic
+      useEffect(() => {
+        const lines = csvData.trim().split('\n');
+        const headers = lines[0].split(',').map(h => h.trim());
+        const result = [];
+
+        for(let i=1; i<lines.length; i++) {
+            if(!lines[i].trim()) continue;
+            const obj = {};
+            const currentline = lines[i].split(',');
+            
+            // Simple CSV parser that handles commas inside CSV slightly better if needed, 
+            // but for this demo, standard split is fine.
+            headers.forEach((header, j) => {
+                obj[header] = currentline[j]?.trim();
+            });
+            result.push(obj);
+        }
+        setParsedData(result);
+      }, [csvData]);
+
+      // Group Data by Hospital - NOW DYNAMIC
+      const hospitalData = useMemo(() => {
+        const groups = {};
+        
+        parsedData.forEach(item => {
+            if (!item.Hospital) return;
+            if (!groups[item.Hospital]) {
+                groups[item.Hospital] = [];
+            }
+            groups[item.Hospital].push(item);
+        });
+        
+        // Sort keys to keep dashboard stable
+        const sortedGroups = {};
+        Object.keys(groups).sort().forEach(key => {
+            sortedGroups[key] = groups[key];
+        });
+        
+        return sortedGroups;
+      }, [parsedData]);
+
+      // NEW: Improved Fake Data Generator with Forced HVAC
+      const generateRealisticData = () => {
+          setIsLoading(true);
+          
+          setTimeout(() => {
+              const hospitals = [
+                  'Macroom Hospital', 
+                  'St. Marys Health Campus', 
+                  'Heather House',
+                  'Youghal Community Hospital',
+                  'St. Stephens Hospital', 
+                  'Mallow General Hospital'
+              ];
+              const buildings = ['Main Block', 'East Wing', 'Outpatients', 'Plant Room', 'Pharmacy', 'Kitchen'];
+              
+              const systemTypes = [
+                  { name: 'HVAC', min: 19, max: 24, unit: '°C' },
+                  { name: 'Boiler 1', min: 65, max: 82, unit: '°C' },
+                  { name: 'Boiler 2', min: 60, max: 80, unit: '°C' },
+                  { name: 'Pharma Fridge', min: 2, max: 8, unit: '°C' },
+                  { name: 'Kitchen Freezer', min: -22, max: -18, unit: '°C' },
+                  { name: 'Medical Gas', min: 4, max: 5, unit: 'Bar' },
+                  { name: 'Water Tank Lvl', min: 80, max: 100, unit: '%' },
+                  { name: 'Generator 1', min: 0, max: 0, unit: 'V' }, 
+                  { name: 'UPS Status', min: 100, max: 100, unit: '%' },
+                  { name: 'Fire Panel', min: 0, max: 0, unit: 'State' }
+              ];
+
+              const faultMessages = ['Filter Dirty', 'Communication Lost', 'Pressure High', 'Valve Stuck', 'Routine Check', 'Low Voltage', 'Leak Detected'];
+              
+              let newCsv = "Timestamp,Hospital,Building,System,Status,Message,Value\n";
+              
+              // 1. Force Generate one valid HVAC reading for EVERY hospital first
+              hospitals.forEach(hosp => {
+                   const val = (Math.random() * (24 - 19) + 19).toFixed(1);
+                   const ts = new Date().toISOString().slice(0,16).replace('T',' ');
+                   newCsv += `${ts},${hosp},Main Block,HVAC,OK,Temp Normal,${val}\n`;
+              });
+
+              // 2. Generate random filler data (increased to 200 lines for density)
+              for(let i=0; i<200; i++) {
+                  const hosp = hospitals[Math.floor(Math.random() * hospitals.length)];
+                  const bldg = buildings[Math.floor(Math.random() * buildings.length)];
+                  const sysConfig = systemTypes[Math.floor(Math.random() * systemTypes.length)];
+                  
+                  let isFault = Math.random() > 0.90; // 10% chance of fault
+                  let val = (Math.random() * (sysConfig.max - sysConfig.min) + sysConfig.min).toFixed(1);
+                  
+                  // Specific Logic for faults
+                  if (sysConfig.name === 'Pharma Fridge' && val > 6) { isFault = true; } 
+                  if (sysConfig.name === 'Boiler 1' && val < 50) { isFault = true; } 
+                  
+                  const status = isFault ? (Math.random() > 0.4 ? 'FAULT' : 'ALARM') : 'OK';
+                  const msg = isFault ? faultMessages[Math.floor(Math.random() * faultMessages.length)] : 'Operating Normal';
+                  
+                  const date = new Date();
+                  date.setMinutes(date.getMinutes() - i * 2); 
+                  const ts = date.toISOString().slice(0,16).replace('T',' ');
+
+                  newCsv += `${ts},${hosp},${bldg},${sysConfig.name},${status},${msg},${val}\n`;
+              }
+              setCsvData(newCsv);
+              setIsLoading(false);
+          }, 1500); 
+      };
+
+      const handleHospitalClick = (name) => {
+          setSelectedHospital(name);
+          setView('details');
+      };
+
+      // Chart Component
+      const TrendChart = () => {
+        const canvasRef = useRef(null);
+        
+        useEffect(() => {
+            if (!canvasRef.current) return;
+            const ctx = canvasRef.current.getContext('2d');
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00'],
+                    datasets: [{
+                        label: 'Active Faults',
+                        data: [2, 5, 3, 6, 4, parsedData.filter(d => d.Status !== 'OK').length],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, suggestedMax: 10 } }
+                }
+            });
+            return () => chart.destroy();
+        }, [parsedData]);
+
+        return <div className="h-48 w-full"><canvas ref={canvasRef} /></div>;
+      };
+
+      return (
+        <div className="min-h-screen pb-20 flex flex-col font-sans">
+          
+          {/* Header */}
+          <header className="bg-emerald-900 text-white p-4 shadow-lg sticky top-0 z-50">
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="bg-white p-1.5 rounded-lg">
+                  <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE" className="h-8 w-auto" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold tracking-tight">Regional BMS Dashboard</h1>
+                  <div className="text-[10px] uppercase font-bold tracking-widest opacity-70">Cork / Kerry Region</div>
+                </div>
+              </div>
+              
+              <nav className="flex bg-emerald-800 p-1 rounded-lg">
+                <button onClick={() => setView('dashboard')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${view === 'dashboard' ? 'bg-white text-emerald-900 shadow-sm' : 'text-emerald-100 hover:text-white'}`}>
+                    <div className="flex items-center gap-2"><Icons.Layout className="w-4 h-4"/> Overview</div>
+                </button>
+                <button onClick={() => setView('csv')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${view === 'csv' ? 'bg-white text-emerald-900 shadow-sm' : 'text-emerald-100 hover:text-white'}`}>
+                    <div className="flex items-center gap-2"><Icons.Cloud className="w-4 h-4"/> Data Source</div>
+                </button>
+              </nav>
+            </div>
+          </header>
+
+          <main className="max-w-7xl mx-auto p-6 flex-grow w-full">
+            
+            {/* VIEW: DASHBOARD */}
+            {view === 'dashboard' && (
+                <div className="space-y-8">
+                    
+                    {/* Top Stats */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <Card className="bg-emerald-50 border-emerald-200">
+                           <div className="flex items-center gap-4">
+                                <div className="p-3 bg-white rounded-full text-emerald-600 shadow-sm"><Icons.Activity /></div>
+                                <div>
+                                    <div className="text-2xl font-black text-emerald-900">{parsedData.length}</div>
+                                    <div className="text-xs font-bold text-emerald-600 uppercase">Live Data Points</div>
+                                </div>
+                           </div>
+                        </Card>
+                        <Card className="bg-white">
+                           <div className="flex items-center gap-4">
+                                <div className="p-3 bg-red-50 rounded-full text-red-600 shadow-sm"><Icons.Bell /></div>
+                                <div>
+                                    <div className="text-2xl font-black text-red-600">{parsedData.filter(d => d.Status === 'ALARM').length}</div>
+                                    <div className="text-xs font-bold text-slate-500 uppercase">Active Alarms</div>
+                                </div>
+                           </div>
+                        </Card>
+                        <Card className="bg-white">
+                           <div className="flex items-center gap-4">
+                                <div className="p-3 bg-orange-50 rounded-full text-orange-600 shadow-sm"><Icons.AlertCircle /></div>
+                                <div>
+                                    <div className="text-2xl font-black text-orange-600">{parsedData.filter(d => d.Status === 'FAULT').length}</div>
+                                    <div className="text-xs font-bold text-slate-500 uppercase">System Faults</div>
+                                </div>
+                           </div>
+                        </Card>
+                    </div>
+
+                    {/* Hospital Grid */}
+                    <div>
+                        <h2 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2">
+                            <Icons.Server className="w-5 h-5 text-emerald-600"/> Site Status
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {Object.keys(hospitalData).map(hName => (
+                                <HospitalCard 
+                                    key={hName} 
+                                    name={hName} 
+                                    data={hospitalData[hName]} 
+                                    onClick={() => handleHospitalClick(hName)}
+                                />
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Alert Trend & Recent List */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2">
+                            <Card>
+                                <h3 className="font-bold text-slate-700 mb-4">Fault Frequency (Last 6 Hours)</h3>
+                                <TrendChart />
+                            </Card>
+                        </div>
+                        <div className="lg:col-span-1">
+                            <Card className="h-full">
+                                <h3 className="font-bold text-slate-700 mb-4">Recent Critical Events</h3>
+                                <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                                    {parsedData.filter(d => d.Status !== 'OK').length === 0 && <p className="text-sm text-slate-400 italic">No active faults detected.</p>}
+                                    {parsedData.filter(d => d.Status !== 'OK').slice(0, 10).map((alert, idx) => (
+                                        <div key={idx} className="flex gap-3 items-start p-2 rounded bg-slate-50 border border-slate-100">
+                                            <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${alert.Status === 'ALARM' ? 'bg-red-500 animate-pulse' : 'bg-orange-500'}`}></div>
+                                            <div>
+                                                <div className="text-xs font-bold text-slate-700">{alert.Hospital}</div>
+                                                <div className="text-sm font-medium text-slate-900">{alert.Message}</div>
+                                                <div className="text-[10px] text-slate-400 font-mono">{alert.Timestamp} • {alert.System}</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </Card>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* VIEW: CSV IMPORT */}
+            {view === 'csv' && (
+                <div className="max-w-4xl mx-auto space-y-6">
+                    
+                    {/* Cloud Connect Section */}
+                    <Card className="border-emerald-100 bg-emerald-50/50">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2 bg-emerald-100 rounded text-emerald-700"><Icons.Cloud /></div>
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-800">Cloud Data Connection</h2>
+                                <p className="text-xs text-slate-500">Connect to live BMS logs via Google Sheets or Excel Online</p>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-4 items-end">
+                            <div className="flex-grow">
+                                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Source URL (Google Sheet / SharePoint)</label>
+                                <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-lg p-2 focus-within:ring-2 focus-within:ring-emerald-500">
+                                    <Icons.Link className="w-4 h-4 text-slate-400"/>
+                                    <input 
+                                        type="text" 
+                                        value={cloudUrl} 
+                                        onChange={(e) => setCloudUrl(e.target.value)}
+                                        placeholder="https://docs.google.com/spreadsheets/d/..." 
+                                        className="w-full text-sm outline-none text-slate-700"
+                                    />
+                                </div>
+                            </div>
+                            <button 
+                                onClick={generateRealisticData} 
+                                disabled={isLoading}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-lg font-bold shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isLoading ? <div className="loader"></div> : <Icons.Cloud className="w-4 h-4" />}
+                                {isLoading ? 'Syncing...' : 'Sync Now'}
+                            </button>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-2 italic">* For demo purposes, clicking "Sync Now" will simulate a connection and pull a large sample dataset from the cloud simulation engine.</p>
+                    </Card>
+
+                    {/* Manual Paste Section */}
+                    <Card>
+                        <div className="flex justify-between items-center mb-4">
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-700">Manual Data Inspection</h2>
+                                <p className="text-sm text-slate-500">View or edit the raw CSV data currently loaded in memory.</p>
+                            </div>
+                        </div>
+                        
+                        <div className="bg-slate-900 rounded-lg p-4 mb-4">
+                            <code className="text-xs text-emerald-400 block mb-2">// Current Data Schema:</code>
+                            <pre className="text-xs text-slate-300 font-mono overflow-x-auto">Timestamp,Hospital,Building,System,Status,Message,Value</pre>
+                        </div>
+
+                        <textarea 
+                            value={csvData}
+                            onChange={(e) => setCsvData(e.target.value)}
+                            className="w-full h-64 p-4 font-mono text-xs bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-y"
+                            placeholder="Data will appear here..."
+                        />
+                        
+                        <div className="mt-4 flex justify-end">
+                            <button onClick={() => setView('dashboard')} className="text-emerald-700 hover:bg-emerald-50 px-6 py-2 rounded-lg font-bold transition-colors">
+                                Cancel
+                            </button>
+                            <button onClick={() => setView('dashboard')} className="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2 rounded-lg font-bold shadow-sm transition-colors ml-2">
+                                Save & View Dashboard
+                            </button>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
+            {/* VIEW: DETAILS MODAL/PAGE */}
+            {view === 'details' && selectedHospital && (
+                 <div className="space-y-6">
+                    <button onClick={() => setView('dashboard')} className="flex items-center gap-2 text-sm text-slate-500 hover:text-emerald-700 font-bold mb-4">
+                        ← Back to Overview
+                    </button>
+                    
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-2xl font-bold text-slate-800">{selectedHospital}</h2>
+                        <div className="text-sm text-slate-500 bg-white px-3 py-1 rounded-full border shadow-sm">
+                            Last Updated: {parsedData[0]?.Timestamp || 'N/A'}
+                        </div>
+                    </div>
+
+                    <Card className="overflow-hidden" noPad>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                                    <tr>
+                                        <th className="px-6 py-3">Time</th>
+                                        <th className="px-6 py-3">Building/Area</th>
+                                        <th className="px-6 py-3">System</th>
+                                        <th className="px-6 py-3">Status</th>
+                                        <th className="px-6 py-3">Message/Code</th>
+                                        <th className="px-6 py-3 text-right">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {hospitalData[selectedHospital].map((row, idx) => (
+                                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-6 py-4 font-mono text-slate-500 text-xs">{row.Timestamp.split(' ')[1]}</td>
+                                            <td className="px-6 py-4 font-medium text-slate-700">{row.Building}</td>
+                                            <td className="px-6 py-4 text-slate-600">{row.System}</td>
+                                            <td className="px-6 py-4"><StatusBadge status={row.Status} /></td>
+                                            <td className="px-6 py-4 text-slate-600">
+                                                {row.Message}
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-mono font-medium">{row.Value}</td>
+                                        </tr>
+                                    ))}
+                                    {hospitalData[selectedHospital].length === 0 && (
+                                        <tr><td colSpan="6" className="p-8 text-center text-slate-400">No data available for this site.</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+                 </div>
+            )}
+
+          </main>
+
+          <footer className="mt-8 py-6 bg-white border-t border-slate-200 text-center">
+            <p className="text-sm font-bold text-slate-600">HSE Estates & Capital Projects</p>
+            <p className="text-xs text-slate-400 mt-1">&copy; {new Date().getFullYear()} Building Management Systems Interface</p>
+          </footer>
+
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
