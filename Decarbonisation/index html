@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HSE Site Audit & Strategy Platform</title>
+  
+  <!-- Favicons -->
+  <link rel="icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #003d32; border-radius: 10px; }
+
+    /* Print Specific Styles */
+    @media print {
+      @page { size: A4 portrait; margin: 8mm; }
+      body { background-color: #ffffff !important; color: #000 !important; }
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      .card-shadow { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
+      .page-break { page-break-before: always; }
+      .break-inside-avoid { break-inside: avoid; }
+    }
+    
+    .print-only { display: none; }
+    .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Mobile UX */
+    input, select, textarea { font-size: 16px !important; } 
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    
+    .hse-emerald { background-color: #003d32; }
+    .hse-text-emerald { color: #003d32; }
+    .hse-border-emerald { border-color: #003d32; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // --- ICONS ---
+    const IconBase = ({ children, className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
+    );
+    const Icons = {
+      Droplets: (props) => <IconBase {...props}><path d="M7 16.3c2.2 0 4-1.8 4-4 0-2.2-4-6-4-6s-4 3.8-4 6c0 2.2 1.8 4 4 4Z"/><path d="M17 16.3c2.2 0 4-1.8 4-4 0-2.2-4-6-4-6s-4 3.8-4 6c0 2.2 1.8 4 4 4Z"/></IconBase>,
+      Trash2: (props) => <IconBase {...props}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconBase>,
+      Zap: (props) => <IconBase {...props}><path d="M13 2 L3 14 L12 14 L11 22 L21 10 L12 10 L13 2 Z"/></IconBase>,
+      Sun: (props) => <IconBase {...props}><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></IconBase>,
+      Lightbulb: (props) => <IconBase {...props}><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A5 5 0 0 0 8 8c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></IconBase>,
+      Building2: (props) => <IconBase {...props}><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/></IconBase>,
+      ShieldCheck: (props) => <IconBase {...props}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></IconBase>,
+      Printer: (props) => <IconBase {...props}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></IconBase>,
+      Target: (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></IconBase>,
+      Globe: (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"/><line x1="2" x2="22" y1="12" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></IconBase>,
+      Truck: (props) => <IconBase {...props}><rect width="16" height="13" x="2" y="4" rx="2"/><path d="M16 9h4l2 3v2h-6V9z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></IconBase>,
+      Users: (props) => <IconBase {...props}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></IconBase>,
+      Package: (props) => <IconBase {...props}><path d="M16.5 9.4 7.5 4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></IconBase>,
+      ClipboardList: (props) => <IconBase {...props}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></IconBase>,
+      Plus: (props) => <IconBase {...props}><path d="M12 5v14M5 12h14"/></IconBase>,
+    };
+
+    const Card = ({ children, className = "" }) => (
+      <div className={`bg-white rounded-xl shadow-sm border border-slate-200 card-shadow overflow-hidden ${className}`}>
+        {children}
+      </div>
+    );
+
+    const Badge = ({ children, color = "bg-slate-100 text-slate-600" }) => (
+      <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${color}`}>
+        {children}
+      </span>
+    );
+
+    // --- DATA SETS ---
+    const BER_WEIGHTS = { 'A1': 1, 'A2': 2, 'A3': 3, 'B1': 4, 'B2': 5, 'B3': 6, 'C1': 7, 'C2': 8, 'C3': 9, 'D1': 10, 'D2': 11, 'E1': 12, 'E2': 13, 'F': 14, 'G': 15 };
+
+    const HSE_BENCHMARKS = {
+      hospital: { name: 'Acute Hospital', energy_target: 450, water_target: 450, ber_target: 'B2' },
+      cnu: { name: 'Community Nursing Unit', energy_target: 280, water_target: 200, ber_target: 'B2' },
+      admin: { name: 'Office / Primary Care', energy_target: 180, water_target: 25, ber_target: 'B1' },
+      dwelling: { name: 'Community Dwelling', energy_target: 120, water_target: 110, ber_target: 'A3' }
+    };
+
+    const METHODS_DB = {
+      energy: [
+        { id: 'led', name: 'LED Upgrade', avgCO2: 0.3, savings: '65%', capex: '€100/unit', payback: '2.5 yrs' },
+        { id: 'pv', name: 'Solar PV', avgCO2: 0.3, savings: '40%', capex: '€1200/kWp', payback: '7 yrs' },
+        { id: 'hp', name: 'Heat Pump', avgCO2: 2.5, savings: '50%', capex: '€40k/unit', payback: '9 yrs' },
+        { id: 'ins', name: 'Fabric Insulation', avgCO2: 0.32, savings: '30%', capex: '€200/m²', payback: '12 yrs' }
+      ],
+      transport: [
+         { id: 'ev', name: 'EV Fleet Switch', avgCO2: 3.5, savings: '75%', capex: '€45k/veh', payback: '6 yrs' },
+         { id: 'charger', name: 'EV Chargers', avgCO2: 0.5, savings: 'N/A', capex: '€8k/unit', payback: 'N/A' }
+      ]
+    };
+
+    const INITIAL_STATE = {
+      name: '',
+      auditor: '',
+      date: new Date().toISOString().split('T')[0],
+      buildingType: 'hospital',
+      area: '',
+      berRating: 'G',
+      annualKwh: '',
+      annualWater: '', 
+      sectionData: {
+        carbon: { status: 'pending', scope1: 'Included', scope2: 'Included', scope3: 'Partially', baseline: '2018', notes: '' },
+        lighting: { status: 'pending', coverage: '0-20%', controls: 'Manual', notes: '' },
+        renewables: { status: 'pending', pv: 'None', thermal: 'None', notes: '' },
+        water: { status: 'pending', mainMeter: 'Manual', subMeters: '0', locations: 'Plant Room, Ward, Kitchen', notes: '' },
+        waste: { status: 'pending', segregation: 'Poor', clinicalRatio: 'High', reuse: 'No', notes: '' },
+        fleet: { status: 'pending', electric: 'No', charging: 'No', travel: 'Manual', notes: '' },
+        governance: { status: 'pending', policy: 'Draft', training: 'None', reporting: 'Annual', notes: '' }
+      },
+      strategy: [] // Array of { method, id, quantity, estimate }
+    };
+
+    function App() {
+      const [view, setView] = useState('dashboard');
+      const [activeSection, setActiveSection] = useState('carbon');
+      const [showCalc, setShowCalc] = useState(false);
+      const [calcItem, setCalcItem] = useState(null);
+      const [data, setData] = useState(() => {
+        try {
+          const saved = localStorage.getItem('hse-audit-strategy-v2');
+          return saved ? JSON.parse(saved) : INITIAL_STATE;
+        } catch (e) { return INITIAL_STATE; }
+      });
+
+      useEffect(() => {
+        localStorage.setItem('hse-audit-strategy-v2', JSON.stringify(data));
+      }, [data]);
+
+      // --- DERIVED METRICS ---
+      const benchmark = useMemo(() => HSE_BENCHMARKS[data.buildingType], [data.buildingType]);
+      
+      const performance = useMemo(() => {
+        const area = parseFloat(data.area) || 0;
+        const energy = parseFloat(data.annualKwh) || 0;
+        return { 
+            intensity: area > 0 ? Math.round(energy / area) : 0,
+            compliant: BER_WEIGHTS[data.berRating] <= BER_WEIGHTS[benchmark.ber_target]
+        };
+      }, [data, benchmark]);
+
+      const strategyImpact = useMemo(() => {
+        return data.strategy.reduce((acc, item) => ({
+          co2: acc.co2 + (parseFloat(item.estimate.co2) || 0),
+          capex: acc.capex + (parseFloat(item.estimate.capex) || 0)
+        }), { co2: 0, capex: 0 });
+      }, [data.strategy]);
+
+      // --- ACTIONS ---
+      const updateField = (section, field, value) => {
+        setData(prev => ({
+          ...prev,
+          sectionData: {
+            ...prev.sectionData,
+            [section]: { ...prev.sectionData[section], [field]: value, status: 'in-progress' }
+          }
+        }));
+      };
+
+      const addStrategyItem = () => {
+        if (!calcItem) return;
+        const qty = parseFloat(calcItem.quantity) || 0;
+        const usage = parseFloat(calcItem.usage) || parseFloat(data.annualKwh) || 0; 
+        
+        // Simple Estimation Logic
+        let co2 = 0, cost = 0, capex = 0;
+        
+        if (calcItem.method.id === 'led') {
+           // 65% saving on lighting portion (assume 20% of total load if usage is total, or usage is lighting load)
+           const saving = usage * 0.65; 
+           co2 = saving * 0.000295; // kg to tonnes conversion rough
+           capex = qty * 100;
+        } else if (calcItem.method.id === 'pv') {
+           // 1kWp generates ~850kWh/yr
+           const gen = qty * 850;
+           co2 = gen * 0.000295;
+           capex = qty * 1200;
+        } else {
+           // Generic fallback
+           const saving = usage * 0.2;
+           co2 = saving * 0.0002;
+           capex = qty * 1000;
+        }
+
+        const newItem = {
+            id: Date.now(),
+            method: calcItem.method,
+            quantity: qty,
+            status: 'Proposed',
+            estimate: {
+                co2: co2.toFixed(1),
+                capex: capex.toFixed(0),
+                payback: calcItem.method.payback
+            }
+        };
+
+        setData(prev => ({ ...prev, strategy: [...prev.strategy, newItem] }));
+        setShowCalc(false);
+        setCalcItem(null);
+      };
+
+      const removeStrategyItem = (id) => {
+        setData(prev => ({ ...prev, strategy: prev.strategy.filter(s => s.id !== id) }));
+      };
+
+      return (
+        <div className="min-h-screen pb-10 print:pb-0 font-sans">
+          
+          {/* HEADER */}
+          <header className="hse-emerald text-white p-3 md:p-4 sticky top-0 z-50 no-print shadow-lg border-b border-emerald-800">
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                <div className="bg-white p-1 rounded shrink-0">
+                  <img src="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico" alt="HSE" className="h-7 w-auto" />
+                </div>
+                <div className="text-left overflow-hidden">
+                  <h1 className="text-sm md:text-lg font-black truncate uppercase tracking-tight">HSE Audit & Strategy Platform</h1>
+                  <Badge color="bg-emerald-700 text-emerald-50">Estate Decarbonisation Unit</Badge>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">
+                <nav className="flex bg-white/10 rounded-lg p-1">
+                  <button onClick={() => setView('dashboard')} className={`px-3 py-1 text-[10px] font-bold rounded transition-all uppercase ${view === 'dashboard' ? 'bg-white text-emerald-900' : 'text-white'}`}>Dashboard</button>
+                  <button onClick={() => setView('audit')} className={`px-3 py-1 text-[10px] font-bold rounded transition-all uppercase ${view === 'audit' ? 'bg-white text-emerald-900' : 'text-white'}`}>Audit Engine</button>
+                  <button onClick={() => setView('strategy')} className={`px-3 py-1 text-[10px] font-bold rounded transition-all uppercase ${view === 'strategy' ? 'bg-white text-emerald-900' : 'text-white'}`}>Strategy</button>
+                </nav>
+                <button onClick={() => window.print()} className="px-3 py-1 bg-white text-emerald-900 rounded text-[10px] font-black shadow active:scale-95 flex items-center gap-1 uppercase">
+                  <Icons.Printer className="w-3 h-3" /> Report
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-7xl mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
+            
+            {/* VIEW: DASHBOARD */}
+            {view === 'dashboard' && (
+              <div className="animate-fade-in space-y-6">
+                
+                {/* 2030 vs 2050 GOAL CARDS */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="bg-emerald-900 text-white p-5 border-none relative overflow-hidden">
+                        <div className="relative z-10 flex justify-between items-center">
+                            <div className="flex items-center gap-4 text-left">
+                                <div className="p-3 bg-emerald-800 rounded-xl"><Icons.Target className="w-8 h-8 text-emerald-400" /></div>
+                                <div>
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Compliance Status</h3>
+                                    <p className="text-xl font-black leading-tight">
+                                        {performance.compliant ? 'COMPLIANT' : 'ACTION REQUIRED'}
+                                    </p>
+                                    <p className="text-[10px] text-emerald-300 font-bold uppercase mt-1">Current: {data.berRating} / Target: {benchmark.ber_target}</p>
+                                </div>
+                            </div>
+                            <div className="text-right border-l border-emerald-800 pl-4">
+                                <p className="text-[9px] uppercase font-black text-emerald-400">Energy Intensity</p>
+                                <p className="text-3xl font-black">{performance.intensity}</p>
+                                <p className="text-[8px] uppercase">kWh/m²/yr</p>
+                            </div>
+                        </div>
+                    </Card>
+
+                    <Card className="bg-slate-900 text-white p-5 border-none relative overflow-hidden">
+                         <div className="relative z-10 flex justify-between items-center">
+                            <div className="flex items-center gap-4 text-left">
+                                <div className="p-3 bg-slate-800 rounded-xl"><Icons.Globe className="w-8 h-8 text-blue-400" /></div>
+                                <div>
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-blue-400">Strategy Impact</h3>
+                                    <p className="text-xl font-black leading-tight">{data.strategy.length} Projects Selected</p>
+                                    <p className="text-[10px] text-blue-300 font-bold uppercase mt-1">Est. Savings: {strategyImpact.co2.toFixed(1)} tCO₂e</p>
+                                </div>
+                            </div>
+                            <div className="text-right border-l border-slate-800 pl-4">
+                                <p className="text-[9px] uppercase font-black text-blue-400">Total CAPEX</p>
+                                <p className="text-3xl font-black">€{(strategyImpact.capex / 1000).toFixed(0)}k</p>
+                                <p className="text-[8px] uppercase">Estimate</p>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+
+                {/* SITE SETUP */}
+                <Card className="p-6 text-left">
+                    <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                      <div className="flex items-center gap-2">
+                        <Icons.Building2 className="w-4 h-4 hse-text-emerald" />
+                        <h3 className="font-black hse-text-emerald uppercase text-xs tracking-widest">Site Parameters</h3>
+                      </div>
+                      <Badge>Audit Setup</Badge>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase">Site Name</label>
+                        <input type="text" className="w-full border border-slate-200 p-2 rounded font-bold outline-none text-sm bg-slate-50 focus:bg-white focus:border-emerald-500 transition-colors" value={data.name} onChange={(e) => setData({...data, name: e.target.value})} placeholder="Facility name..." />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase">Profile Type</label>
+                        <select className="w-full border border-slate-200 p-2 rounded font-bold outline-none text-sm bg-slate-50" value={data.buildingType} onChange={(e) => setData({...data, buildingType: e.target.value})}>
+                          {Object.entries(HSE_BENCHMARKS).map(([key, val]) => (
+                            <option key={key} value={key}>{val.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase">Floor Area (m²)</label>
+                        <input type="number" className="w-full border border-slate-200 p-2 rounded font-bold outline-none text-sm bg-slate-50 focus:bg-white focus:border-emerald-500 transition-colors" value={data.area} onChange={(e) => setData({...data, area: e.target.value})} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase">Auditor Name</label>
+                        <input type="text" className="w-full border border-slate-200 p-2 rounded font-bold outline-none text-sm bg-slate-50 focus:bg-white focus:border-emerald-500 transition-colors" value={data.auditor} onChange={(e) => setData({...data, auditor: e.target.value})} placeholder="Name..." />
+                      </div>
+                    </div>
+                </Card>
+
+                {/* MODULE LAUNCHER */}
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                   {[
+                     { id: 'carbon', label: 'Baselines', icon: Icons.Globe, color: 'text-emerald-600' },
+                     { id: 'lighting', label: 'Lighting', icon: Icons.Lightbulb, color: 'text-yellow-500' },
+                     { id: 'renewables', label: 'Renewables', icon: Icons.Sun, color: 'text-orange-500' },
+                     { id: 'water', label: 'Water', icon: Icons.Droplets, color: 'text-blue-500' },
+                     { id: 'waste', label: 'Waste', icon: Icons.Trash2, color: 'text-rose-500' },
+                     { id: 'fleet', label: 'Fleet', icon: Icons.Truck, color: 'text-indigo-600' },
+                     { id: 'governance', label: 'Policy', icon: Icons.Users, color: 'text-slate-600' },
+                   ].map(m => (
+                     <button 
+                        key={m.id} 
+                        onClick={() => {setView('audit'); setActiveSection(m.id);}}
+                        className="p-4 bg-white border border-slate-200 rounded-xl hover:hse-border-emerald hover:shadow-md transition-all flex flex-col items-center justify-center gap-2 group"
+                     >
+                        <m.icon className={`w-6 h-6 ${m.color} group-hover:scale-110 transition-transform`} />
+                        <span className="text-[9px] font-black uppercase text-slate-600 tracking-wider group-hover:hse-text-emerald">{m.label}</span>
+                     </button>
+                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* VIEW: AUDIT ENGINE */}
+            {view === 'audit' && (
+              <div className="animate-fade-in flex flex-col md:grid md:grid-cols-12 gap-6 text-left">
+                
+                {/* SIDEBAR NAVIGATION */}
+                <div className="md:col-span-3">
+                  <div className="bg-emerald-900 text-white p-4 rounded-xl shadow-lg space-y-2 no-print sticky top-24">
+                    <h4 className="text-[10px] font-black uppercase text-emerald-400 mb-4 tracking-widest border-b border-emerald-800 pb-2">Audit Modules</h4>
+                    {[
+                      { id: 'carbon', label: 'Emissions & Baseline' },
+                      { id: 'lighting', label: 'Lighting Systems' },
+                      { id: 'renewables', label: 'Solar & Renewables' },
+                      { id: 'water', label: 'Water Management' },
+                      { id: 'waste', label: 'Waste Segregation' },
+                      { id: 'fleet', label: 'Fleet & Logistics' },
+                      { id: 'governance', label: 'Governance & Culture' }
+                    ].map(s => (
+                      <button 
+                        key={s.id} 
+                        onClick={() => setActiveSection(s.id)}
+                        className={`w-full text-left p-3 rounded-lg text-xs font-bold transition-all flex justify-between items-center ${activeSection === s.id ? 'bg-emerald-600 text-white' : 'hover:bg-white/5 text-slate-400'}`}
+                      >
+                        {s.label}
+                        {data.sectionData[s.id].status === 'in-progress' && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>}
+                      </button>
+                    ))}
+                    <button onClick={() => setView('dashboard')} className="w-full mt-6 p-3 hse-emerald hover:bg-emerald-950 rounded-lg text-[10px] font-black uppercase text-emerald-400 transition-all border border-emerald-800">← Back to Dashboard</button>
+                  </div>
+                </div>
+
+                {/* WORKSPACE */}
+                <Card className="md:col-span-9 p-4 md:p-8">
+                  <div className="flex justify-between items-center mb-6 border-b pb-4 border-slate-100">
+                    <h2 className="text-xl md:text-2xl font-black hse-text-emerald uppercase tracking-tight">{activeSection.replace('_', ' ')} Assessment</h2>
+                    <Badge color="bg-emerald-100 hse-text-emerald font-black tracking-widest uppercase">Clinical Audit Grade</Badge>
+                  </div>
+
+                  <div className="space-y-6">
+                    
+                    {/* Carbon / Energy */}
+                    {activeSection === 'carbon' && (
+                      <div className="space-y-6 animate-fade-in">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-4">
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase">Current Annual Energy (kWh)</label>
+                                <input type="number" className="w-full p-2 bg-slate-50 border border-slate-200 rounded font-bold text-sm mt-1 focus:bg-white focus:border-emerald-500" value={data.annualKwh} onChange={(e) => setData({...data, annualKwh: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase">Current BER Rating</label>
+                                <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded font-bold text-sm mt-1" value={data.berRating} onChange={(e) => setData({...data, berRating: e.target.value})}>
+                                    {Object.keys(BER_WEIGHTS).map(b => <option key={b} value={b}>{b}</option>)}
+                                </select>
+                            </div>
+                          </div>
+                          <div className="space-y-4">
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase">Baseline Year</label>
+                                <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded font-bold text-sm mt-1" value={data.sectionData.carbon.baseline} onChange={(e) => updateField('carbon', 'baseline', e.target.value)}>
+                                <option>2018 (SEAI Baseline)</option><option>2021</option><option>2023</option>
+                                </select>
+                            </div>
+                             <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase">Reporting Scope</label>
+                                <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded font-bold text-sm mt-1" value={data.sectionData.carbon.scope3} onChange={(e) => updateField('carbon', 'scope3', e.target.value)}>
+                                <option>Scope 1 & 2 Only</option><option>Scope 1, 2 & Primary Scope 3</option><option>Full Life-Cycle Reporting</option>
+                                </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Lighting */}
+                    {activeSection === 'lighting' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                        <div className="space-y-4">
+                          <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase">Current LED Coverage</label>
+                            <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded font-bold text-sm mt-1" value={data.sectionData.lighting.coverage} onChange={(e) => updateField('lighting', 'coverage', e.target.value)}>
+                              <option>0-20%</option><option>20-50%</option><option>50-80%</option><option>80-100%</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase">Control Systems</label>
+                            <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded font-bold text-sm mt-1" value={data.sectionData.lighting.controls} onChange={(e) => updateField('lighting', 'controls', e.target.value)}>
+                              <option>Manual Switching</option><option>PIR/Motion Sensors</option><option>Daylight Dimming</option><option>Central BMS Control</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-100 flex items-start gap-3">
+                           <Icons.Lightbulb className="w-5 h-5 text-yellow-600 mt-1" />
+                           <p className="text-[10px] text-yellow-800 font-bold leading-tight uppercase">Audit Tip: If coverage is below 50%, consider a full site-wide LED retrofit project in the Strategy section.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Renewables */}
+                    {activeSection === 'renewables' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                        <div className="space-y-4">
+                          <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase">Existing Solar PV</label>
+                            <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded font-bold text-sm mt-1" value={data.sectionData.renewables.pv} onChange={(e) => updateField('renewables', 'pv', e.target.value)}>
+                              <option>None</option><option>Small Array (&lt;10kW)</option><option>Large Array (&gt;10kW)</option><option>Solar Carport</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase">Existing Thermal/Heat Pumps</label>
+                            <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded font-bold text-sm mt-1" value={data.sectionData.renewables.thermal} onChange={(e) => updateField('renewables', 'thermal', e.target.value)}>
+                              <option>None (Gas/Oil Boilers)</option><option>Solar Thermal (Hot Water)</option><option>Air Source Heat Pump</option><option>Geothermal</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 flex items-start gap-3">
+                           <Icons.Sun className="w-5 h-5 text-orange-600 mt-1" />
+                           <p className="text-[10px] text-orange-800 font-bold leading-tight uppercase">Audit Tip: Check roof structural integrity and orientation (South-facing is ideal) before proposing PV.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Water */}
+                    {activeSection === 'water' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                        <div className="space-y-4">
+                          <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase">Sub-meters Installed</label>
+                            <input type="number" className="w-full p-2 bg-slate-50 border border-slate-200 rounded font-black text-sm mt-1" value={data.sectionData.water.subMeters} onChange={(e) => updateField('water', 'subMeters', e.target.value)} />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase">Read Method</label>
+                            <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded font-bold text-sm mt-1" value={data.sectionData.water.mainMeter} onChange={(e) => updateField('water', 'mainMeter', e.target.value)}>
+                              <option>Manual Read</option><option>AMR Connected</option><option>Pulse-logger Output</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Waste */}
+                    {activeSection === 'waste' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                        <div className="space-y-4">
+                          <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase">Segregation Standard</label>
+                            <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded font-black text-xs mt-1 uppercase" value={data.sectionData.waste.segregation} onChange={(e) => updateField('waste', 'segregation', e.target.value)}>
+                              <option value="Poor">Poor (High Contamination)</option>
+                              <option value="Fair">Fair (Needs improvement)</option>
+                              <option value="Good">Good (Low contamination)</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                     {/* Fleet */}
+                    {activeSection === 'fleet' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                        <div className="space-y-4">
+                          <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase">Fleet Electrification</label>
+                            <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded font-bold text-sm mt-1" value={data.sectionData.fleet.electric} onChange={(e) => updateField('fleet', 'electric', e.target.value)}>
+                              <option>None</option><option>Partial (&lt; 20%)</option><option>Targeted (50%+)</option><option>Full EV Fleet</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Governance */}
+                    {activeSection === 'governance' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                        <div className="space-y-4">
+                          <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase">Climate Policy Status</label>
+                            <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded font-bold text-sm mt-1" value={data.sectionData.governance.policy} onChange={(e) => updateField('governance', 'policy', e.target.value)}>
+                              <option>None</option><option>Draft</option><option>Published & Active</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Notes Field (Always Visible) */}
+                    <div className="space-y-1 pt-4 border-t border-slate-100">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Auditor Observations</label>
+                      <textarea 
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded font-medium text-sm min-h-[140px] outline-none focus:bg-white focus:border-emerald-500 transition-colors" 
+                        placeholder={`Provide detailed observations for ${activeSection} audit...`}
+                        value={data.sectionData[activeSection].notes}
+                        onChange={(e) => updateField(activeSection, 'notes', e.target.value)}
+                      ></textarea>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-4">
+                         <div className="text-xs text-slate-400 font-bold italic">Auto-saving to device storage...</div>
+                         <button onClick={() => setView('strategy')} className="px-6 py-2 bg-slate-800 text-white rounded-lg font-bold uppercase text-xs hover:bg-slate-700 transition-colors">
+                            Next: Strategy Plan →
+                         </button>
+                    </div>
+
+                  </div>
+                </Card>
+              </div>
+            )}
+
+            {/* VIEW: STRATEGY */}
+            {view === 'strategy' && (
+              <div className="animate-fade-in text-left">
+                <Card className="p-6">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                        <div>
+                            <h2 className="text-2xl font-black hse-text-emerald uppercase tracking-tight">Decarbonisation Strategy</h2>
+                            <p className="text-sm text-slate-500 font-medium">Select interventions based on audit findings.</p>
+                        </div>
+                        <div className="flex gap-2">
+                             <div className="text-right px-4 border-r border-slate-200">
+                                <p className="text-[10px] uppercase font-black text-slate-400">Total CAPEX</p>
+                                <p className="text-xl font-black text-slate-800">€{strategyImpact.capex.toLocaleString()}</p>
+                             </div>
+                             <div className="text-right px-4">
+                                <p className="text-[10px] uppercase font-black text-slate-400">Carbon Saved</p>
+                                <p className="text-xl font-black hse-text-emerald">{strategyImpact.co2.toFixed(1)} <span className="text-xs">tCO₂e</span></p>
+                             </div>
+                        </div>
+                    </div>
+
+                    {/* INTERVENTION SELECTOR */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                        {METHODS_DB.energy.map(m => (
+                            <button 
+                                key={m.id}
+                                onClick={() => {
+                                    setCalcItem({ method: m, quantity: '', usage: '' });
+                                    setShowCalc(true);
+                                }}
+                                className="bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 p-4 rounded-xl text-left transition-all group"
+                            >
+                                <div className="flex justify-between items-start mb-2">
+                                    <Badge color="bg-white group-hover:bg-emerald-100 group-hover:text-emerald-800 transition-colors">{m.payback}</Badge>
+                                    <Icons.Plus className="w-4 h-4 text-slate-400 group-hover:text-emerald-600" />
+                                </div>
+                                <h4 className="font-bold text-slate-800 group-hover:text-emerald-900">{m.name}</h4>
+                                <p className="text-xs text-slate-500 mt-1">Avg Saving: {m.savings}</p>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* SELECTED PROJECTS TABLE */}
+                    <div className="overflow-hidden rounded-xl border border-slate-200">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-slate-100 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                                <tr>
+                                    <th className="p-4">Intervention</th>
+                                    <th className="p-4">Quantity</th>
+                                    <th className="p-4">Est. CAPEX</th>
+                                    <th className="p-4">Est. CO₂ Saving</th>
+                                    <th className="p-4 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {data.strategy.length === 0 ? (
+                                    <tr><td colSpan="5" className="p-8 text-center text-slate-400 italic">No interventions selected yet. Click above to add.</td></tr>
+                                ) : (
+                                    data.strategy.map(item => (
+                                        <tr key={item.id} className="hover:bg-slate-50">
+                                            <td className="p-4 font-bold text-slate-700">{item.method.name}</td>
+                                            <td className="p-4">{item.quantity}</td>
+                                            <td className="p-4">€{item.estimate.capex}</td>
+                                            <td className="p-4 text-emerald-700 font-bold">{item.estimate.co2} t</td>
+                                            <td className="p-4 text-right">
+                                                <button onClick={() => removeStrategyItem(item.id)} className="text-red-400 hover:text-red-600 font-bold text-xs uppercase">Remove</button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+              </div>
+            )}
+
+            {/* PRINT ONLY SECTION */}
+            <div className="print-only break-inside-avoid">
+                <div className="mb-8 border-b-2 border-emerald-800 pb-4">
+                     <h1 className="text-2xl font-black uppercase text-emerald-900">Sustainability Audit Report</h1>
+                     <div className="flex justify-between mt-2 text-sm">
+                        <p><strong>Site:</strong> {data.name || 'Not Specified'}</p>
+                        <p><strong>Date:</strong> {data.date}</p>
+                     </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-8 mb-8">
+                     <div className="p-4 border border-slate-300 rounded">
+                        <h3 className="font-bold uppercase text-xs mb-2">Audit Summary</h3>
+                        <p className="text-sm">BER Rating: <strong>{data.berRating}</strong></p>
+                        <p className="text-sm">Energy Intensity: <strong>{performance.intensity} kWh/m²</strong></p>
+                        <p className="text-sm">Sub-metering: <strong>{data.sectionData.water.subMeters > 0 ? 'Yes' : 'No'}</strong></p>
+                        <p className="text-sm">LED Coverage: <strong>{data.sectionData.lighting.coverage}</strong></p>
+                        <p className="text-sm">Renewables: <strong>{data.sectionData.renewables.pv}</strong></p>
+                     </div>
+                     <div className="p-4 border border-slate-300 rounded">
+                        <h3 className="font-bold uppercase text-xs mb-2">Strategy Plan</h3>
+                        <p className="text-sm">Proposed Projects: <strong>{data.strategy.length}</strong></p>
+                        <p className="text-sm">Total Investment: <strong>€{strategyImpact.capex.toLocaleString()}</strong></p>
+                        <p className="text-sm">Carbon Reduction: <strong>{strategyImpact.co2.toFixed(1)} tCO₂e</strong></p>
+                     </div>
+                </div>
+
+                <h3 className="font-black uppercase text-sm mb-4 border-b pb-1">Auditor Observations</h3>
+                {Object.entries(data.sectionData).map(([key, section]) => (
+                    section.notes && (
+                        <div key={key} className="mb-4">
+                            <h4 className="font-bold text-xs uppercase text-slate-600 mb-1">{key}</h4>
+                            <p className="text-sm italic text-slate-800">{section.notes}</p>
+                        </div>
+                    )
+                ))}
+
+                <div className="mt-16 pt-8 border-t border-slate-300">
+                    <div className="flex justify-between items-end">
+                        <div>
+                            <p className="text-[10px] font-bold uppercase text-slate-400">Prepared By</p>
+                            <p className="text-lg font-black font-serif italic">{data.auditor || '________________'}</p>
+                        </div>
+                        <div className="text-right">
+                             <p className="text-[10px] font-bold uppercase text-slate-400">HSE National Green Campus Initiative</p>
+                             <p className="text-xs">Estate Decarbonisation Unit</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+          </main>
+
+          {/* CALCULATOR MODAL */}
+          {showCalc && (
+            <div className="fixed inset-0 bg-emerald-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                <Card className="w-full max-w-md p-6 animate-fade-in">
+                    <h3 className="font-black hse-text-emerald text-lg mb-1">{calcItem?.method.name}</h3>
+                    <p className="text-xs text-slate-500 mb-4 uppercase font-bold">Quick Calculator</p>
+                    
+                    <div className="space-y-4">
+                        <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase">Quantity ({calcItem?.method.id === 'ins' ? 'm²' : 'Units'})</label>
+                            <input autoFocus type="number" className="w-full border-2 border-slate-200 p-2 rounded-lg font-bold text-lg" value={calcItem.quantity} onChange={(e) => setCalcItem({...calcItem, quantity: e.target.value})} />
+                        </div>
+                        {calcItem.method.id === 'led' && (
+                             <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase">Est. Annual Usage (kWh)</label>
+                                <input type="number" className="w-full border-2 border-slate-200 p-2 rounded-lg font-bold text-lg" placeholder={data.annualKwh} value={calcItem.usage} onChange={(e) => setCalcItem({...calcItem, usage: e.target.value})} />
+                                <p className="text-[10px] text-slate-400 mt-1">Leave blank to use site total (auto-adjusted to 20% lighting load)</p>
+                            </div>
+                        )}
+                        <div className="flex gap-2 pt-2">
+                            <button onClick={() => setShowCalc(false)} className="flex-1 py-3 bg-slate-100 font-bold uppercase text-xs rounded-lg hover:bg-slate-200">Cancel</button>
+                            <button onClick={addStrategyItem} className="flex-1 py-3 bg-emerald-600 text-white font-bold uppercase text-xs rounded-lg hover:bg-emerald-700 shadow-lg">Add to Plan</button>
+                        </div>
+                    </div>
+                </Card>
+            </div>
+          )}
+
+          <footer className="mt-8 text-center text-slate-400 no-print px-4 pb-4">
+             <p className="text-[10px] font-bold leading-tight uppercase tracking-tight">
+               HSE National Sustainability Audit Unit &copy; 2026.
+             </p>
+          </footer>
+
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
+
+
