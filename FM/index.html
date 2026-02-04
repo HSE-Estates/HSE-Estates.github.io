@@ -40,7 +40,7 @@
     <div id="root">
         <!-- Loading State -->
         <div style="height: 100vh; display: flex; align-items: center; justify-content: center; color: #64748b; font-family: sans-serif;">
-            Initializing Dashboard (Lightweight Mode)...
+            Initializing Dashboard...
         </div>
     </div>
 
@@ -48,7 +48,6 @@
     <script>
         window.onerror = function(msg, url, lineNo, columnNo, error) {
             const root = document.getElementById('root');
-            // Check for missing globals
             let missing = [];
             if (!window.React) missing.push("React");
             if (!window.XLSX) missing.push("SheetJS");
@@ -86,13 +85,10 @@
                             const heightPercent = maxValue > 0 ? (d.value / maxValue) * 100 : 0;
                             return (
                                 <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end">
-                                    {/* Tooltip */}
                                     <div className="chart-tooltip absolute bottom-full mb-2 bg-slate-800 text-white text-xs py-1 px-2 rounded shadow-lg z-10 whitespace-nowrap">
                                         <div className="font-semibold">{d.name}</div>
                                         <div>{d.value} responses</div>
                                     </div>
-                                    
-                                    {/* Bar */}
                                     <div 
                                         style={{ height: `${heightPercent}%`, backgroundColor: color }} 
                                         className="w-full rounded-t-sm opacity-90 group-hover:opacity-100 transition-all cursor-default"
@@ -101,7 +97,6 @@
                             );
                         })}
                     </div>
-                    {/* Labels */}
                     <div className="flex gap-2 mt-2 border-t border-slate-200 pt-2">
                         {data.map((d, i) => (
                             <div key={i} className="flex-1 text-center">
@@ -159,7 +154,6 @@
                             </div>
                         );
                     })}
-                    {/* Legend */}
                     <div className="flex justify-center gap-4 mt-2">
                         {Object.keys(colors).map(key => (
                             <div key={key} className="flex items-center gap-1.5">
@@ -175,8 +169,6 @@
         // 3. Simple Donut Chart
         const NativeDonutChart = ({ data, colors }) => {
             if (!data || data.length === 0) return null;
-            
-            // Calculate segments
             const total = data.reduce((acc, curr) => acc + curr.value, 0);
             let accumulatedPercent = 0;
 
@@ -191,40 +183,26 @@
                 const percent = d.value / total;
                 accumulatedPercent += percent;
                 const endPercent = accumulatedPercent;
-
                 const [startX, startY] = getCoordinatesForPercent(startPercent);
                 const [endX, endY] = getCoordinatesForPercent(endPercent);
                 const largeArcFlag = percent > 0.5 ? 1 : 0;
-
-                // Path command
                 const pathData = [
                     `M ${startX} ${startY}`,
                     `A 1 1 0 ${largeArcFlag} 1 ${endX} ${endY}`,
                     `L 0 0`,
                 ].join(' ');
-
                 return { pathData, color: colors[i % colors.length], ...d, percent };
             });
 
             return (
                 <div className="w-full h-full flex items-center justify-center gap-8">
-                    {/* The Chart */}
                     <div className="relative w-48 h-48">
                          <svg viewBox="-1 -1 2 2" style={{ transform: 'rotate(-90deg)' }} className="w-full h-full">
                             {segments.map((s, i) => (
-                                <path 
-                                    key={i} 
-                                    d={s.pathData} 
-                                    fill={s.color} 
-                                    stroke="white"
-                                    strokeWidth="0.02"
-                                    className="hover:opacity-90 transition-opacity"
-                                />
+                                <path key={i} d={s.pathData} fill={s.color} stroke="white" strokeWidth="0.02" className="hover:opacity-90 transition-opacity"/>
                             ))}
-                            {/* Inner Circle for Donut Effect */}
                             <circle cx="0" cy="0" r="0.6" fill="white" />
                          </svg>
-                         {/* Center Text */}
                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <div className="text-center">
                                 <div className="text-2xl font-bold text-slate-800">{total}</div>
@@ -232,8 +210,6 @@
                             </div>
                          </div>
                     </div>
-                    
-                    {/* The Legend */}
                     <div className="flex flex-col justify-center gap-2">
                         {data.map((d, i) => (
                             <div key={i} className="flex items-center gap-2">
@@ -311,6 +287,7 @@
         // --- Main Application ---
         function App() {
             const [data, setData] = useState([]);
+            const [tableColumns, setTableColumns] = useState([]);
             const [filterType, setFilterType] = useState('All');
             const [viewMode, setViewMode] = useState('dashboard');
             const [statusMsg, setStatusMsg] = useState('Ready for Upload');
@@ -326,7 +303,7 @@
                 reader.onload = (e) => {
                     try {
                         const fileData = e.target.result;
-                        let jsonData = [];
+                        let processedData = [];
 
                         if (window.XLSX) {
                             setStatusMsg('Parsing Excel data...');
@@ -335,8 +312,17 @@
                             const sheet = workbook.Sheets[sheetName];
                             const rawJson = XLSX.utils.sheet_to_json(sheet, { defval: "" });
                             
-                            jsonData = rawJson.map(row => {
-                                // Robust Finder
+                            if (rawJson.length > 0) {
+                                // Extract all headers from the first row for the Table view
+                                setTableColumns(Object.keys(rawJson[0]));
+                            }
+
+                            processedData = rawJson.map(row => {
+                                // We keep the entire row for the "Data Table" view
+                                const rowWithInternalMetrics = { ...row };
+
+                                // --- Internal Metric Calculation for Charts (prefixed with __) ---
+                                // Robust Finder for Fuzzy Matching
                                 const findVal = (keywords) => {
                                     if (!row) return "";
                                     const key = Object.keys(row).find(k => k.toLowerCase().includes(keywords.toLowerCase()));
@@ -355,32 +341,27 @@
                                     return "Unknown";
                                 };
 
-                                return {
-                                    "Submission Date": findVal("Date") || findVal("Submission") || "N/A",
-                                    "Facility Type": findVal("matches your service area") || findVal("Facility Type") || "Unknown",
-                                    "Size": findVal("beds") || findVal("Size") || "Unknown",
-                                    "Role": findVal("Role") || findVal("Job Title") || "Unknown",
-                                    "FM Model": findVal("FM delivery model") || "Unknown",
-                                    "Maintenance Strategy": findVal("maintenance strategy") || "Unknown",
-                                    "Challenges": findVal("main challenges") || findVal("issues"),
-                                    "Reactive Maintenance": findTaskVal("General reactive maintenance"),
-                                    "PPM Plant": findTaskVal("Planned preventative maintenance"),
-                                    "Fire Alarm": findTaskVal("Fire alarm"),
-                                    "Lifts": findTaskVal("Lifts"),
-                                    "HVAC": findTaskVal("HVAC") || findTaskVal("Air conditioning") || findTaskVal("Ventilation"),
-                                    "Satisfaction": findVal("Satisfaction") || "Unknown",
-                                    "Comment": findVal("Comment") || findVal("Feedback") || findVal("further training")
-                                };
+                                // Map keys to internal normalized names for charts
+                                rowWithInternalMetrics.__FacilityType = findVal("matches your service area") || findVal("Facility Type") || "Unknown";
+                                rowWithInternalMetrics.__FMModel = findVal("FM delivery model") || "Unknown";
+                                rowWithInternalMetrics.__Challenges = findVal("main challenges") || findVal("issues");
+                                rowWithInternalMetrics.__Reactive = findTaskVal("General reactive maintenance");
+                                rowWithInternalMetrics.__PPM = findTaskVal("Planned preventative maintenance");
+                                rowWithInternalMetrics.__FireAlarm = findTaskVal("Fire alarm");
+                                rowWithInternalMetrics.__Lifts = findTaskVal("Lifts");
+                                rowWithInternalMetrics.__Comment = findVal("Comment") || findVal("Feedback") || findVal("further training");
+
+                                return rowWithInternalMetrics;
                             });
                         } else {
                             setStatusMsg("Error: Excel parser not loaded.");
                             return;
                         }
 
-                        if (jsonData.length > 0) {
-                            setData(jsonData);
+                        if (processedData.length > 0) {
+                            setData(processedData);
                             setFilterType('All'); 
-                            setStatusMsg(`Successfully loaded ${jsonData.length} records.`);
+                            setStatusMsg(`Successfully loaded ${processedData.length} records.`);
                         } else {
                             setStatusMsg("File parsed but 0 records found. Check format.");
                         }
@@ -400,7 +381,7 @@
             // --- Analytics Processing ---
             const filteredData = useMemo(() => {
                 if (filterType === 'All') return data;
-                return data.filter(d => d["Facility Type"] && d["Facility Type"].includes(filterType));
+                return data.filter(d => d["__FacilityType"] && d["__FacilityType"].includes(filterType));
             }, [data, filterType]);
 
             const stats = useMemo(() => {
@@ -409,7 +390,7 @@
                 // 1. Model Distribution
                 const models = {};
                 filteredData.forEach(d => {
-                    let model = d["FM Model"]?.split('(')[0].trim() || "Unknown";
+                    let model = d["__FMModel"]?.split('(')[0].trim() || "Unknown";
                     if (!model) model = "Unknown";
                     models[model] = (models[model] || 0) + 1;
                 });
@@ -418,24 +399,30 @@
                 // 2. Challenges Frequency
                 const challengeCounts = {};
                 filteredData.forEach(d => {
-                    if (d.Challenges && typeof d.Challenges === 'string') {
-                        const list = d.Challenges.split(/[,-]/).map(s => s.trim());
+                    if (d.__Challenges && typeof d.__Challenges === 'string') {
+                        const list = d.__Challenges.split(/[,-]/).map(s => s.trim());
                         list.forEach(c => {
                             if (c && c.length > 3) challengeCounts[c] = (challengeCounts[c] || 0) + 1;
                         });
                     }
                 });
                 const challengeData = Object.keys(challengeCounts)
-                    .map(k => ({ name: k, count: challengeCounts[k], value: challengeCounts[k] })) // Add value for compatibility
+                    .map(k => ({ name: k, count: challengeCounts[k], value: challengeCounts[k] })) 
                     .sort((a, b) => b.count - a.count)
                     .slice(0, 5);
 
                 // 3. Task Responsibility Matrix
-                const tasks = ["Reactive Maintenance", "PPM Plant", "Fire Alarm", "Lifts"];
+                const tasks = [
+                    { label: "Reactive Maintenance", key: "__Reactive" },
+                    { label: "PPM Plant", key: "__PPM" },
+                    { label: "Fire Alarm", key: "__FireAlarm" },
+                    { label: "Lifts", key: "__Lifts" }
+                ];
+                
                 const matrixData = tasks.map(task => {
-                    const counts = { name: task, "In-House": 0, "Contractor": 0, "Shared": 0 };
+                    const counts = { name: task.label, "In-House": 0, "Contractor": 0, "Shared": 0 };
                     filteredData.forEach(d => {
-                        const val = d[task];
+                        const val = d[task.key];
                         if (!val) return;
                         if (val.toLowerCase().includes("in-house")) counts["In-House"]++;
                         else if (val.toLowerCase().includes("contractor")) counts["Contractor"]++;
@@ -608,18 +595,18 @@
                                 <div className="divide-y divide-slate-100 max-h-[300px] overflow-y-auto">
                                     {data.length > 0 ? (
                                         <>
-                                            {filteredData.filter(d => d.Comment && typeof d.Comment === 'string' && d.Comment.length > 5).map((d, i) => (
+                                            {filteredData.filter(d => d.__Comment && typeof d.__Comment === 'string' && d.__Comment.length > 5).map((d, i) => (
                                                 <div key={i} className="p-4 hover:bg-slate-50 transition-colors">
                                                     <div className="flex justify-between items-start mb-1">
                                                         <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                                                            {d["Facility Type"]?.split('-')[0]}
+                                                            {d["__FacilityType"]?.split('-')[0]}
                                                         </span>
-                                                        <span className="text-xs text-slate-400">{d["Size"]}</span>
+                                                        <span className="text-xs text-slate-400">Response #{i + 1}</span>
                                                     </div>
-                                                    <p className="text-sm text-slate-700 italic">"{d.Comment}"</p>
+                                                    <p className="text-sm text-slate-700 italic">"{d.__Comment}"</p>
                                                 </div>
                                             ))}
-                                            {filteredData.filter(d => d.Comment && d.Comment.length > 5).length === 0 && (
+                                            {filteredData.filter(d => d.__Comment && d.__Comment.length > 5).length === 0 && (
                                                 <div className="p-8 text-center text-slate-400 text-sm">
                                                     No comments found in current filter selection.
                                                 </div>
@@ -635,33 +622,27 @@
                         </>
                         ) : (
                             // --- Data Table View ---
-                            <Card>
-                                <CardHeader title="Raw Data Table" icon={Icons.Table} subtitle={`Showing all ${data.length} records`} />
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm text-left text-slate-500">
-                                        <thead className="text-xs text-slate-700 uppercase bg-slate-50">
+                            <Card className="overflow-hidden flex flex-col h-full">
+                                <CardHeader title="Raw Data Table" icon={Icons.Table} subtitle={`Showing all columns from ${data.length} records`} />
+                                <div className="overflow-auto flex-grow max-h-[800px]">
+                                    <table className="w-full text-sm text-left text-slate-500 whitespace-nowrap">
+                                        <thead className="text-xs text-slate-700 uppercase bg-slate-50 sticky top-0 z-10">
                                             <tr>
-                                                <th className="px-6 py-3">Facility Type</th>
-                                                <th className="px-6 py-3">Role</th>
-                                                <th className="px-6 py-3">Model</th>
-                                                <th className="px-6 py-3">Reactive Maint.</th>
-                                                <th className="px-6 py-3">PPM Plant</th>
-                                                <th className="px-6 py-3">Challenges</th>
+                                                {tableColumns.map((col, idx) => (
+                                                    <th key={idx} className="px-6 py-3 border-b border-slate-200 bg-slate-50 min-w-[150px]">
+                                                        {col.length > 30 ? col.substring(0, 30) + "..." : col}
+                                                    </th>
+                                                ))}
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {data.map((row, index) => (
-                                                <tr key={index} className="bg-white border-b hover:bg-slate-50">
-                                                    <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">
-                                                        {row["Facility Type"]?.substring(0, 30)}...
-                                                    </td>
-                                                    <td className="px-6 py-4">{row["Role"]}</td>
-                                                    <td className="px-6 py-4">{row["FM Model"]?.substring(0, 20)}...</td>
-                                                    <td className="px-6 py-4">{row["Reactive Maintenance"]}</td>
-                                                    <td className="px-6 py-4">{row["PPM Plant"]}</td>
-                                                    <td className="px-6 py-4 truncate max-w-xs" title={row["Challenges"]}>
-                                                        {row["Challenges"]?.substring(0, 40)}...
-                                                    </td>
+                                            {data.map((row, rIdx) => (
+                                                <tr key={rIdx} className="bg-white border-b hover:bg-slate-50">
+                                                    {tableColumns.map((col, cIdx) => (
+                                                        <td key={cIdx} className="px-6 py-4 border-b border-slate-100">
+                                                            {row[col] ? String(row[col]).substring(0, 50) + (String(row[col]).length > 50 ? "..." : "") : "-"}
+                                                        </td>
+                                                    ))}
                                                 </tr>
                                             ))}
                                         </tbody>
