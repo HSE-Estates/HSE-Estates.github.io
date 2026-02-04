@@ -1,0 +1,480 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from 'recharts';
+import { Upload, FileText, Activity, Users, AlertTriangle, CheckCircle, Building, Wrench, Table as TableIcon, BarChart2, FileSpreadsheet } from 'lucide-react';
+
+// --- Card Components ---
+const Card = ({ children, className = "" }) => (
+  <div className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ${className}`}>
+    {children}
+  </div>
+);
+
+const CardHeader = ({ title, icon: Icon, subtitle }) => (
+  <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+    <div>
+      <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+        {Icon && <Icon className="w-5 h-5 text-emerald-600" />}
+        {title}
+      </h3>
+      {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
+    </div>
+  </div>
+);
+
+const CardContent = ({ children, className = "" }) => (
+  <div className={`p-6 ${className}`}>
+    {children}
+  </div>
+);
+
+const MetricCard = ({ title, value, subtext, icon: Icon, trend }) => (
+  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between hover:shadow-md transition-shadow">
+    <div>
+      <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
+      <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
+      {subtext && <p className="text-xs text-slate-400 mt-1">{subtext}</p>}
+    </div>
+    <div className={`p-3 rounded-lg ${trend === 'positive' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+      <Icon className="w-6 h-6" />
+    </div>
+  </div>
+);
+
+// --- Main Application ---
+
+export default function FMDashboard() {
+  const [data, setData] = useState([]); // Start blank
+  const [filterType, setFilterType] = useState('All');
+  const [viewMode, setViewMode] = useState('dashboard'); // 'dashboard' or 'table'
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Load SheetJS for Excel parsing
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
+  // --- Excel/CSV Parser ---
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setIsLoading(true);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target.result;
+        let jsonData = [];
+
+        // Check if XLSX library is loaded
+        if (window.XLSX) {
+          const workbook = window.XLSX.read(data, { type: 'binary' });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const rawJson = window.XLSX.utils.sheet_to_json(sheet, { defval: "" });
+          
+          jsonData = rawJson.map(row => {
+            // Helper to fuzzy find keys in the row object
+            const findVal = (keywords) => {
+               const key = Object.keys(row).find(k => k.toLowerCase().includes(keywords.toLowerCase()));
+               return key ? row[key] : "";
+            };
+
+            // Specific logic for survey questions which might have long headers
+            // We search for the specific task and take the value
+            const findTaskVal = (taskName) => {
+                // Find all keys that contain the task name
+                const relevantKeys = Object.keys(row).filter(k => k.toLowerCase().includes(taskName.toLowerCase()));
+                // If the value in the cell is meaningful (longer than 2 chars), use it
+                for (let key of relevantKeys) {
+                    const val = row[key];
+                    if (val && typeof val === 'string' && val.length > 2 && val !== "Not Applicable") {
+                        return val;
+                    }
+                }
+                return "Unknown";
+            };
+
+            return {
+              "Submission Date": findVal("Date") || findVal("Submission") || "N/A",
+              "Facility Type": findVal("matches your service area") || findVal("Facility Type") || "Unknown",
+              "Size": findVal("beds") || findVal("Size") || "Unknown",
+              "Role": findVal("Role") || findVal("Job Title") || "Unknown",
+              "FM Model": findVal("FM delivery model") || "Unknown",
+              "Maintenance Strategy": findVal("maintenance strategy") || "Unknown",
+              "Challenges": findVal("main challenges") || findVal("issues"),
+              "Reactive Maintenance": findTaskVal("General reactive maintenance"),
+              "PPM Plant": findTaskVal("Planned preventative maintenance"),
+              "Fire Alarm": findTaskVal("Fire alarm"),
+              "Lifts": findTaskVal("Lifts"),
+              "HVAC": findTaskVal("HVAC") || findTaskVal("Air conditioning") || findTaskVal("Ventilation"),
+              "Satisfaction": findVal("Satisfaction") || "Unknown",
+              "Comment": findVal("Comment") || findVal("Feedback") || findVal("further training") // Heuristic based on user data
+            };
+          });
+
+        } else {
+           // Fallback to simple CSV split if XLSX fails or isn't loaded (rare)
+           alert("Excel parser loading... please try again in 2 seconds.");
+           return;
+        }
+
+        if (jsonData.length > 0) {
+            setData(jsonData);
+            setFilterType('All'); // Reset filter
+        }
+      } catch (error) {
+        console.error("Error parsing file:", error);
+        alert("Error reading file. Please ensure it is a valid Excel or CSV file.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (file.name.endsWith('.csv')) {
+        reader.readAsText(file); // Fallback but XLSX.read can handle text too usually
+    } else {
+        reader.readAsBinaryString(file);
+    }
+  };
+
+  // --- Analytics Processing ---
+
+  const filteredData = useMemo(() => {
+    if (filterType === 'All') return data;
+    return data.filter(d => d["Facility Type"] && d["Facility Type"].includes(filterType));
+  }, [data, filterType]);
+
+  const stats = useMemo(() => {
+    if (!data.length) return { modelData: [], challengeData: [], matrixData: [] };
+
+    // 1. Model Distribution
+    const models = {};
+    filteredData.forEach(d => {
+      let model = d["FM Model"]?.split('(')[0].trim() || "Unknown";
+      if (!model) model = "Unknown";
+      models[model] = (models[model] || 0) + 1;
+    });
+    const modelData = Object.keys(models).map(k => ({ name: k, value: models[k] }));
+
+    // 2. Challenges Frequency
+    const challengeCounts = {};
+    filteredData.forEach(d => {
+      if (d.Challenges && typeof d.Challenges === 'string') {
+        const list = d.Challenges.split(/[,-]/).map(s => s.trim()); // Split by comma or dash
+        list.forEach(c => {
+          if (c && c.length > 3) challengeCounts[c] = (challengeCounts[c] || 0) + 1;
+        });
+      }
+    });
+    const challengeData = Object.keys(challengeCounts)
+      .map(k => ({ name: k, count: challengeCounts[k] }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    // 3. Task Responsibility Matrix
+    const tasks = ["Reactive Maintenance", "PPM Plant", "Fire Alarm", "Lifts"];
+    const matrixData = tasks.map(task => {
+      const counts = { name: task, "In-House": 0, "Contractor": 0, "Shared": 0 };
+      filteredData.forEach(d => {
+        const val = d[task];
+        if (!val) return;
+        if (val.toLowerCase().includes("in-house")) counts["In-House"]++;
+        else if (val.toLowerCase().includes("contractor")) counts["Contractor"]++;
+        else if (val.toLowerCase().includes("shared")) counts["Shared"]++;
+      });
+      return counts;
+    });
+
+    return { modelData, challengeData, matrixData };
+  }, [filteredData, data]);
+
+  // Colors
+  const COLORS = {
+    pie: ['#059669', '#2563eb', '#d97706', '#64748b', '#8b5cf6', '#ec4899'], 
+    bar: '#3b82f6',
+    matrix: {
+      "In-House": "#10b981", 
+      "Contractor": "#3b82f6", 
+      "Shared": "#f59e0b" 
+    }
+  };
+
+  // Expanded accept attribute to catch all Excel MIME types
+  const ACCEPT_TYPES = ".csv, .xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel";
+
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-12">
+      {/* Top Navigation */}
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Building className="w-6 h-6 text-emerald-600" />
+            <h1 className="text-xl font-bold text-slate-900 hidden sm:block">Irish Healthcare FM Analytics</h1>
+            <h1 className="text-xl font-bold text-slate-900 sm:hidden">FM Analytics</h1>
+          </div>
+          
+          <div className="flex items-center gap-4">
+             {data.length > 0 && (
+                 <div className="flex bg-slate-100 p-1 rounded-lg">
+                    <button 
+                        onClick={() => setViewMode('dashboard')}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${viewMode === 'dashboard' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        <BarChart2 className="w-4 h-4" />
+                        <span className="hidden sm:inline">Dashboard</span>
+                    </button>
+                    <button 
+                        onClick={() => setViewMode('table')}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        <TableIcon className="w-4 h-4" />
+                        <span className="hidden sm:inline">Data Table</span>
+                    </button>
+                 </div>
+             )}
+
+            {data.length > 0 && (
+                <div className="hidden md:flex items-center gap-2 text-sm text-slate-500">
+                <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-800">
+                    Live Data ({data.length} rows)
+                </span>
+                </div>
+            )}
+            
+            <label className={`flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg cursor-pointer transition-colors shadow-sm ${isLoading ? 'opacity-70 pointer-events-none' : ''}`}>
+              <Upload className="w-4 h-4" />
+              <span>{isLoading ? 'Loading...' : 'Import Excel/CSV'}</span>
+              <input type="file" accept={ACCEPT_TYPES} onChange={handleFileUpload} className="hidden" />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        
+        {data.length === 0 ? (
+            // --- Empty State ---
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
+                <div className="bg-emerald-50 p-6 rounded-full mb-6">
+                    <FileSpreadsheet className="w-12 h-12 text-emerald-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">Ready for your Data</h2>
+                <p className="text-slate-500 max-w-md text-center mb-8">
+                    Upload your Facilities Management Excel report (.xlsx) or CSV file to generate the dashboard.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <label className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-lg cursor-pointer transition-transform active:scale-95 shadow-lg">
+                        <Upload className="w-5 h-5" />
+                        <span>Select Excel File</span>
+                        <input type="file" accept={ACCEPT_TYPES} onChange={handleFileUpload} className="hidden" />
+                    </label>
+                </div>
+                <p className="mt-8 text-xs text-slate-400">
+                    Supported formats: .xlsx, .xls, .csv
+                </p>
+            </div>
+        ) : (
+            // --- Dashboard Content ---
+            <>
+                {viewMode === 'dashboard' ? (
+                <>
+                    {/* Header Controls */}
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-800">Executive Overview</h2>
+                            <p className="text-slate-500">Analysis of Facilities Management delivery models across the estate.</p>
+                        </div>
+                        <select 
+                            className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2.5 shadow-sm min-w-[200px]"
+                            value={filterType}
+                            onChange={(e) => setFilterType(e.target.value)}
+                        >
+                            <option value="All">All Facility Types</option>
+                            <option value="Acute">Acute Hospitals</option>
+                            <option value="Community">Community Hospitals</option>
+                            <option value="Residential">Residential Care</option>
+                        </select>
+                    </div>
+
+                    {/* Key Metrics Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <MetricCard 
+                        title="Total Responses" 
+                        value={filteredData.length} 
+                        icon={Users} 
+                        trend="positive" 
+                    />
+                    <MetricCard 
+                        title="Dominant Model" 
+                        value={stats.modelData.sort((a,b) => b.value - a.value)[0]?.name.substring(0, 15) + "..." || "N/A"} 
+                        subtext="Most common strategy"
+                        icon={Activity} 
+                        trend="neutral" 
+                    />
+                    <MetricCard 
+                        title="Top Challenge" 
+                        value={stats.challengeData[0]?.name.split(' ')[0] + "..." || "N/A"} 
+                        subtext="Most cited issue"
+                        icon={AlertTriangle} 
+                        trend="negative" 
+                    />
+                    <MetricCard 
+                        title="Satisfaction" 
+                        value="Good" 
+                        subtext="Qualitative average"
+                        icon={CheckCircle} 
+                        trend="positive" 
+                    />
+                    </div>
+
+                    {/* Charts Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    
+                    {/* Chart 1: Who Does What? */}
+                    <Card className="lg:col-span-2">
+                        <CardHeader 
+                            title="Operational Responsibility Matrix" 
+                            subtitle="Breakdown of In-House vs. Specialist Contractor execution for key Hard FM tasks."
+                            icon={Wrench}
+                        />
+                        <CardContent className="h-[400px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={stats.matrixData} layout="vertical" margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+                            <XAxis type="number" hide />
+                            <YAxis dataKey="name" type="category" width={140} tick={{fill: '#475569', fontSize: 13, fontWeight: 500}} />
+                            <Tooltip 
+                                cursor={{fill: '#f1f5f9'}}
+                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                            />
+                            <Legend iconType="circle" />
+                            <Bar dataKey="In-House" stackId="a" fill={COLORS.matrix["In-House"]} radius={[0, 0, 0, 0]} barSize={40} />
+                            <Bar dataKey="Shared" stackId="a" fill={COLORS.matrix["Shared"]} radius={[0, 0, 0, 0]} barSize={40} />
+                            <Bar dataKey="Contractor" stackId="a" fill={COLORS.matrix["Contractor"]} radius={[0, 4, 4, 0]} barSize={40} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+
+                    {/* Chart 2: Delivery Models */}
+                    <Card>
+                        <CardHeader title="FM Delivery Model Distribution" icon={Building} />
+                        <CardContent className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                            <Pie
+                                data={stats.modelData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={60}
+                                outerRadius={100}
+                                fill="#8884d8"
+                                paddingAngle={5}
+                                dataKey="value"
+                            >
+                                {stats.modelData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS.pie[index % COLORS.pie.length]} />
+                                ))}
+                            </Pie>
+                            <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                            <Legend verticalAlign="bottom" height={36}/>
+                            </PieChart>
+                        </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+
+                    {/* Chart 3: Top Challenges */}
+                    <Card>
+                        <CardHeader title="Top 5 Operational Challenges" icon={AlertTriangle} />
+                        <CardContent className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={stats.challengeData} layout="vertical" margin={{ left: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
+                                <XAxis type="number" hide />
+                                <YAxis dataKey="name" type="category" width={180} tick={{fill: '#64748b', fontSize: 11}} interval={0} />
+                                <Tooltip cursor={{fill: 'transparent'}} />
+                                <Bar dataKey="count" fill="#ef4444" radius={[0, 4, 4, 0]} barSize={20} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+
+                    </div>
+
+                    {/* Qualitative Data Section */}
+                    <Card>
+                        <CardHeader title="Recent Qualitative Feedback" icon={FileText} />
+                        <div className="divide-y divide-slate-100 max-h-[300px] overflow-y-auto">
+                            {filteredData.filter(d => d.Comment && typeof d.Comment === 'string' && d.Comment.length > 5).map((d, i) => (
+                                <div key={i} className="p-4 hover:bg-slate-50 transition-colors">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                                            {d["Facility Type"]?.split('-')[0]}
+                                        </span>
+                                        <span className="text-xs text-slate-400">{d["Size"]}</span>
+                                    </div>
+                                    <p className="text-sm text-slate-700 italic">"{d.Comment}"</p>
+                                </div>
+                            ))}
+                            {filteredData.filter(d => d.Comment && d.Comment.length > 5).length === 0 && (
+                                <div className="p-8 text-center text-slate-400 text-sm">
+                                    No comments found in current filter selection.
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+                </>
+                ) : (
+                    // --- Data Table View ---
+                    <Card>
+                        <CardHeader title="Raw Data Table" icon={TableIcon} subtitle={`Showing all ${data.length} records`} />
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left text-slate-500">
+                                <thead className="text-xs text-slate-700 uppercase bg-slate-50">
+                                    <tr>
+                                        <th className="px-6 py-3">Facility Type</th>
+                                        <th className="px-6 py-3">Role</th>
+                                        <th className="px-6 py-3">Model</th>
+                                        <th className="px-6 py-3">Reactive Maint.</th>
+                                        <th className="px-6 py-3">PPM Plant</th>
+                                        <th className="px-6 py-3">Challenges</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {data.map((row, index) => (
+                                        <tr key={index} className="bg-white border-b hover:bg-slate-50">
+                                            <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">
+                                                {row["Facility Type"]?.substring(0, 30)}...
+                                            </td>
+                                            <td className="px-6 py-4">{row["Role"]}</td>
+                                            <td className="px-6 py-4">{row["FM Model"]?.substring(0, 20)}...</td>
+                                            <td className="px-6 py-4">{row["Reactive Maintenance"]}</td>
+                                            <td className="px-6 py-4">{row["PPM Plant"]}</td>
+                                            <td className="px-6 py-4 truncate max-w-xs" title={row["Challenges"]}>
+                                                {row["Challenges"]?.substring(0, 40)}...
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+                )}
+            </>
+        )}
+
+      </main>
+    </div>
+  );
+}
+
+
