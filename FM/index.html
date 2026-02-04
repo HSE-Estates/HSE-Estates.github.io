@@ -1,480 +1,689 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
-} from 'recharts';
-import { Upload, FileText, Activity, Users, AlertTriangle, CheckCircle, Building, Wrench, Table as TableIcon, BarChart2, FileSpreadsheet } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Irish Healthcare FM Analytics</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM (Using cdnjs) -->
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    
+    <!-- SheetJS (For Excel) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-// --- Card Components ---
-const Card = ({ children, className = "" }) => (
-  <div className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ${className}`}>
-    {children}
-  </div>
-);
-
-const CardHeader = ({ title, icon: Icon, subtitle }) => (
-  <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-    <div>
-      <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-        {Icon && <Icon className="w-5 h-5 text-emerald-600" />}
-        {title}
-      </h3>
-      {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
-    </div>
-  </div>
-);
-
-const CardContent = ({ children, className = "" }) => (
-  <div className={`p-6 ${className}`}>
-    {children}
-  </div>
-);
-
-const MetricCard = ({ title, value, subtext, icon: Icon, trend }) => (
-  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between hover:shadow-md transition-shadow">
-    <div>
-      <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
-      <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
-      {subtext && <p className="text-xs text-slate-400 mt-1">{subtext}</p>}
-    </div>
-    <div className={`p-3 rounded-lg ${trend === 'positive' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
-      <Icon className="w-6 h-6" />
-    </div>
-  </div>
-);
-
-// --- Main Application ---
-
-export default function FMDashboard() {
-  const [data, setData] = useState([]); // Start blank
-  const [filterType, setFilterType] = useState('All');
-  const [viewMode, setViewMode] = useState('dashboard'); // 'dashboard' or 'table'
-  const [isLoading, setIsLoading] = useState(false);
-
-  // Load SheetJS for Excel parsing
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
-    script.async = true;
-    document.body.appendChild(script);
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
-
-  // --- Excel/CSV Parser ---
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    setIsLoading(true);
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = e.target.result;
-        let jsonData = [];
-
-        // Check if XLSX library is loaded
-        if (window.XLSX) {
-          const workbook = window.XLSX.read(data, { type: 'binary' });
-          const sheetName = workbook.SheetNames[0];
-          const sheet = workbook.Sheets[sheetName];
-          const rawJson = window.XLSX.utils.sheet_to_json(sheet, { defval: "" });
-          
-          jsonData = rawJson.map(row => {
-            // Helper to fuzzy find keys in the row object
-            const findVal = (keywords) => {
-               const key = Object.keys(row).find(k => k.toLowerCase().includes(keywords.toLowerCase()));
-               return key ? row[key] : "";
-            };
-
-            // Specific logic for survey questions which might have long headers
-            // We search for the specific task and take the value
-            const findTaskVal = (taskName) => {
-                // Find all keys that contain the task name
-                const relevantKeys = Object.keys(row).filter(k => k.toLowerCase().includes(taskName.toLowerCase()));
-                // If the value in the cell is meaningful (longer than 2 chars), use it
-                for (let key of relevantKeys) {
-                    const val = row[key];
-                    if (val && typeof val === 'string' && val.length > 2 && val !== "Not Applicable") {
-                        return val;
-                    }
-                }
-                return "Unknown";
-            };
-
-            return {
-              "Submission Date": findVal("Date") || findVal("Submission") || "N/A",
-              "Facility Type": findVal("matches your service area") || findVal("Facility Type") || "Unknown",
-              "Size": findVal("beds") || findVal("Size") || "Unknown",
-              "Role": findVal("Role") || findVal("Job Title") || "Unknown",
-              "FM Model": findVal("FM delivery model") || "Unknown",
-              "Maintenance Strategy": findVal("maintenance strategy") || "Unknown",
-              "Challenges": findVal("main challenges") || findVal("issues"),
-              "Reactive Maintenance": findTaskVal("General reactive maintenance"),
-              "PPM Plant": findTaskVal("Planned preventative maintenance"),
-              "Fire Alarm": findTaskVal("Fire alarm"),
-              "Lifts": findTaskVal("Lifts"),
-              "HVAC": findTaskVal("HVAC") || findTaskVal("Air conditioning") || findTaskVal("Ventilation"),
-              "Satisfaction": findVal("Satisfaction") || "Unknown",
-              "Comment": findVal("Comment") || findVal("Feedback") || findVal("further training") // Heuristic based on user data
-            };
-          });
-
-        } else {
-           // Fallback to simple CSV split if XLSX fails or isn't loaded (rare)
-           alert("Excel parser loading... please try again in 2 seconds.");
-           return;
-        }
-
-        if (jsonData.length > 0) {
-            setData(jsonData);
-            setFilterType('All'); // Reset filter
-        }
-      } catch (error) {
-        console.error("Error parsing file:", error);
-        alert("Error reading file. Please ensure it is a valid Excel or CSV file.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (file.name.endsWith('.csv')) {
-        reader.readAsText(file); // Fallback but XLSX.read can handle text too usually
-    } else {
-        reader.readAsBinaryString(file);
-    }
-  };
-
-  // --- Analytics Processing ---
-
-  const filteredData = useMemo(() => {
-    if (filterType === 'All') return data;
-    return data.filter(d => d["Facility Type"] && d["Facility Type"].includes(filterType));
-  }, [data, filterType]);
-
-  const stats = useMemo(() => {
-    if (!data.length) return { modelData: [], challengeData: [], matrixData: [] };
-
-    // 1. Model Distribution
-    const models = {};
-    filteredData.forEach(d => {
-      let model = d["FM Model"]?.split('(')[0].trim() || "Unknown";
-      if (!model) model = "Unknown";
-      models[model] = (models[model] || 0) + 1;
-    });
-    const modelData = Object.keys(models).map(k => ({ name: k, value: models[k] }));
-
-    // 2. Challenges Frequency
-    const challengeCounts = {};
-    filteredData.forEach(d => {
-      if (d.Challenges && typeof d.Challenges === 'string') {
-        const list = d.Challenges.split(/[,-]/).map(s => s.trim()); // Split by comma or dash
-        list.forEach(c => {
-          if (c && c.length > 3) challengeCounts[c] = (challengeCounts[c] || 0) + 1;
-        });
-      }
-    });
-    const challengeData = Object.keys(challengeCounts)
-      .map(k => ({ name: k, count: challengeCounts[k] }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-
-    // 3. Task Responsibility Matrix
-    const tasks = ["Reactive Maintenance", "PPM Plant", "Fire Alarm", "Lifts"];
-    const matrixData = tasks.map(task => {
-      const counts = { name: task, "In-House": 0, "Contractor": 0, "Shared": 0 };
-      filteredData.forEach(d => {
-        const val = d[task];
-        if (!val) return;
-        if (val.toLowerCase().includes("in-house")) counts["In-House"]++;
-        else if (val.toLowerCase().includes("contractor")) counts["Contractor"]++;
-        else if (val.toLowerCase().includes("shared")) counts["Shared"]++;
-      });
-      return counts;
-    });
-
-    return { modelData, challengeData, matrixData };
-  }, [filteredData, data]);
-
-  // Colors
-  const COLORS = {
-    pie: ['#059669', '#2563eb', '#d97706', '#64748b', '#8b5cf6', '#ec4899'], 
-    bar: '#3b82f6',
-    matrix: {
-      "In-House": "#10b981", 
-      "Contractor": "#3b82f6", 
-      "Shared": "#f59e0b" 
-    }
-  };
-
-  // Expanded accept attribute to catch all Excel MIME types
-  const ACCEPT_TYPES = ".csv, .xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel";
-
-  return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-12">
-      {/* Top Navigation */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Building className="w-6 h-6 text-emerald-600" />
-            <h1 className="text-xl font-bold text-slate-900 hidden sm:block">Irish Healthcare FM Analytics</h1>
-            <h1 className="text-xl font-bold text-slate-900 sm:hidden">FM Analytics</h1>
-          </div>
-          
-          <div className="flex items-center gap-4">
-             {data.length > 0 && (
-                 <div className="flex bg-slate-100 p-1 rounded-lg">
-                    <button 
-                        onClick={() => setViewMode('dashboard')}
-                        className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${viewMode === 'dashboard' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                        <BarChart2 className="w-4 h-4" />
-                        <span className="hidden sm:inline">Dashboard</span>
-                    </button>
-                    <button 
-                        onClick={() => setViewMode('table')}
-                        className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                        <TableIcon className="w-4 h-4" />
-                        <span className="hidden sm:inline">Data Table</span>
-                    </button>
-                 </div>
-             )}
-
-            {data.length > 0 && (
-                <div className="hidden md:flex items-center gap-2 text-sm text-slate-500">
-                <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-800">
-                    Live Data ({data.length} rows)
-                </span>
-                </div>
-            )}
-            
-            <label className={`flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg cursor-pointer transition-colors shadow-sm ${isLoading ? 'opacity-70 pointer-events-none' : ''}`}>
-              <Upload className="w-4 h-4" />
-              <span>{isLoading ? 'Loading...' : 'Import Excel/CSV'}</span>
-              <input type="file" accept={ACCEPT_TYPES} onChange={handleFileUpload} className="hidden" />
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f8fafc; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
-        {data.length === 0 ? (
-            // --- Empty State ---
-            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
-                <div className="bg-emerald-50 p-6 rounded-full mb-6">
-                    <FileSpreadsheet className="w-12 h-12 text-emerald-600" />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-900 mb-2">Ready for your Data</h2>
-                <p className="text-slate-500 max-w-md text-center mb-8">
-                    Upload your Facilities Management Excel report (.xlsx) or CSV file to generate the dashboard.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4">
-                    <label className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-lg cursor-pointer transition-transform active:scale-95 shadow-lg">
-                        <Upload className="w-5 h-5" />
-                        <span>Select Excel File</span>
-                        <input type="file" accept={ACCEPT_TYPES} onChange={handleFileUpload} className="hidden" />
-                    </label>
-                </div>
-                <p className="mt-8 text-xs text-slate-400">
-                    Supported formats: .xlsx, .xls, .csv
-                </p>
-            </div>
-        ) : (
-            // --- Dashboard Content ---
-            <>
-                {viewMode === 'dashboard' ? (
-                <>
-                    {/* Header Controls */}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div>
-                            <h2 className="text-2xl font-bold text-slate-800">Executive Overview</h2>
-                            <p className="text-slate-500">Analysis of Facilities Management delivery models across the estate.</p>
-                        </div>
-                        <select 
-                            className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2.5 shadow-sm min-w-[200px]"
-                            value={filterType}
-                            onChange={(e) => setFilterType(e.target.value)}
-                        >
-                            <option value="All">All Facility Types</option>
-                            <option value="Acute">Acute Hospitals</option>
-                            <option value="Community">Community Hospitals</option>
-                            <option value="Residential">Residential Care</option>
-                        </select>
-                    </div>
-
-                    {/* Key Metrics Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <MetricCard 
-                        title="Total Responses" 
-                        value={filteredData.length} 
-                        icon={Users} 
-                        trend="positive" 
-                    />
-                    <MetricCard 
-                        title="Dominant Model" 
-                        value={stats.modelData.sort((a,b) => b.value - a.value)[0]?.name.substring(0, 15) + "..." || "N/A"} 
-                        subtext="Most common strategy"
-                        icon={Activity} 
-                        trend="neutral" 
-                    />
-                    <MetricCard 
-                        title="Top Challenge" 
-                        value={stats.challengeData[0]?.name.split(' ')[0] + "..." || "N/A"} 
-                        subtext="Most cited issue"
-                        icon={AlertTriangle} 
-                        trend="negative" 
-                    />
-                    <MetricCard 
-                        title="Satisfaction" 
-                        value="Good" 
-                        subtext="Qualitative average"
-                        icon={CheckCircle} 
-                        trend="positive" 
-                    />
-                    </div>
-
-                    {/* Charts Grid */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    
-                    {/* Chart 1: Who Does What? */}
-                    <Card className="lg:col-span-2">
-                        <CardHeader 
-                            title="Operational Responsibility Matrix" 
-                            subtitle="Breakdown of In-House vs. Specialist Contractor execution for key Hard FM tasks."
-                            icon={Wrench}
-                        />
-                        <CardContent className="h-[400px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={stats.matrixData} layout="vertical" margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                            <XAxis type="number" hide />
-                            <YAxis dataKey="name" type="category" width={140} tick={{fill: '#475569', fontSize: 13, fontWeight: 500}} />
-                            <Tooltip 
-                                cursor={{fill: '#f1f5f9'}}
-                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                            />
-                            <Legend iconType="circle" />
-                            <Bar dataKey="In-House" stackId="a" fill={COLORS.matrix["In-House"]} radius={[0, 0, 0, 0]} barSize={40} />
-                            <Bar dataKey="Shared" stackId="a" fill={COLORS.matrix["Shared"]} radius={[0, 0, 0, 0]} barSize={40} />
-                            <Bar dataKey="Contractor" stackId="a" fill={COLORS.matrix["Contractor"]} radius={[0, 4, 4, 0]} barSize={40} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                        </CardContent>
-                    </Card>
-
-                    {/* Chart 2: Delivery Models */}
-                    <Card>
-                        <CardHeader title="FM Delivery Model Distribution" icon={Building} />
-                        <CardContent className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                            <Pie
-                                data={stats.modelData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={60}
-                                outerRadius={100}
-                                fill="#8884d8"
-                                paddingAngle={5}
-                                dataKey="value"
-                            >
-                                {stats.modelData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS.pie[index % COLORS.pie.length]} />
-                                ))}
-                            </Pie>
-                            <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                            <Legend verticalAlign="bottom" height={36}/>
-                            </PieChart>
-                        </ResponsiveContainer>
-                        </CardContent>
-                    </Card>
-
-                    {/* Chart 3: Top Challenges */}
-                    <Card>
-                        <CardHeader title="Top 5 Operational Challenges" icon={AlertTriangle} />
-                        <CardContent className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={stats.challengeData} layout="vertical" margin={{ left: 20 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
-                                <XAxis type="number" hide />
-                                <YAxis dataKey="name" type="category" width={180} tick={{fill: '#64748b', fontSize: 11}} interval={0} />
-                                <Tooltip cursor={{fill: 'transparent'}} />
-                                <Bar dataKey="count" fill="#ef4444" radius={[0, 4, 4, 0]} barSize={20} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                        </CardContent>
-                    </Card>
-
-                    </div>
-
-                    {/* Qualitative Data Section */}
-                    <Card>
-                        <CardHeader title="Recent Qualitative Feedback" icon={FileText} />
-                        <div className="divide-y divide-slate-100 max-h-[300px] overflow-y-auto">
-                            {filteredData.filter(d => d.Comment && typeof d.Comment === 'string' && d.Comment.length > 5).map((d, i) => (
-                                <div key={i} className="p-4 hover:bg-slate-50 transition-colors">
-                                    <div className="flex justify-between items-start mb-1">
-                                        <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                                            {d["Facility Type"]?.split('-')[0]}
-                                        </span>
-                                        <span className="text-xs text-slate-400">{d["Size"]}</span>
-                                    </div>
-                                    <p className="text-sm text-slate-700 italic">"{d.Comment}"</p>
-                                </div>
-                            ))}
-                            {filteredData.filter(d => d.Comment && d.Comment.length > 5).length === 0 && (
-                                <div className="p-8 text-center text-slate-400 text-sm">
-                                    No comments found in current filter selection.
-                                </div>
-                            )}
-                        </div>
-                    </Card>
-                </>
-                ) : (
-                    // --- Data Table View ---
-                    <Card>
-                        <CardHeader title="Raw Data Table" icon={TableIcon} subtitle={`Showing all ${data.length} records`} />
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left text-slate-500">
-                                <thead className="text-xs text-slate-700 uppercase bg-slate-50">
-                                    <tr>
-                                        <th className="px-6 py-3">Facility Type</th>
-                                        <th className="px-6 py-3">Role</th>
-                                        <th className="px-6 py-3">Model</th>
-                                        <th className="px-6 py-3">Reactive Maint.</th>
-                                        <th className="px-6 py-3">PPM Plant</th>
-                                        <th className="px-6 py-3">Challenges</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {data.map((row, index) => (
-                                        <tr key={index} className="bg-white border-b hover:bg-slate-50">
-                                            <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">
-                                                {row["Facility Type"]?.substring(0, 30)}...
-                                            </td>
-                                            <td className="px-6 py-4">{row["Role"]}</td>
-                                            <td className="px-6 py-4">{row["FM Model"]?.substring(0, 20)}...</td>
-                                            <td className="px-6 py-4">{row["Reactive Maintenance"]}</td>
-                                            <td className="px-6 py-4">{row["PPM Plant"]}</td>
-                                            <td className="px-6 py-4 truncate max-w-xs" title={row["Challenges"]}>
-                                                {row["Challenges"]?.substring(0, 40)}...
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </Card>
-                )}
-            </>
-        )}
-
-      </main>
+        /* Custom Tooltip Animation */
+        .chart-tooltip {
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+        .group:hover .chart-tooltip {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <!-- Loading State -->
+        <div style="height: 100vh; display: flex; align-items: center; justify-content: center; color: #64748b; font-family: sans-serif;">
+            Initializing Dashboard (Lightweight Mode)...
+        </div>
     </div>
-  );
-}
+
+    <!-- Error Handler -->
+    <script>
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            const root = document.getElementById('root');
+            // Check for missing globals
+            let missing = [];
+            if (!window.React) missing.push("React");
+            if (!window.XLSX) missing.push("SheetJS");
+
+            if (root) {
+                let helpfulInfo = "";
+                if (missing.length > 0) {
+                    helpfulInfo = `<p><strong>Network Block Detected:</strong> The following libraries failed to load: ${missing.join(", ")}.</p>`;
+                }
+
+                root.innerHTML = `<div style="padding: 40px; color: #ef4444; font-family: sans-serif; max-width: 600px; margin: 0 auto; background: #fff; border: 1px solid #fee2e2; border-radius: 8px; margin-top: 40px;">
+                    <h3 style="margin-top:0">Application Error</h3>
+                    ${helpfulInfo}
+                    <p style="color: #666; font-size: 0.9em;">Details: ${msg}</p>
+                </div>`;
+            }
+            return false;
+        };
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- NATIVE CHART COMPONENTS (No External Library) ---
+
+        // 1. Simple Bar Chart
+        const NativeBarChart = ({ data, color = "#3b82f6" }) => {
+            if (!data || data.length === 0) return null;
+            const maxValue = Math.max(...data.map(d => d.value));
+
+            return (
+                <div className="w-full h-full flex flex-col">
+                    <div className="flex-grow flex items-end gap-2 pt-6">
+                        {data.map((d, i) => {
+                            const heightPercent = maxValue > 0 ? (d.value / maxValue) * 100 : 0;
+                            return (
+                                <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end">
+                                    {/* Tooltip */}
+                                    <div className="chart-tooltip absolute bottom-full mb-2 bg-slate-800 text-white text-xs py-1 px-2 rounded shadow-lg z-10 whitespace-nowrap">
+                                        <div className="font-semibold">{d.name}</div>
+                                        <div>{d.value} responses</div>
+                                    </div>
+                                    
+                                    {/* Bar */}
+                                    <div 
+                                        style={{ height: `${heightPercent}%`, backgroundColor: color }} 
+                                        className="w-full rounded-t-sm opacity-90 group-hover:opacity-100 transition-all cursor-default"
+                                    ></div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    {/* Labels */}
+                    <div className="flex gap-2 mt-2 border-t border-slate-200 pt-2">
+                        {data.map((d, i) => (
+                            <div key={i} className="flex-1 text-center">
+                                <div className="text-[10px] text-slate-500 truncate px-1" title={d.name}>
+                                    {d.name}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // 2. Simple Stacked Bar Chart (For Matrix)
+        const NativeStackedBarChart = ({ data, colors }) => {
+            if (!data || data.length === 0) return null;
+
+            return (
+                <div className="w-full h-full flex flex-col justify-center gap-4 overflow-y-auto">
+                    {data.map((row, i) => {
+                        const total = (row["In-House"] || 0) + (row["Contractor"] || 0) + (row["Shared"] || 0);
+                        const pInHouse = total ? (row["In-House"] / total) * 100 : 0;
+                        const pContractor = total ? (row["Contractor"] / total) * 100 : 0;
+                        const pShared = total ? (row["Shared"] / total) * 100 : 0;
+
+                        return (
+                            <div key={i} className="w-full">
+                                <div className="flex justify-between text-xs mb-1">
+                                    <span className="font-medium text-slate-700">{row.name}</span>
+                                    <span className="text-slate-400">{total} Responses</span>
+                                </div>
+                                <div className="w-full h-6 flex rounded-md overflow-hidden bg-slate-100">
+                                    {pInHouse > 0 && (
+                                        <div style={{ width: `${pInHouse}%`, background: colors["In-House"] }} className="h-full group relative hover:opacity-90 transition-opacity">
+                                             <div className="chart-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-slate-800 text-white text-xs py-1 px-2 rounded z-10">
+                                                In-House: {row["In-House"]}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {pShared > 0 && (
+                                        <div style={{ width: `${pShared}%`, background: colors["Shared"] }} className="h-full group relative hover:opacity-90 transition-opacity">
+                                            <div className="chart-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-slate-800 text-white text-xs py-1 px-2 rounded z-10">
+                                                Shared: {row["Shared"]}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {pContractor > 0 && (
+                                        <div style={{ width: `${pContractor}%`, background: colors["Contractor"] }} className="h-full group relative hover:opacity-90 transition-opacity">
+                                            <div className="chart-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-slate-800 text-white text-xs py-1 px-2 rounded z-10">
+                                                Contractor: {row["Contractor"]}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                    {/* Legend */}
+                    <div className="flex justify-center gap-4 mt-2">
+                        {Object.keys(colors).map(key => (
+                            <div key={key} className="flex items-center gap-1.5">
+                                <div className="w-3 h-3 rounded-full" style={{background: colors[key]}}></div>
+                                <span className="text-xs text-slate-600">{key}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // 3. Simple Donut Chart
+        const NativeDonutChart = ({ data, colors }) => {
+            if (!data || data.length === 0) return null;
+            
+            // Calculate segments
+            const total = data.reduce((acc, curr) => acc + curr.value, 0);
+            let accumulatedPercent = 0;
+
+            const getCoordinatesForPercent = (percent) => {
+                const x = Math.cos(2 * Math.PI * percent);
+                const y = Math.sin(2 * Math.PI * percent);
+                return [x, y];
+            }
+
+            const segments = data.map((d, i) => {
+                const startPercent = accumulatedPercent;
+                const percent = d.value / total;
+                accumulatedPercent += percent;
+                const endPercent = accumulatedPercent;
+
+                const [startX, startY] = getCoordinatesForPercent(startPercent);
+                const [endX, endY] = getCoordinatesForPercent(endPercent);
+                const largeArcFlag = percent > 0.5 ? 1 : 0;
+
+                // Path command
+                const pathData = [
+                    `M ${startX} ${startY}`,
+                    `A 1 1 0 ${largeArcFlag} 1 ${endX} ${endY}`,
+                    `L 0 0`,
+                ].join(' ');
+
+                return { pathData, color: colors[i % colors.length], ...d, percent };
+            });
+
+            return (
+                <div className="w-full h-full flex items-center justify-center gap-8">
+                    {/* The Chart */}
+                    <div className="relative w-48 h-48">
+                         <svg viewBox="-1 -1 2 2" style={{ transform: 'rotate(-90deg)' }} className="w-full h-full">
+                            {segments.map((s, i) => (
+                                <path 
+                                    key={i} 
+                                    d={s.pathData} 
+                                    fill={s.color} 
+                                    stroke="white"
+                                    strokeWidth="0.02"
+                                    className="hover:opacity-90 transition-opacity"
+                                />
+                            ))}
+                            {/* Inner Circle for Donut Effect */}
+                            <circle cx="0" cy="0" r="0.6" fill="white" />
+                         </svg>
+                         {/* Center Text */}
+                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="text-center">
+                                <div className="text-2xl font-bold text-slate-800">{total}</div>
+                                <div className="text-[10px] text-slate-400 uppercase">Models</div>
+                            </div>
+                         </div>
+                    </div>
+                    
+                    {/* The Legend */}
+                    <div className="flex flex-col justify-center gap-2">
+                        {data.map((d, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full" style={{background: colors[i % colors.length]}}></div>
+                                <div className="text-xs text-slate-600">
+                                    <span className="font-medium">{d.name}</span>
+                                    <span className="text-slate-400 ml-1">({Math.round((d.value/total)*100)}%)</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Icons ---
+        const Icon = ({ path, className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                {path}
+            </svg>
+        );
+
+        const Icons = {
+            Upload: (props) => <Icon {...props} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></>} />,
+            FileText: (props) => <Icon {...props} path={<><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></>} />,
+            Activity: (props) => <Icon {...props} path={<><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></>} />,
+            Users: (props) => <Icon {...props} path={<><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>} />,
+            AlertTriangle: (props) => <Icon {...props} path={<><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>} />,
+            CheckCircle: (props) => <Icon {...props} path={<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>} />,
+            Building: (props) => <Icon {...props} path={<><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="9" x2="9.01" y1="22" y2="22"/><line x1="15" x2="15.01" y1="22" y2="22"/><line x1="9" x2="9.01" y1="18" y2="18"/><line x1="15" x2="15.01" y1="18" y2="18"/><line x1="9" x2="9.01" y1="14" y2="14"/><line x1="15" x2="15.01" y1="14" y2="14"/><line x1="9" x2="9.01" y1="10" y2="10"/><line x1="15" x2="15.01" y1="10" y2="10"/><line x1="9" x2="9.01" y1="6" y2="6"/><line x1="15" x2="15.01" y1="6" y2="6"/></>} />,
+            Wrench: (props) => <Icon {...props} path={<><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></>} />,
+            Table: (props) => <Icon {...props} path={<><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" x2="21" y1="9" y2="9"/><line x1="3" x2="21" y1="15" y2="15"/><line x1="12" x2="12" y1="3" y2="21"/></>} />,
+            BarChart2: (props) => <Icon {...props} path={<><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></>} />,
+            FileSpreadsheet: (props) => <Icon {...props} path={<><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><path d="M14 2v6h6"/><path d="M4 15v7"/><path d="M9 15v7"/><path d="M14 15v7"/><path d="M4 18.5h15"/></>} />
+        };
+
+        // --- Card Components ---
+        const Card = ({ children, className = "" }) => (
+            <div className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ${className}`}>
+                {children}
+            </div>
+        );
+
+        const CardHeader = ({ title, icon: Icon, subtitle }) => (
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div>
+                    <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                        {Icon && <Icon className="w-5 h-5 text-emerald-600" />}
+                        {title}
+                    </h3>
+                    {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
+                </div>
+            </div>
+        );
+
+        const CardContent = ({ children, className = "" }) => (
+            <div className={`p-6 ${className}`}>
+                {children}
+            </div>
+        );
+
+        const MetricCard = ({ title, value, subtext, icon: Icon, trend }) => (
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between hover:shadow-md transition-shadow">
+                <div>
+                    <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
+                    <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
+                    {subtext && <p className="text-xs text-slate-400 mt-1">{subtext}</p>}
+                </div>
+                <div className={`p-3 rounded-lg ${trend === 'positive' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'}`}>
+                    <Icon className="w-6 h-6" />
+                </div>
+            </div>
+        );
+
+        // --- Main Application ---
+        function App() {
+            const [data, setData] = useState([]);
+            const [filterType, setFilterType] = useState('All');
+            const [viewMode, setViewMode] = useState('dashboard');
+            const [statusMsg, setStatusMsg] = useState('Ready for Upload');
+
+            // --- Excel/CSV Parser ---
+            const handleFileUpload = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                setStatusMsg(`Reading ${file.name}...`);
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const fileData = e.target.result;
+                        let jsonData = [];
+
+                        if (window.XLSX) {
+                            setStatusMsg('Parsing Excel data...');
+                            const workbook = XLSX.read(fileData, { type: 'binary' });
+                            const sheetName = workbook.SheetNames[0];
+                            const sheet = workbook.Sheets[sheetName];
+                            const rawJson = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+                            
+                            jsonData = rawJson.map(row => {
+                                // Robust Finder
+                                const findVal = (keywords) => {
+                                    if (!row) return "";
+                                    const key = Object.keys(row).find(k => k.toLowerCase().includes(keywords.toLowerCase()));
+                                    return key ? row[key] : "";
+                                };
+
+                                const findTaskVal = (taskName) => {
+                                    if (!row) return "Unknown";
+                                    const relevantKeys = Object.keys(row).filter(k => k.toLowerCase().includes(taskName.toLowerCase()));
+                                    for (let key of relevantKeys) {
+                                        const val = row[key];
+                                        if (val && typeof val === 'string' && val.length > 2 && val !== "Not Applicable") {
+                                            return val;
+                                        }
+                                    }
+                                    return "Unknown";
+                                };
+
+                                return {
+                                    "Submission Date": findVal("Date") || findVal("Submission") || "N/A",
+                                    "Facility Type": findVal("matches your service area") || findVal("Facility Type") || "Unknown",
+                                    "Size": findVal("beds") || findVal("Size") || "Unknown",
+                                    "Role": findVal("Role") || findVal("Job Title") || "Unknown",
+                                    "FM Model": findVal("FM delivery model") || "Unknown",
+                                    "Maintenance Strategy": findVal("maintenance strategy") || "Unknown",
+                                    "Challenges": findVal("main challenges") || findVal("issues"),
+                                    "Reactive Maintenance": findTaskVal("General reactive maintenance"),
+                                    "PPM Plant": findTaskVal("Planned preventative maintenance"),
+                                    "Fire Alarm": findTaskVal("Fire alarm"),
+                                    "Lifts": findTaskVal("Lifts"),
+                                    "HVAC": findTaskVal("HVAC") || findTaskVal("Air conditioning") || findTaskVal("Ventilation"),
+                                    "Satisfaction": findVal("Satisfaction") || "Unknown",
+                                    "Comment": findVal("Comment") || findVal("Feedback") || findVal("further training")
+                                };
+                            });
+                        } else {
+                            setStatusMsg("Error: Excel parser not loaded.");
+                            return;
+                        }
+
+                        if (jsonData.length > 0) {
+                            setData(jsonData);
+                            setFilterType('All'); 
+                            setStatusMsg(`Successfully loaded ${jsonData.length} records.`);
+                        } else {
+                            setStatusMsg("File parsed but 0 records found. Check format.");
+                        }
+                    } catch (error) {
+                        console.error("Error parsing file:", error);
+                        setStatusMsg("Error reading file: " + error.message);
+                    }
+                };
+
+                if (file.name.endsWith('.csv')) {
+                    reader.readAsText(file);
+                } else {
+                    reader.readAsBinaryString(file);
+                }
+            };
+
+            // --- Analytics Processing ---
+            const filteredData = useMemo(() => {
+                if (filterType === 'All') return data;
+                return data.filter(d => d["Facility Type"] && d["Facility Type"].includes(filterType));
+            }, [data, filterType]);
+
+            const stats = useMemo(() => {
+                if (!data.length) return { modelData: [], challengeData: [], matrixData: [] };
+
+                // 1. Model Distribution
+                const models = {};
+                filteredData.forEach(d => {
+                    let model = d["FM Model"]?.split('(')[0].trim() || "Unknown";
+                    if (!model) model = "Unknown";
+                    models[model] = (models[model] || 0) + 1;
+                });
+                const modelData = Object.keys(models).map(k => ({ name: k, value: models[k] }));
+
+                // 2. Challenges Frequency
+                const challengeCounts = {};
+                filteredData.forEach(d => {
+                    if (d.Challenges && typeof d.Challenges === 'string') {
+                        const list = d.Challenges.split(/[,-]/).map(s => s.trim());
+                        list.forEach(c => {
+                            if (c && c.length > 3) challengeCounts[c] = (challengeCounts[c] || 0) + 1;
+                        });
+                    }
+                });
+                const challengeData = Object.keys(challengeCounts)
+                    .map(k => ({ name: k, count: challengeCounts[k], value: challengeCounts[k] })) // Add value for compatibility
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 5);
+
+                // 3. Task Responsibility Matrix
+                const tasks = ["Reactive Maintenance", "PPM Plant", "Fire Alarm", "Lifts"];
+                const matrixData = tasks.map(task => {
+                    const counts = { name: task, "In-House": 0, "Contractor": 0, "Shared": 0 };
+                    filteredData.forEach(d => {
+                        const val = d[task];
+                        if (!val) return;
+                        if (val.toLowerCase().includes("in-house")) counts["In-House"]++;
+                        else if (val.toLowerCase().includes("contractor")) counts["Contractor"]++;
+                        else if (val.toLowerCase().includes("shared")) counts["Shared"]++;
+                    });
+                    return counts;
+                });
+
+                return { modelData, challengeData, matrixData };
+            }, [filteredData, data]);
+
+            // Colors
+            const COLORS = {
+                pie: ['#059669', '#2563eb', '#d97706', '#64748b', '#8b5cf6', '#ec4899'], 
+                bar: '#ef4444',
+                matrix: {
+                    "In-House": "#10b981", 
+                    "Contractor": "#3b82f6", 
+                    "Shared": "#f59e0b" 
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-12 flex flex-col">
+                    {/* Top Navigation */}
+                    <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Icons.Building className="w-6 h-6 text-emerald-600" />
+                                <h1 className="text-xl font-bold text-slate-900 hidden sm:block">Irish Healthcare FM Analytics</h1>
+                                <h1 className="text-xl font-bold text-slate-900 sm:hidden">FM Analytics</h1>
+                            </div>
+                            
+                            <div className="flex items-center gap-4">
+                                {data.length > 0 && (
+                                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                                        <button 
+                                            onClick={() => setViewMode('dashboard')}
+                                            className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${viewMode === 'dashboard' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            <Icons.BarChart2 className="w-4 h-4" />
+                                            <span className="hidden sm:inline">Dashboard</span>
+                                        </button>
+                                        <button 
+                                            onClick={() => setViewMode('table')}
+                                            className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            <Icons.Table className="w-4 h-4" />
+                                            <span className="hidden sm:inline">Data Table</span>
+                                        </button>
+                                    </div>
+                                )}
+                                
+                                <label className={`flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg cursor-pointer transition-colors shadow-sm`}>
+                                    <Icons.Upload className="w-4 h-4" />
+                                    <span>Import Excel/CSV</span>
+                                    <input type="file" onChange={handleFileUpload} className="hidden" />
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 flex-grow">
+                        
+                        {viewMode === 'dashboard' ? (
+                        <>
+                            {/* Header Controls */}
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-slate-800">Executive Overview</h2>
+                                    <p className="text-slate-500">Analysis of Facilities Management delivery models across the estate.</p>
+                                </div>
+                                <select 
+                                    className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2.5 shadow-sm min-w-[200px]"
+                                    value={filterType}
+                                    onChange={(e) => setFilterType(e.target.value)}
+                                >
+                                    <option value="All">All Facility Types</option>
+                                    <option value="Acute">Acute Hospitals</option>
+                                    <option value="Community">Community Hospitals</option>
+                                    <option value="Residential">Residential Care</option>
+                                </select>
+                            </div>
+
+                            {/* Key Metrics Row */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <MetricCard 
+                                title="Total Responses" 
+                                value={filteredData.length} 
+                                icon={Icons.Users} 
+                                trend="positive" 
+                            />
+                            <MetricCard 
+                                title="Dominant Model" 
+                                value={stats.modelData.length ? stats.modelData.sort((a,b) => b.value - a.value)[0]?.name.substring(0, 15) + "..." : "-"} 
+                                subtext="Most common strategy"
+                                icon={Icons.Activity} 
+                                trend="neutral" 
+                            />
+                            <MetricCard 
+                                title="Top Challenge" 
+                                value={stats.challengeData.length ? stats.challengeData[0]?.name.split(' ')[0] + "..." : "-"} 
+                                subtext="Most cited issue"
+                                icon={Icons.AlertTriangle} 
+                                trend="negative" 
+                            />
+                            <MetricCard 
+                                title="Satisfaction" 
+                                value={data.length > 0 ? "Good" : "-"} 
+                                subtext="Qualitative average"
+                                icon={Icons.CheckCircle} 
+                                trend="positive" 
+                            />
+                            </div>
+
+                            {/* Charts Grid */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            
+                            {/* Chart 1: Who Does What? */}
+                            <Card className="lg:col-span-2">
+                                <CardHeader 
+                                    title="Operational Responsibility Matrix" 
+                                    subtitle="Breakdown of In-House vs. Specialist Contractor execution for key Hard FM tasks."
+                                    icon={Icons.Wrench}
+                                />
+                                <CardContent className="h-[400px]">
+                                    {data.length > 0 ? (
+                                        <NativeStackedBarChart data={stats.matrixData} colors={COLORS.matrix} />
+                                    ) : (
+                                        <div className="empty-chart-placeholder">
+                                            <span>Upload data to see Responsibility Matrix</span>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* Chart 2: Delivery Models */}
+                            <Card>
+                                <CardHeader title="FM Delivery Model Distribution" icon={Icons.Building} />
+                                <CardContent className="h-[300px]">
+                                    {data.length > 0 ? (
+                                        <NativeDonutChart data={stats.modelData} colors={COLORS.pie} />
+                                    ) : (
+                                        <div className="empty-chart-placeholder">
+                                            <span>Waiting for Data...</span>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* Chart 3: Top Challenges */}
+                            <Card>
+                                <CardHeader title="Top 5 Operational Challenges" icon={Icons.AlertTriangle} />
+                                <CardContent className="h-[300px]">
+                                    {data.length > 0 ? (
+                                        <NativeBarChart data={stats.challengeData} color="#ef4444" />
+                                    ) : (
+                                        <div className="empty-chart-placeholder">
+                                            <span>Waiting for Data...</span>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            </div>
+
+                            {/* Qualitative Data Section */}
+                            <Card>
+                                <CardHeader title="Recent Qualitative Feedback" icon={Icons.FileText} />
+                                <div className="divide-y divide-slate-100 max-h-[300px] overflow-y-auto">
+                                    {data.length > 0 ? (
+                                        <>
+                                            {filteredData.filter(d => d.Comment && typeof d.Comment === 'string' && d.Comment.length > 5).map((d, i) => (
+                                                <div key={i} className="p-4 hover:bg-slate-50 transition-colors">
+                                                    <div className="flex justify-between items-start mb-1">
+                                                        <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                                                            {d["Facility Type"]?.split('-')[0]}
+                                                        </span>
+                                                        <span className="text-xs text-slate-400">{d["Size"]}</span>
+                                                    </div>
+                                                    <p className="text-sm text-slate-700 italic">"{d.Comment}"</p>
+                                                </div>
+                                            ))}
+                                            {filteredData.filter(d => d.Comment && d.Comment.length > 5).length === 0 && (
+                                                <div className="p-8 text-center text-slate-400 text-sm">
+                                                    No comments found in current filter selection.
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div className="p-8 text-center text-slate-400 text-sm">
+                                            Upload file to view qualitative feedback.
+                                        </div>
+                                    )}
+                                </div>
+                            </Card>
+                        </>
+                        ) : (
+                            // --- Data Table View ---
+                            <Card>
+                                <CardHeader title="Raw Data Table" icon={Icons.Table} subtitle={`Showing all ${data.length} records`} />
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm text-left text-slate-500">
+                                        <thead className="text-xs text-slate-700 uppercase bg-slate-50">
+                                            <tr>
+                                                <th className="px-6 py-3">Facility Type</th>
+                                                <th className="px-6 py-3">Role</th>
+                                                <th className="px-6 py-3">Model</th>
+                                                <th className="px-6 py-3">Reactive Maint.</th>
+                                                <th className="px-6 py-3">PPM Plant</th>
+                                                <th className="px-6 py-3">Challenges</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {data.map((row, index) => (
+                                                <tr key={index} className="bg-white border-b hover:bg-slate-50">
+                                                    <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">
+                                                        {row["Facility Type"]?.substring(0, 30)}...
+                                                    </td>
+                                                    <td className="px-6 py-4">{row["Role"]}</td>
+                                                    <td className="px-6 py-4">{row["FM Model"]?.substring(0, 20)}...</td>
+                                                    <td className="px-6 py-4">{row["Reactive Maintenance"]}</td>
+                                                    <td className="px-6 py-4">{row["PPM Plant"]}</td>
+                                                    <td className="px-6 py-4 truncate max-w-xs" title={row["Challenges"]}>
+                                                        {row["Challenges"]?.substring(0, 40)}...
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </Card>
+                        )}
+
+                    </main>
+                    
+                    {/* Status Bar */}
+                    <div className="bg-slate-900 text-slate-300 text-xs py-1 px-4 text-right">
+                        Status: <span className="text-white font-medium">{statusMsg}</span>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
 
 
