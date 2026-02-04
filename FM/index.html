@@ -97,11 +97,11 @@
                             );
                         })}
                     </div>
-                    <div className="flex gap-2 mt-2 border-t border-slate-200 pt-2">
+                    <div className="flex gap-2 mt-2 border-t border-slate-200 pt-2 overflow-hidden">
                         {data.map((d, i) => (
                             <div key={i} className="flex-1 text-center">
                                 <div className="text-[10px] text-slate-500 truncate px-1" title={d.name}>
-                                    {d.name}
+                                    {d.name.substring(0, 15)}
                                 </div>
                             </div>
                         ))}
@@ -313,16 +313,13 @@
                             const rawJson = XLSX.utils.sheet_to_json(sheet, { defval: "" });
                             
                             if (rawJson.length > 0) {
-                                // Extract all headers from the first row for the Table view
                                 setTableColumns(Object.keys(rawJson[0]));
                             }
 
-                            processedData = rawJson.map(row => {
-                                // We keep the entire row for the "Data Table" view
-                                const rowWithInternalMetrics = { ...row };
+                            processedData = rawJson.map((row, index) => {
+                                const rowWithInternalMetrics = { ...row, __id: index + 1 }; // Add Row Number
 
-                                // --- Internal Metric Calculation for Charts (prefixed with __) ---
-                                // Robust Finder for Fuzzy Matching
+                                // Robust Finder
                                 const findVal = (keywords) => {
                                     if (!row) return "";
                                     const key = Object.keys(row).find(k => k.toLowerCase().includes(keywords.toLowerCase()));
@@ -341,7 +338,14 @@
                                     return "Unknown";
                                 };
 
-                                // Map keys to internal normalized names for charts
+                                // Find Rating/Satisfaction Columns (Values like "3 Acceptable", "5 Strongly Agree")
+                                let ratingValues = [];
+                                Object.values(row).forEach(val => {
+                                    if (typeof val === 'string' && /^[1-5]\s/.test(val)) {
+                                        ratingValues.push(val);
+                                    }
+                                });
+
                                 rowWithInternalMetrics.__FacilityType = findVal("matches your service area") || findVal("Facility Type") || "Unknown";
                                 rowWithInternalMetrics.__FMModel = findVal("FM delivery model") || "Unknown";
                                 rowWithInternalMetrics.__Challenges = findVal("main challenges") || findVal("issues");
@@ -350,6 +354,7 @@
                                 rowWithInternalMetrics.__FireAlarm = findTaskVal("Fire alarm");
                                 rowWithInternalMetrics.__Lifts = findTaskVal("Lifts");
                                 rowWithInternalMetrics.__Comment = findVal("Comment") || findVal("Feedback") || findVal("further training");
+                                rowWithInternalMetrics.__Ratings = ratingValues; // Store all found ratings
 
                                 return rowWithInternalMetrics;
                             });
@@ -385,7 +390,7 @@
             }, [data, filterType]);
 
             const stats = useMemo(() => {
-                if (!data.length) return { modelData: [], challengeData: [], matrixData: [] };
+                if (!data.length) return { modelData: [], challengeData: [], matrixData: [], ratingData: [], avgScore: 0 };
 
                 // 1. Model Distribution
                 const models = {};
@@ -431,13 +436,45 @@
                     return counts;
                 });
 
-                return { modelData, challengeData, matrixData };
+                // 4. Ratings / Satisfaction Analysis (New)
+                const ratingCounts = {};
+                let totalScore = 0;
+                let scoreCount = 0;
+
+                filteredData.forEach(d => {
+                    if (d.__Ratings && d.__Ratings.length > 0) {
+                        d.__Ratings.forEach(r => {
+                            // Extract numeric score (e.g. "5" from "5 Strongly Agree")
+                            const scoreMatch = r.match(/^(\d)/);
+                            if (scoreMatch) {
+                                const score = parseInt(scoreMatch[1]);
+                                totalScore += score;
+                                scoreCount++;
+                                
+                                // Clean name "5 Strongly Agree" -> "5: Strongly Agree" or just group by label
+                                // Let's group by the text part
+                                const label = r.substring(2).trim() || r; 
+                                ratingCounts[label] = (ratingCounts[label] || 0) + 1;
+                            }
+                        });
+                    }
+                });
+
+                const ratingData = Object.keys(ratingCounts)
+                    .map(k => ({ name: k, value: ratingCounts[k] }))
+                    .sort((a,b) => b.value - a.value)
+                    .slice(0, 6); // Top 6 rating types
+
+                const avgScore = scoreCount > 0 ? (totalScore / scoreCount).toFixed(1) : "N/A";
+
+                return { modelData, challengeData, matrixData, ratingData, avgScore };
             }, [filteredData, data]);
 
             // Colors
             const COLORS = {
                 pie: ['#059669', '#2563eb', '#d97706', '#64748b', '#8b5cf6', '#ec4899'], 
                 bar: '#ef4444',
+                rating: '#8b5cf6',
                 matrix: {
                     "In-House": "#10b981", 
                     "Contractor": "#3b82f6", 
@@ -530,9 +567,9 @@
                                 trend="negative" 
                             />
                             <MetricCard 
-                                title="Satisfaction" 
-                                value={data.length > 0 ? "Good" : "-"} 
-                                subtext="Qualitative average"
+                                title="Avg. Satisfaction" 
+                                value={stats.avgScore !== "N/A" ? `${stats.avgScore} / 5.0` : "-"} 
+                                subtext="Mean score across all rated questions"
                                 icon={Icons.CheckCircle} 
                                 trend="positive" 
                             />
@@ -587,6 +624,20 @@
                                 </CardContent>
                             </Card>
 
+                            {/* Chart 4: Service Ratings (New) */}
+                            <Card>
+                                <CardHeader title="Service Satisfaction Levels" icon={Icons.CheckCircle} />
+                                <CardContent className="h-[300px]">
+                                    {data.length > 0 ? (
+                                        <NativeBarChart data={stats.ratingData} color="#8b5cf6" />
+                                    ) : (
+                                        <div className="empty-chart-placeholder">
+                                            <span>Waiting for Data...</span>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
                             </div>
 
                             {/* Qualitative Data Section */}
@@ -601,7 +652,7 @@
                                                         <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
                                                             {d["__FacilityType"]?.split('-')[0]}
                                                         </span>
-                                                        <span className="text-xs text-slate-400">Response #{i + 1}</span>
+                                                        <span className="text-xs text-slate-400">Response #{d.__id}</span>
                                                     </div>
                                                     <p className="text-sm text-slate-700 italic">"{d.__Comment}"</p>
                                                 </div>
@@ -628,6 +679,7 @@
                                     <table className="w-full text-sm text-left text-slate-500 whitespace-nowrap">
                                         <thead className="text-xs text-slate-700 uppercase bg-slate-50 sticky top-0 z-10">
                                             <tr>
+                                                <th className="px-6 py-3 border-b border-slate-200 bg-slate-50 w-12">#</th>
                                                 {tableColumns.map((col, idx) => (
                                                     <th key={idx} className="px-6 py-3 border-b border-slate-200 bg-slate-50 min-w-[150px]">
                                                         {col.length > 30 ? col.substring(0, 30) + "..." : col}
@@ -638,6 +690,7 @@
                                         <tbody>
                                             {data.map((row, rIdx) => (
                                                 <tr key={rIdx} className="bg-white border-b hover:bg-slate-50">
+                                                    <td className="px-6 py-4 border-b border-slate-100 font-mono text-xs">{row.__id}</td>
                                                     {tableColumns.map((col, cIdx) => (
                                                         <td key={cIdx} className="px-6 py-4 border-b border-slate-100">
                                                             {row[col] ? String(row[col]).substring(0, 50) + (String(row[col]).length > 50 ? "..." : "") : "-"}
