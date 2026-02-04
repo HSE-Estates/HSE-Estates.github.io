@@ -25,7 +25,6 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
-        /* Custom Tooltip Animation */
         .chart-tooltip {
             opacity: 0;
             transition: opacity 0.2s;
@@ -38,9 +37,8 @@
 </head>
 <body>
     <div id="root">
-        <!-- Loading State -->
         <div style="height: 100vh; display: flex; align-items: center; justify-content: center; color: #64748b; font-family: sans-serif;">
-            Initializing Dashboard...
+            Initializing Analytics Engine...
         </div>
     </div>
 
@@ -48,19 +46,10 @@
     <script>
         window.onerror = function(msg, url, lineNo, columnNo, error) {
             const root = document.getElementById('root');
-            let missing = [];
-            if (!window.React) missing.push("React");
-            if (!window.XLSX) missing.push("SheetJS");
-
             if (root) {
-                let helpfulInfo = "";
-                if (missing.length > 0) {
-                    helpfulInfo = `<p><strong>Network Block Detected:</strong> The following libraries failed to load: ${missing.join(", ")}.</p>`;
-                }
-
                 root.innerHTML = `<div style="padding: 40px; color: #ef4444; font-family: sans-serif; max-width: 600px; margin: 0 auto; background: #fff; border: 1px solid #fee2e2; border-radius: 8px; margin-top: 40px;">
                     <h3 style="margin-top:0">Application Error</h3>
-                    ${helpfulInfo}
+                    <p><strong>Network Block Detected:</strong> Libraries failed to load. Please whitelist cdnjs.cloudflare.com.</p>
                     <p style="color: #666; font-size: 0.9em;">Details: ${msg}</p>
                 </div>`;
             }
@@ -71,11 +60,10 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // --- NATIVE CHART COMPONENTS (No External Library) ---
+        // --- NATIVE CHART COMPONENTS ---
 
-        // 1. Simple Bar Chart
         const NativeBarChart = ({ data, color = "#3b82f6" }) => {
-            if (!data || data.length === 0) return null;
+            if (!data || data.length === 0) return <div className="flex items-center justify-center h-full text-slate-400 text-sm">No valid data found</div>;
             const maxValue = Math.max(...data.map(d => d.value));
 
             return (
@@ -87,7 +75,7 @@
                                 <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end">
                                     <div className="chart-tooltip absolute bottom-full mb-2 bg-slate-800 text-white text-xs py-1 px-2 rounded shadow-lg z-10 whitespace-nowrap">
                                         <div className="font-semibold">{d.name}</div>
-                                        <div>{d.value} responses</div>
+                                        <div>{d.value.toFixed(1)}</div>
                                     </div>
                                     <div 
                                         style={{ height: `${heightPercent}%`, backgroundColor: color }} 
@@ -110,10 +98,35 @@
             );
         };
 
-        // 2. Simple Stacked Bar Chart (For Matrix)
-        const NativeStackedBarChart = ({ data, colors }) => {
-            if (!data || data.length === 0) return null;
+        const NativeHorizontalBarChart = ({ data, color = "#10b981" }) => {
+            if (!data || data.length === 0) return <div className="flex items-center justify-center h-full text-slate-400 text-sm">No valid data found</div>;
+            const maxValue = Math.max(...data.map(d => d.value));
 
+            return (
+                <div className="w-full h-full flex flex-col justify-center gap-3 overflow-y-auto pr-2">
+                    {data.map((d, i) => {
+                        const widthPercent = maxValue > 0 ? (d.value / maxValue) * 100 : 0;
+                        return (
+                            <div key={i} className="w-full">
+                                <div className="flex justify-between text-xs mb-1">
+                                    <span className="font-medium text-slate-700 truncate max-w-[80%]" title={d.name}>{d.name}</span>
+                                    <span className="text-slate-400">{d.value}</span>
+                                </div>
+                                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                    <div 
+                                        style={{ width: `${widthPercent}%`, backgroundColor: color }} 
+                                        className="h-full rounded-full transition-all duration-500"
+                                    ></div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        };
+
+        const NativeStackedBarChart = ({ data, colors }) => {
+            if (!data || data.length === 0) return <div className="flex items-center justify-center h-full text-slate-400 text-sm">No valid data found</div>;
             return (
                 <div className="w-full h-full flex flex-col justify-center gap-4 overflow-y-auto">
                     {data.map((row, i) => {
@@ -121,35 +134,16 @@
                         const pInHouse = total ? (row["In-House"] / total) * 100 : 0;
                         const pContractor = total ? (row["Contractor"] / total) * 100 : 0;
                         const pShared = total ? (row["Shared"] / total) * 100 : 0;
-
                         return (
                             <div key={i} className="w-full">
                                 <div className="flex justify-between text-xs mb-1">
                                     <span className="font-medium text-slate-700">{row.name}</span>
-                                    <span className="text-slate-400">{total} Responses</span>
+                                    <span className="text-slate-400">{total}</span>
                                 </div>
                                 <div className="w-full h-6 flex rounded-md overflow-hidden bg-slate-100">
-                                    {pInHouse > 0 && (
-                                        <div style={{ width: `${pInHouse}%`, background: colors["In-House"] }} className="h-full group relative hover:opacity-90 transition-opacity">
-                                             <div className="chart-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-slate-800 text-white text-xs py-1 px-2 rounded z-10">
-                                                In-House: {row["In-House"]}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {pShared > 0 && (
-                                        <div style={{ width: `${pShared}%`, background: colors["Shared"] }} className="h-full group relative hover:opacity-90 transition-opacity">
-                                            <div className="chart-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-slate-800 text-white text-xs py-1 px-2 rounded z-10">
-                                                Shared: {row["Shared"]}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {pContractor > 0 && (
-                                        <div style={{ width: `${pContractor}%`, background: colors["Contractor"] }} className="h-full group relative hover:opacity-90 transition-opacity">
-                                            <div className="chart-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-slate-800 text-white text-xs py-1 px-2 rounded z-10">
-                                                Contractor: {row["Contractor"]}
-                                            </div>
-                                        </div>
-                                    )}
+                                    {pInHouse > 0 && <div style={{ width: `${pInHouse}%`, background: colors["In-House"] }} className="h-full group relative hover:opacity-90" title={`In-House: ${row["In-House"]}`}></div>}
+                                    {pShared > 0 && <div style={{ width: `${pShared}%`, background: colors["Shared"] }} className="h-full group relative hover:opacity-90" title={`Shared: ${row["Shared"]}`}></div>}
+                                    {pContractor > 0 && <div style={{ width: `${pContractor}%`, background: colors["Contractor"] }} className="h-full group relative hover:opacity-90" title={`Contractor: ${row["Contractor"]}`}></div>}
                                 </div>
                             </div>
                         );
@@ -166,18 +160,15 @@
             );
         };
 
-        // 3. Simple Donut Chart
         const NativeDonutChart = ({ data, colors }) => {
-            if (!data || data.length === 0) return null;
+            if (!data || data.length === 0) return <div className="flex items-center justify-center h-full text-slate-400 text-sm">No valid data found</div>;
             const total = data.reduce((acc, curr) => acc + curr.value, 0);
             let accumulatedPercent = 0;
-
             const getCoordinatesForPercent = (percent) => {
                 const x = Math.cos(2 * Math.PI * percent);
                 const y = Math.sin(2 * Math.PI * percent);
                 return [x, y];
             }
-
             const segments = data.map((d, i) => {
                 const startPercent = accumulatedPercent;
                 const percent = d.value / total;
@@ -186,27 +177,22 @@
                 const [startX, startY] = getCoordinatesForPercent(startPercent);
                 const [endX, endY] = getCoordinatesForPercent(endPercent);
                 const largeArcFlag = percent > 0.5 ? 1 : 0;
-                const pathData = [
-                    `M ${startX} ${startY}`,
-                    `A 1 1 0 ${largeArcFlag} 1 ${endX} ${endY}`,
-                    `L 0 0`,
-                ].join(' ');
+                const pathData = [`M ${startX} ${startY}`, `A 1 1 0 ${largeArcFlag} 1 ${endX} ${endY}`, `L 0 0`].join(' ');
                 return { pathData, color: colors[i % colors.length], ...d, percent };
             });
 
             return (
                 <div className="w-full h-full flex items-center justify-center gap-8">
-                    <div className="relative w-48 h-48">
+                    <div className="relative w-40 h-40">
                          <svg viewBox="-1 -1 2 2" style={{ transform: 'rotate(-90deg)' }} className="w-full h-full">
                             {segments.map((s, i) => (
-                                <path key={i} d={s.pathData} fill={s.color} stroke="white" strokeWidth="0.02" className="hover:opacity-90 transition-opacity"/>
+                                <path key={i} d={s.pathData} fill={s.color} stroke="white" strokeWidth="0.02" className="hover:opacity-90 transition-opacity" title={`${s.name}: ${s.value}`}/>
                             ))}
                             <circle cx="0" cy="0" r="0.6" fill="white" />
                          </svg>
                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-slate-800">{total}</div>
-                                <div className="text-[10px] text-slate-400 uppercase">Models</div>
+                                <div className="text-xl font-bold text-slate-800">{total}</div>
                             </div>
                          </div>
                     </div>
@@ -225,13 +211,59 @@
             );
         };
 
+        const NativeHeatmap = ({ data }) => {
+            if (!data || Object.keys(data).length === 0) return <div className="flex items-center justify-center h-full text-slate-400 text-sm">No valid data found</div>;
+            
+            const xLabels = ["Poor (1-2)", "Fair (3)", "Good (4)", "Excellent (5)"];
+            const yLabels = Object.keys(data).sort(); 
+
+            let maxVal = 0;
+            yLabels.forEach(y => {
+                xLabels.forEach(x => {
+                    if (data[y][x] > maxVal) maxVal = data[y][x];
+                });
+            });
+
+            const getColor = (val) => {
+                if (!val) return '#f8fafc';
+                const intensity = val / maxVal;
+                if (intensity < 0.3) return '#bbf7d0';
+                if (intensity < 0.6) return '#4ade80';
+                return '#16a34a';
+            };
+
+            return (
+                <div className="w-full h-full flex flex-col justify-center">
+                    <div className="grid grid-cols-5 gap-1 mb-1">
+                        <div></div>
+                        {xLabels.map((x, i) => (
+                            <div key={i} className="text-[10px] text-center text-slate-500 font-medium">{x}</div>
+                        ))}
+                    </div>
+                    {yLabels.map((y, i) => (
+                        <div key={i} className="grid grid-cols-5 gap-1 mb-1 items-center">
+                            <div className="text-xs text-slate-600 font-medium text-right pr-2 leading-tight">{y}</div>
+                            {xLabels.map((x, j) => (
+                                <div 
+                                    key={j} 
+                                    className="h-10 rounded flex items-center justify-center text-xs font-bold text-slate-700 relative group"
+                                    style={{ backgroundColor: getColor(data[y][x] || 0) }}
+                                >
+                                    {data[y][x] > 0 ? data[y][x] : ''}
+                                </div>
+                            ))}
+                        </div>
+                    ))}
+                </div>
+            );
+        };
+
         // --- Icons ---
         const Icon = ({ path, className }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
                 {path}
             </svg>
         );
-
         const Icons = {
             Upload: (props) => <Icon {...props} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></>} />,
             FileText: (props) => <Icon {...props} path={<><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></>} />,
@@ -243,34 +275,21 @@
             Wrench: (props) => <Icon {...props} path={<><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></>} />,
             Table: (props) => <Icon {...props} path={<><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" x2="21" y1="9" y2="9"/><line x1="3" x2="21" y1="15" y2="15"/><line x1="12" x2="12" y1="3" y2="21"/></>} />,
             BarChart2: (props) => <Icon {...props} path={<><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></>} />,
-            FileSpreadsheet: (props) => <Icon {...props} path={<><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><path d="M14 2v6h6"/><path d="M4 15v7"/><path d="M9 15v7"/><path d="M14 15v7"/><path d="M4 18.5h15"/></>} />
+            TrendingUp: (props) => <Icon {...props} path={<><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></>} />,
+            Target: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>} />,
+            Lightbulb: (props) => <Icon {...props} path={<><line x1="9" x2="15" y1="18" y2="18"/><line x1="10" x2="14" y1="22" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 12 2a4.65 4.65 0 0 0-4.5 9.5c.7.7 1.23 1.52 1.41 2.5"/></>} />
         };
 
-        // --- Card Components ---
-        const Card = ({ children, className = "" }) => (
-            <div className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ${className}`}>
-                {children}
-            </div>
-        );
-
+        const Card = ({ children, className = "" }) => <div className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ${className}`}>{children}</div>;
         const CardHeader = ({ title, icon: Icon, subtitle }) => (
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div>
-                    <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                        {Icon && <Icon className="w-5 h-5 text-emerald-600" />}
-                        {title}
-                    </h3>
+                    <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">{Icon && <Icon className="w-5 h-5 text-emerald-600" />}{title}</h3>
                     {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
                 </div>
             </div>
         );
-
-        const CardContent = ({ children, className = "" }) => (
-            <div className={`p-6 ${className}`}>
-                {children}
-            </div>
-        );
-
+        const CardContent = ({ children, className = "" }) => <div className={`p-6 ${className}`}>{children}</div>;
         const MetricCard = ({ title, value, subtext, icon: Icon, trend }) => (
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between hover:shadow-md transition-shadow">
                 <div>
@@ -278,9 +297,7 @@
                     <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
                     {subtext && <p className="text-xs text-slate-400 mt-1">{subtext}</p>}
                 </div>
-                <div className={`p-3 rounded-lg ${trend === 'positive' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'}`}>
-                    <Icon className="w-6 h-6" />
-                </div>
+                <div className={`p-3 rounded-lg ${trend === 'positive' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'}`}><Icon className="w-6 h-6" /></div>
             </div>
         );
 
@@ -291,6 +308,41 @@
             const [filterType, setFilterType] = useState('All');
             const [viewMode, setViewMode] = useState('dashboard');
             const [statusMsg, setStatusMsg] = useState('Ready for Upload');
+
+            // --- Content-Aware Column Detection ---
+            // Helper to find the best matching column key based on cell CONTENT signatures
+            // This is needed because headers are often generic ("Please select one")
+            const findColumnByContent = (data, signatureFn) => {
+                if (!data || data.length === 0) return null;
+                const keys = Object.keys(data[0]);
+                
+                for (const key of keys) {
+                    // Check the first 10 rows for a match
+                    for (let i = 0; i < Math.min(data.length, 10); i++) {
+                        const val = data[i][key];
+                        if (val && signatureFn(String(val))) {
+                            return key;
+                        }
+                    }
+                }
+                return null;
+            };
+
+            // Signatures for detection
+            const isSizeCol = (val) => {
+                const v = val.toLowerCase();
+                return v.includes("beds") && (v.includes(">") || v.includes("<") || v.includes("large") || v.includes("small") || v.includes("medium"));
+            };
+            const isDependenceCol = (val) => val.toLowerCase().includes("dependence");
+            const isSkillsCol = (val) => {
+                const v = val.toLowerCase();
+                return (v.includes("electrician") || v.includes("plumber") || v.includes("fitter") || v.includes("trade") || v.includes("mechanic"));
+            };
+            const isPriorityCol = (val) => {
+                const v = val.toLowerCase();
+                return (v.includes("in-house staff") || v.includes("asset information") || v.includes("funding") || v.includes("recruitment"));
+            };
+
 
             // --- Excel/CSV Parser ---
             const handleFileUpload = (event) => {
@@ -314,53 +366,89 @@
                             
                             if (rawJson.length > 0) {
                                 setTableColumns(Object.keys(rawJson[0]));
-                            }
+                                
+                                // DETECT COLUMNS DYNAMICALLY
+                                const sizeKey = findColumnByContent(rawJson, isSizeCol);
+                                const depKey = findColumnByContent(rawJson, isDependenceCol);
+                                const skillsKey = findColumnByContent(rawJson, isSkillsCol);
+                                const priorityKey = findColumnByContent(rawJson, isPriorityCol);
 
-                            processedData = rawJson.map((row, index) => {
-                                const rowWithInternalMetrics = { ...row, __id: index + 1 }; // Add Row Number
+                                console.log("Detected Columns:", { sizeKey, depKey, skillsKey, priorityKey });
 
-                                // Robust Finder
-                                const findVal = (keywords) => {
-                                    if (!row) return "";
-                                    const key = Object.keys(row).find(k => k.toLowerCase().includes(keywords.toLowerCase()));
-                                    return key ? row[key] : "";
-                                };
+                                processedData = rawJson.map((row, index) => {
+                                    const rowWithInternalMetrics = { ...row, __id: index + 1 }; 
 
-                                const findTaskVal = (taskName) => {
-                                    if (!row) return "Unknown";
-                                    const relevantKeys = Object.keys(row).filter(k => k.toLowerCase().includes(taskName.toLowerCase()));
-                                    for (let key of relevantKeys) {
-                                        const val = row[key];
-                                        if (val && typeof val === 'string' && val.length > 2 && val !== "Not Applicable") {
-                                            return val;
+                                    // Robust Finder for Headers
+                                    const findVal = (keywords) => {
+                                        if (!row) return "";
+                                        const lowerKeywords = keywords.toLowerCase();
+                                        const matchingKeys = Object.keys(row).filter(k => k.toLowerCase().includes(lowerKeywords));
+                                        for (const key of matchingKeys) {
+                                            const val = row[key];
+                                            if (val && String(val).trim().length > 0 && String(val).trim().toLowerCase() !== "not applicable") {
+                                                return val;
+                                            }
                                         }
-                                    }
-                                    return "Unknown";
-                                };
+                                        return "";
+                                    };
 
-                                // Find Rating/Satisfaction Columns (Values like "3 Acceptable", "5 Strongly Agree")
-                                let ratingValues = [];
-                                Object.values(row).forEach(val => {
-                                    if (typeof val === 'string' && /^[1-5]\s/.test(val)) {
-                                        ratingValues.push(val);
-                                    }
+                                    const findTaskVal = (taskName) => {
+                                        if (!row) return "Unknown";
+                                        const matchingKeys = Object.keys(row).filter(k => k.toLowerCase().includes(taskName.toLowerCase()));
+                                        for (const key of matchingKeys) {
+                                            const val = row[key];
+                                            if (val && String(val).trim().length > 2 && String(val).trim().toLowerCase() !== "not applicable") {
+                                                return val;
+                                            }
+                                        }
+                                        return "Unknown";
+                                    };
+
+                                    // Find Rating/Satisfaction Columns
+                                    let ratingValues = [];
+                                    let totalScore = 0;
+                                    let countScore = 0;
+                                    Object.values(row).forEach(val => {
+                                        if (typeof val === 'string' && /^[1-5]\s/.test(val)) {
+                                            ratingValues.push(val);
+                                            const scoreMatch = val.match(/^(\d)/);
+                                            if (scoreMatch) {
+                                                totalScore += parseInt(scoreMatch[1]);
+                                                countScore++;
+                                            }
+                                        }
+                                    });
+                                    const avgRowScore = countScore > 0 ? (totalScore / countScore) : 0;
+
+                                    // MAPPINGS
+                                    rowWithInternalMetrics.__FacilityType = findVal("matches your service area") || findVal("Facility Type") || "Unknown";
+                                    rowWithInternalMetrics.__FMModel = findVal("FM delivery model") || "Unknown";
+                                    rowWithInternalMetrics.__Strategy = findVal("maintenance strategy") || "Unknown";
+                                    rowWithInternalMetrics.__Challenges = findVal("main challenges") || findVal("issues");
+                                    rowWithInternalMetrics.__Reactive = findTaskVal("General reactive maintenance");
+                                    rowWithInternalMetrics.__PPM = findTaskVal("Planned preventative maintenance");
+                                    rowWithInternalMetrics.__FireAlarm = findTaskVal("Fire alarm");
+                                    rowWithInternalMetrics.__Lifts = findTaskVal("Lifts");
+                                    rowWithInternalMetrics.__Comment = findVal("Comment") || findVal("Feedback") || findVal("further training");
+                                    rowWithInternalMetrics.__Ratings = ratingValues;
+                                    rowWithInternalMetrics.__AvgScore = avgRowScore;
+                                    
+                                    // USE DETECTED KEYS
+                                    rowWithInternalMetrics.__SpecificSkills = (skillsKey && row[skillsKey]) ? row[skillsKey] : (findVal("Electricians") || findVal("trade") || findVal("shortage") || findVal("skill"));
+                                    rowWithInternalMetrics.__Dependence = (depKey && row[depKey]) ? row[depKey] : (findVal("Dependence") || findVal("reliance")); 
+                                    rowWithInternalMetrics.__FuturePriorities = (priorityKey && row[priorityKey]) ? row[priorityKey] : (findVal("More in-house staff") || findVal("future") || findVal("changes") || findVal("investment") || findVal("priority"));
+                                    
+                                    // Parse Size
+                                    const sizeRaw = (sizeKey && row[sizeKey]) ? row[sizeKey] : (findVal("beds") || findVal("size") || "Unknown");
+                                    const sizeStr = String(sizeRaw).toLowerCase();
+                                    if (sizeStr.includes("large")) rowWithInternalMetrics.__Size = "Large";
+                                    else if (sizeStr.includes("medium")) rowWithInternalMetrics.__Size = "Medium";
+                                    else if (sizeStr.includes("small")) rowWithInternalMetrics.__Size = "Small";
+                                    else rowWithInternalMetrics.__Size = "Unknown";
+
+                                    return rowWithInternalMetrics;
                                 });
-
-                                rowWithInternalMetrics.__FacilityType = findVal("matches your service area") || findVal("Facility Type") || "Unknown";
-                                rowWithInternalMetrics.__FMModel = findVal("FM delivery model") || "Unknown";
-                                rowWithInternalMetrics.__Challenges = findVal("main challenges") || findVal("issues");
-                                rowWithInternalMetrics.__Reactive = findTaskVal("General reactive maintenance");
-                                rowWithInternalMetrics.__PPM = findTaskVal("Planned preventative maintenance");
-                                rowWithInternalMetrics.__FireAlarm = findTaskVal("Fire alarm");
-                                rowWithInternalMetrics.__Lifts = findTaskVal("Lifts");
-                                rowWithInternalMetrics.__Comment = findVal("Comment") || findVal("Feedback") || findVal("further training");
-                                rowWithInternalMetrics.__Ratings = ratingValues; // Store all found ratings
-
-                                return rowWithInternalMetrics;
-                            });
-                        } else {
-                            setStatusMsg("Error: Excel parser not loaded.");
-                            return;
+                            }
                         }
 
                         if (processedData.length > 0) {
@@ -376,11 +464,8 @@
                     }
                 };
 
-                if (file.name.endsWith('.csv')) {
-                    reader.readAsText(file);
-                } else {
-                    reader.readAsBinaryString(file);
-                }
+                if (file.name.endsWith('.csv')) reader.readAsText(file);
+                else reader.readAsBinaryString(file);
             };
 
             // --- Analytics Processing ---
@@ -390,7 +475,7 @@
             }, [data, filterType]);
 
             const stats = useMemo(() => {
-                if (!data.length) return { modelData: [], challengeData: [], matrixData: [], ratingData: [], avgScore: 0 };
+                if (!data.length) return { modelData: [], challengeData: [], matrixData: [], ratingData: [], skillsData: [], dependenceData: [], futureData: [], avgScore: 0, heatmapData: {}, modelSatData: [] };
 
                 // 1. Model Distribution
                 const models = {};
@@ -401,34 +486,46 @@
                 });
                 const modelData = Object.keys(models).map(k => ({ name: k, value: models[k] }));
 
-                // 2. Challenges Frequency
-                const challengeCounts = {};
-                filteredData.forEach(d => {
-                    if (d.__Challenges && typeof d.__Challenges === 'string') {
-                        const list = d.__Challenges.split(/[,-]/).map(s => s.trim());
-                        list.forEach(c => {
-                            if (c && c.length > 3) challengeCounts[c] = (challengeCounts[c] || 0) + 1;
-                        });
-                    }
-                });
-                const challengeData = Object.keys(challengeCounts)
-                    .map(k => ({ name: k, count: challengeCounts[k], value: challengeCounts[k] })) 
-                    .sort((a, b) => b.count - a.count)
-                    .slice(0, 5);
+                // 2. Challenges & Skills & Future
+                const processMultiValue = (field, splitChar = /[,-]/) => {
+                    const counts = {};
+                    filteredData.forEach(d => {
+                        if (d[field] && typeof d[field] === 'string') {
+                            const list = d[field].split(splitChar).map(s => s.trim());
+                            list.forEach(c => {
+                                c = c.trim();
+                                if (c && c.length > 3 && c.toLowerCase() !== "not applicable") {
+                                    counts[c] = (counts[c] || 0) + 1;
+                                }
+                            });
+                        }
+                    });
+                    return Object.keys(counts).map(k => ({ name: k, value: counts[k] })).sort((a,b) => b.value - a.value);
+                };
 
-                // 3. Task Responsibility Matrix
+                const challengeData = processMultiValue('__Challenges').slice(0, 5);
+                const skillsData = processMultiValue('__SpecificSkills').slice(0, 6);
+                const futureData = processMultiValue('__FuturePriorities').slice(0, 6);
+
+                // 3. Dependence
+                const depCounts = {};
+                filteredData.forEach(d => {
+                     if (d.__Dependence && d.__Dependence.length > 3) depCounts[d.__Dependence] = (depCounts[d.__Dependence] || 0) + 1;
+                });
+                const dependenceData = Object.keys(depCounts).map(k => ({ name: k, value: depCounts[k] }));
+
+                // 4. Matrix
                 const tasks = [
                     { label: "Reactive Maintenance", key: "__Reactive" },
                     { label: "PPM Plant", key: "__PPM" },
                     { label: "Fire Alarm", key: "__FireAlarm" },
                     { label: "Lifts", key: "__Lifts" }
                 ];
-                
                 const matrixData = tasks.map(task => {
                     const counts = { name: task.label, "In-House": 0, "Contractor": 0, "Shared": 0 };
                     filteredData.forEach(d => {
                         const val = d[task.key];
-                        if (!val) return;
+                        if (!val || val === "Unknown") return;
                         if (val.toLowerCase().includes("in-house")) counts["In-House"]++;
                         else if (val.toLowerCase().includes("contractor")) counts["Contractor"]++;
                         else if (val.toLowerCase().includes("shared")) counts["Shared"]++;
@@ -436,38 +533,66 @@
                     return counts;
                 });
 
-                // 4. Ratings / Satisfaction Analysis (New)
+                // 5. Ratings & Avg Score
                 const ratingCounts = {};
-                let totalScore = 0;
-                let scoreCount = 0;
-
+                let totalScore = 0, scoreCount = 0;
                 filteredData.forEach(d => {
                     if (d.__Ratings && d.__Ratings.length > 0) {
                         d.__Ratings.forEach(r => {
-                            // Extract numeric score (e.g. "5" from "5 Strongly Agree")
                             const scoreMatch = r.match(/^(\d)/);
                             if (scoreMatch) {
-                                const score = parseInt(scoreMatch[1]);
-                                totalScore += score;
+                                totalScore += parseInt(scoreMatch[1]);
                                 scoreCount++;
-                                
-                                // Clean name "5 Strongly Agree" -> "5: Strongly Agree" or just group by label
-                                // Let's group by the text part
                                 const label = r.substring(2).trim() || r; 
                                 ratingCounts[label] = (ratingCounts[label] || 0) + 1;
                             }
                         });
                     }
                 });
-
-                const ratingData = Object.keys(ratingCounts)
-                    .map(k => ({ name: k, value: ratingCounts[k] }))
-                    .sort((a,b) => b.value - a.value)
-                    .slice(0, 6); // Top 6 rating types
-
+                const ratingData = Object.keys(ratingCounts).map(k => ({ name: k, value: ratingCounts[k] })).sort((a,b) => b.value - a.value).slice(0, 6);
                 const avgScore = scoreCount > 0 ? (totalScore / scoreCount).toFixed(1) : "N/A";
 
-                return { modelData, challengeData, matrixData, ratingData, avgScore };
+                // 6. Heatmap Data (Size vs Satisfaction Bucket)
+                const heatmapData = { "Small": {}, "Medium": {}, "Large": {}, "Unknown": {} };
+                // Init buckets
+                const satBuckets = ["Poor (1-2)", "Fair (3)", "Good (4)", "Excellent (5)"];
+                Object.keys(heatmapData).forEach(sz => satBuckets.forEach(b => heatmapData[sz][b] = 0));
+
+                filteredData.forEach(d => {
+                    const sz = d.__Size || "Unknown";
+                    const score = d.__AvgScore;
+                    if (score > 0) {
+                        let bucket = "Fair (3)";
+                        if (score < 2.5) bucket = "Poor (1-2)";
+                        else if (score >= 4.5) bucket = "Excellent (5)";
+                        else if (score >= 3.5) bucket = "Good (4)";
+                        
+                        if (heatmapData[sz]) heatmapData[sz][bucket]++;
+                    }
+                });
+                // Remove empty rows from heatmap
+                Object.keys(heatmapData).forEach(k => {
+                   const total = Object.values(heatmapData[k]).reduce((a,b)=>a+b,0);
+                   if (total === 0) delete heatmapData[k];
+                });
+
+
+                // 7. Model vs Satisfaction (Smart Analytics)
+                const modelSatMap = {};
+                filteredData.forEach(d => {
+                    const m = d.__FMModel?.split('(')[0].trim() || "Unknown";
+                    if (d.__AvgScore > 0 && m !== "Unknown") {
+                        if (!modelSatMap[m]) modelSatMap[m] = { total: 0, count: 0 };
+                        modelSatMap[m].total += d.__AvgScore;
+                        modelSatMap[m].count++;
+                    }
+                });
+                const modelSatData = Object.keys(modelSatMap).map(k => ({
+                    name: k,
+                    value: modelSatMap[k].total / modelSatMap[k].count
+                })).sort((a,b) => b.value - a.value);
+
+                return { modelData, challengeData, matrixData, ratingData, skillsData, dependenceData, futureData, avgScore, heatmapData, modelSatData };
             }, [filteredData, data]);
 
             // Colors
@@ -475,11 +600,7 @@
                 pie: ['#059669', '#2563eb', '#d97706', '#64748b', '#8b5cf6', '#ec4899'], 
                 bar: '#ef4444',
                 rating: '#8b5cf6',
-                matrix: {
-                    "In-House": "#10b981", 
-                    "Contractor": "#3b82f6", 
-                    "Shared": "#f59e0b" 
-                }
+                matrix: { "In-House": "#10b981", "Contractor": "#3b82f6", "Shared": "#f59e0b" }
             };
 
             return (
@@ -492,30 +613,15 @@
                                 <h1 className="text-xl font-bold text-slate-900 hidden sm:block">Irish Healthcare FM Analytics</h1>
                                 <h1 className="text-xl font-bold text-slate-900 sm:hidden">FM Analytics</h1>
                             </div>
-                            
                             <div className="flex items-center gap-4">
                                 {data.length > 0 && (
                                     <div className="flex bg-slate-100 p-1 rounded-lg">
-                                        <button 
-                                            onClick={() => setViewMode('dashboard')}
-                                            className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${viewMode === 'dashboard' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                                        >
-                                            <Icons.BarChart2 className="w-4 h-4" />
-                                            <span className="hidden sm:inline">Dashboard</span>
-                                        </button>
-                                        <button 
-                                            onClick={() => setViewMode('table')}
-                                            className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                                        >
-                                            <Icons.Table className="w-4 h-4" />
-                                            <span className="hidden sm:inline">Data Table</span>
-                                        </button>
+                                        <button onClick={() => setViewMode('dashboard')} className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${viewMode === 'dashboard' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}><Icons.BarChart2 className="w-4 h-4" /><span className="hidden sm:inline">Dashboard</span></button>
+                                        <button onClick={() => setViewMode('table')} className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}><Icons.Table className="w-4 h-4" /><span className="hidden sm:inline">Data Table</span></button>
                                     </div>
                                 )}
-                                
                                 <label className={`flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg cursor-pointer transition-colors shadow-sm`}>
-                                    <Icons.Upload className="w-4 h-4" />
-                                    <span>Import Excel/CSV</span>
+                                    <Icons.Upload className="w-4 h-4" /><span>Import Excel/CSV</span>
                                     <input type="file" onChange={handleFileUpload} className="hidden" />
                                 </label>
                             </div>
@@ -523,20 +629,15 @@
                     </div>
 
                     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 flex-grow">
-                        
                         {viewMode === 'dashboard' ? (
                         <>
-                            {/* Header Controls */}
+                            {/* Controls */}
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                 <div>
                                     <h2 className="text-2xl font-bold text-slate-800">Executive Overview</h2>
                                     <p className="text-slate-500">Analysis of Facilities Management delivery models across the estate.</p>
                                 </div>
-                                <select 
-                                    className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2.5 shadow-sm min-w-[200px]"
-                                    value={filterType}
-                                    onChange={(e) => setFilterType(e.target.value)}
-                                >
+                                <select className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2.5 shadow-sm min-w-[200px]" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
                                     <option value="All">All Facility Types</option>
                                     <option value="Acute">Acute Hospitals</option>
                                     <option value="Community">Community Hospitals</option>
@@ -544,146 +645,106 @@
                                 </select>
                             </div>
 
-                            {/* Key Metrics Row */}
+                            {/* Metrics */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <MetricCard 
-                                title="Total Responses" 
-                                value={filteredData.length} 
-                                icon={Icons.Users} 
-                                trend="positive" 
-                            />
-                            <MetricCard 
-                                title="Dominant Model" 
-                                value={stats.modelData.length ? stats.modelData.sort((a,b) => b.value - a.value)[0]?.name.substring(0, 15) + "..." : "-"} 
-                                subtext="Most common strategy"
-                                icon={Icons.Activity} 
-                                trend="neutral" 
-                            />
-                            <MetricCard 
-                                title="Top Challenge" 
-                                value={stats.challengeData.length ? stats.challengeData[0]?.name.split(' ')[0] + "..." : "-"} 
-                                subtext="Most cited issue"
-                                icon={Icons.AlertTriangle} 
-                                trend="negative" 
-                            />
-                            <MetricCard 
-                                title="Avg. Satisfaction" 
-                                value={stats.avgScore !== "N/A" ? `${stats.avgScore} / 5.0` : "-"} 
-                                subtext="Mean score across all rated questions"
-                                icon={Icons.CheckCircle} 
-                                trend="positive" 
-                            />
+                                <MetricCard title="Total Responses" value={filteredData.length} icon={Icons.Users} trend="positive" />
+                                <MetricCard title="Dominant Model" value={stats.modelData.length ? stats.modelData.sort((a,b) => b.value - a.value)[0]?.name.substring(0, 15) + "..." : "-"} subtext="Most common strategy" icon={Icons.Activity} trend="neutral" />
+                                <MetricCard title="Top Priority" value={stats.futureData.length ? stats.futureData[0]?.name.split(' ')[0] + "..." : "-"} subtext="Most cited future need" icon={Icons.Target} trend="positive" />
+                                <MetricCard title="Avg. Satisfaction" value={stats.avgScore !== "N/A" ? `${stats.avgScore} / 5.0` : "-"} subtext="Mean score across all rated questions" icon={Icons.CheckCircle} trend="positive" />
                             </div>
 
-                            {/* Charts Grid */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            
-                            {/* Chart 1: Who Does What? */}
-                            <Card className="lg:col-span-2">
-                                <CardHeader 
-                                    title="Operational Responsibility Matrix" 
-                                    subtitle="Breakdown of In-House vs. Specialist Contractor execution for key Hard FM tasks."
-                                    icon={Icons.Wrench}
-                                />
-                                <CardContent className="h-[400px]">
-                                    {data.length > 0 ? (
-                                        <NativeStackedBarChart data={stats.matrixData} colors={COLORS.matrix} />
-                                    ) : (
-                                        <div className="empty-chart-placeholder">
-                                            <span>Upload data to see Responsibility Matrix</span>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-
-                            {/* Chart 2: Delivery Models */}
-                            <Card>
-                                <CardHeader title="FM Delivery Model Distribution" icon={Icons.Building} />
-                                <CardContent className="h-[300px]">
-                                    {data.length > 0 ? (
-                                        <NativeDonutChart data={stats.modelData} colors={COLORS.pie} />
-                                    ) : (
-                                        <div className="empty-chart-placeholder">
-                                            <span>Waiting for Data...</span>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-
-                            {/* Chart 3: Top Challenges */}
-                            <Card>
-                                <CardHeader title="Top 5 Operational Challenges" icon={Icons.AlertTriangle} />
-                                <CardContent className="h-[300px]">
-                                    {data.length > 0 ? (
-                                        <NativeBarChart data={stats.challengeData} color="#ef4444" />
-                                    ) : (
-                                        <div className="empty-chart-placeholder">
-                                            <span>Waiting for Data...</span>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-
-                            {/* Chart 4: Service Ratings (New) */}
-                            <Card>
-                                <CardHeader title="Service Satisfaction Levels" icon={Icons.CheckCircle} />
-                                <CardContent className="h-[300px]">
-                                    {data.length > 0 ? (
-                                        <NativeBarChart data={stats.ratingData} color="#8b5cf6" />
-                                    ) : (
-                                        <div className="empty-chart-placeholder">
-                                            <span>Waiting for Data...</span>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-
+                            {/* Standard Charts Section */}
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <Card className="lg:col-span-2">
+                                    <CardHeader title="Operational Responsibility Matrix" subtitle="In-House vs. Contractor execution for Hard FM." icon={Icons.Wrench} />
+                                    <CardContent className="h-[320px]">
+                                        {data.length > 0 ? <NativeStackedBarChart data={stats.matrixData} colors={COLORS.matrix} /> : <div className="text-center text-slate-400 py-20">Waiting for Data...</div>}
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardHeader title="Delivery Model" icon={Icons.Building} />
+                                    <CardContent className="h-[320px]">
+                                        {data.length > 0 ? <NativeDonutChart data={stats.modelData} colors={COLORS.pie} /> : <div className="text-center text-slate-400 py-20">Waiting for Data...</div>}
+                                    </CardContent>
+                                </Card>
                             </div>
 
-                            {/* Qualitative Data Section */}
-                            <Card>
-                                <CardHeader title="Recent Qualitative Feedback" icon={Icons.FileText} />
-                                <div className="divide-y divide-slate-100 max-h-[300px] overflow-y-auto">
+                            {/* Advanced Strategic Analysis Section */}
+                            <div className="pt-8 pb-4">
+                                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                    <Icons.Lightbulb className="w-5 h-5 text-purple-600" />
+                                    Advanced Strategic Analysis
+                                </h2>
+                                <p className="text-slate-500 text-sm">Correlations and deeper insights into estate performance.</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Heatmap: Bed Size vs Satisfaction */}
+                                <Card>
+                                    <CardHeader title="Impact of Facility Size on Satisfaction" subtitle="Heatmap: Density of responses by Bed Size & Score" icon={Icons.Activity} />
+                                    <CardContent className="h-[300px]">
+                                        {data.length > 0 ? <NativeHeatmap data={stats.heatmapData} /> : <div className="text-center text-slate-400 py-20">Waiting for Data...</div>}
+                                    </CardContent>
+                                </Card>
+
+                                {/* Smart Analytic: Model vs Efficiency */}
+                                <Card>
+                                    <CardHeader title="Model Efficiency Impact" subtitle="Average Satisfaction Score by Delivery Model" icon={Icons.Target} />
+                                    <CardContent className="h-[300px]">
+                                        {data.length > 0 ? <NativeBarChart data={stats.modelSatData} color="#10b981" /> : <div className="text-center text-slate-400 py-20">Waiting for Data...</div>}
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <Card>
+                                    <CardHeader title="Skills Shortages" subtitle="Critical trade gaps" icon={Icons.AlertTriangle} />
+                                    <CardContent className="h-[300px]">
+                                        {data.length > 0 ? <NativeHorizontalBarChart data={stats.skillsData} color="#64748b" /> : <div className="text-center text-slate-400 py-20">Waiting for Data...</div>}
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardHeader title="Contractor Dependence" subtitle="Reliance levels" icon={Icons.Activity} />
+                                    <CardContent className="h-[300px]">
+                                        {data.length > 0 ? <NativeDonutChart data={stats.dependenceData} colors={['#ef4444', '#f59e0b', '#10b981']} /> : <div className="text-center text-slate-400 py-20">Waiting for Data...</div>}
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardHeader title="Future Priorities" subtitle="Strategic wish list" icon={Icons.TrendingUp} />
+                                    <CardContent className="h-[300px]">
+                                        {data.length > 0 ? <NativeHorizontalBarChart data={stats.futureData} color="#8b5cf6" /> : <div className="text-center text-slate-400 py-20">Waiting for Data...</div>}
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            {/* Qualitative Feedback */}
+                             <Card>
+                                <CardHeader title="Recent Feedback" icon={Icons.FileText} />
+                                <div className="divide-y divide-slate-100 max-h-[250px] overflow-y-auto">
                                     {data.length > 0 ? (
-                                        <>
-                                            {filteredData.filter(d => d.__Comment && typeof d.__Comment === 'string' && d.__Comment.length > 5).map((d, i) => (
-                                                <div key={i} className="p-4 hover:bg-slate-50 transition-colors">
-                                                    <div className="flex justify-between items-start mb-1">
-                                                        <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                                                            {d["__FacilityType"]?.split('-')[0]}
-                                                        </span>
-                                                        <span className="text-xs text-slate-400">Response #{d.__id}</span>
-                                                    </div>
-                                                    <p className="text-sm text-slate-700 italic">"{d.__Comment}"</p>
+                                        filteredData.filter(d => d.__Comment && d.__Comment.length > 5).map((d, i) => (
+                                            <div key={i} className="p-4 hover:bg-slate-50 transition-colors">
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{d["__FacilityType"]?.split('-')[0]}</span>
                                                 </div>
-                                            ))}
-                                            {filteredData.filter(d => d.__Comment && d.__Comment.length > 5).length === 0 && (
-                                                <div className="p-8 text-center text-slate-400 text-sm">
-                                                    No comments found in current filter selection.
-                                                </div>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <div className="p-8 text-center text-slate-400 text-sm">
-                                            Upload file to view qualitative feedback.
-                                        </div>
-                                    )}
+                                                <p className="text-sm text-slate-700 italic">"{d.__Comment}"</p>
+                                            </div>
+                                        ))
+                                    ) : <div className="p-8 text-center text-slate-400 text-sm">Upload file to view feedback.</div>}
                                 </div>
                             </Card>
                         </>
                         ) : (
                             // --- Data Table View ---
                             <Card className="overflow-hidden flex flex-col h-full">
-                                <CardHeader title="Raw Data Table" icon={Icons.Table} subtitle={`Showing all columns from ${data.length} records`} />
+                                <CardHeader title="Raw Data Table" icon={Icons.Table} subtitle={`Import Status: ${tableColumns.length} columns identified across ${data.length} rows.`} />
                                 <div className="overflow-auto flex-grow max-h-[800px]">
                                     <table className="w-full text-sm text-left text-slate-500 whitespace-nowrap">
                                         <thead className="text-xs text-slate-700 uppercase bg-slate-50 sticky top-0 z-10">
                                             <tr>
                                                 <th className="px-6 py-3 border-b border-slate-200 bg-slate-50 w-12">#</th>
                                                 {tableColumns.map((col, idx) => (
-                                                    <th key={idx} className="px-6 py-3 border-b border-slate-200 bg-slate-50 min-w-[150px]">
-                                                        {col.length > 30 ? col.substring(0, 30) + "..." : col}
-                                                    </th>
+                                                    <th key={idx} className="px-6 py-3 border-b border-slate-200 bg-slate-50 min-w-[150px]">{col.length > 30 ? col.substring(0, 30) + "..." : col}</th>
                                                 ))}
                                             </tr>
                                         </thead>
@@ -692,9 +753,7 @@
                                                 <tr key={rIdx} className="bg-white border-b hover:bg-slate-50">
                                                     <td className="px-6 py-4 border-b border-slate-100 font-mono text-xs">{row.__id}</td>
                                                     {tableColumns.map((col, cIdx) => (
-                                                        <td key={cIdx} className="px-6 py-4 border-b border-slate-100">
-                                                            {row[col] ? String(row[col]).substring(0, 50) + (String(row[col]).length > 50 ? "..." : "") : "-"}
-                                                        </td>
+                                                        <td key={cIdx} className="px-6 py-4 border-b border-slate-100">{row[col] ? String(row[col]).substring(0, 50) + (String(row[col]).length > 50 ? "..." : "") : "-"}</td>
                                                     ))}
                                                 </tr>
                                             ))}
@@ -703,13 +762,8 @@
                                 </div>
                             </Card>
                         )}
-
                     </main>
-                    
-                    {/* Status Bar */}
-                    <div className="bg-slate-900 text-slate-300 text-xs py-1 px-4 text-right">
-                        Status: <span className="text-white font-medium">{statusMsg}</span>
-                    </div>
+                    <div className="bg-slate-900 text-slate-300 text-xs py-1 px-4 text-right">Status: <span className="text-white font-medium">{statusMsg}</span></div>
                 </div>
             );
         }
