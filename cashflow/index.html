@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HSE Capital & Estates Cash Flow</title>
+  <title>HSE Capital & Estates Cash Flow v2.93</title>
   
   <link rel="icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico">
   
@@ -13,6 +13,9 @@
   <!-- Chart.js & Plugins -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+  
+  <!-- PDF Generation Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   
   <!-- React & Babel -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -52,47 +55,147 @@
       width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px;
     }
 
-    /* Print Styles - Enhanced for Report Quality */
+    /* Toggle Switch Fixed Animation */
+    .toggle-checkbox {
+      left: 0;
+      transition: transform 0.3s ease, border-color 0.3s ease;
+    }
+    .toggle-checkbox:checked {
+      transform: translateX(1.25rem); /* Slides 20px right */
+      border-color: #006858;
+    }
+    .toggle-checkbox:checked + .toggle-label {
+      background-color: #006858;
+    }
+
+    /* --- PDF & PRINT MODE OPTIMISATIONS v2.93 (LANDSCAPE) --- */
+    
+    /* The "Ghost" Copy - Optimised for A4 LANDSCAPE */
+    .pdf-mode {
+      width: 1050px !important; /* A4 Landscape width (approx) */
+      background: white !important;
+      padding: 15px !important;
+      font-family: 'Inter', sans-serif !important;
+    }
+    
+    /* Hide unwanted elements */
+    .pdf-mode .print-hidden { display: none !important; }
+    .pdf-mode .print-visible { display: block !important; }
+    
+    /* Top Cards: 4 in a row for Landscape */
+    .pdf-mode .pdf-top-cards { 
+        display: grid !important; 
+        grid-template-columns: 1fr 1fr 1fr 1fr !important; /* 4 columns */
+        gap: 10px !important; 
+        margin-bottom: 15px !important;
+    }
+
+    /* Bottom Section: FLEX LAYOUT (Strict Side-by-Side) */
+    .pdf-mode .pdf-bottom-section {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: flex-start !important;
+        justify-content: space-between !important;
+        gap: 15px !important;
+        margin-top: 0 !important;
+    }
+
+    /* Left Side: Chart */
+    .pdf-mode .pdf-chart-container {
+        width: 60% !important;
+        margin-bottom: 0 !important;
+        border: 1px solid #e2e8f0 !important;
+        padding: 10px !important;
+        border-radius: 8px !important;
+    }
+    
+    /* Right Side: Data Tables Wrapper */
+    .pdf-mode .pdf-sidebar-data {
+        width: 38% !important;
+        display: block !important; 
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 8px !important;
+        padding: 8px !important;
+        background: #f8fafc !important;
+        height: auto !important;
+    }
+
+    /* Split the Data Sidebar into 2 Columns (Actuals | Planned) */
+    .pdf-mode .pdf-data-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 10px !important;
+    }
+
+    /* Tighter Headers */
+    .pdf-mode .pdf-sidebar-data h4 {
+        font-size: 9px !important;
+        color: #006858 !important;
+        margin-bottom: 4px !important;
+        border-bottom: 1px solid #cbd5e1 !important;
+    }
+
+    /* Compact Rows */
+    .pdf-mode .pdf-sidebar-data .data-row {
+        font-size: 8px !important; /* Very small for print */
+        padding: 2px 0 !important;
+        border-bottom: 1px dashed #e2e8f0 !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        line-height: 1.2 !important;
+    }
+    
+    /* Remove Shadows for clean print */
+    .pdf-mode .shadow-sm, .pdf-mode .shadow-lg { 
+        box-shadow: none !important; 
+    }
+    
+    /* Hide inputs in PDF, show clean text */
+    .pdf-mode input[type=range] { display: none !important; }
+    
+    /* Compact Text Sizes */
+    .pdf-mode .text-2xl { font-size: 1.1rem !important; } 
+    .pdf-mode h2 { font-size: 1.2rem !important; margin: 0 !important;}
+    .pdf-mode h3 { font-size: 0.9rem !important; }
+    .pdf-mode .p-5, .pdf-mode .p-6 { padding: 8px !important; }
+    .pdf-mode .h-[400px] { height: 280px !important; } /* Slightly taller for landscape */
+    .pdf-mode .gap-6 { gap: 8px !important; }
+    .pdf-mode .space-y-6 { space-y: 8px !important; margin-top: 8px !important;}
+    .pdf-mode nav { margin-bottom: 10px !important; padding: 10px !important; border-bottom: 2px solid #006858 !important;}
+    
+    /* Standard Print Styles (Fallback for Ctrl+P) */
     @media print {
-      @page { size: landscape; margin: 15mm; } /* Added 15mm margin */
+      @page { size: landscape; margin: 5mm; } 
+      body { background: white; -webkit-print-color-adjust: exact; }
+      .no-print, button, .modal-overlay, .tab-nav { display: none !important; }
       
-      body { 
-        background: white; 
-        -webkit-print-color-adjust: exact !important; 
-        print-color-adjust: exact !important;
+      #main-report-content { width: 100% !important; max-width: none !important; padding: 0 !important; }
+      
+      /* Force 4 columns for cards */
+      .print-grid { display: grid !important; grid-template-columns: 1fr 1fr 1fr 1fr !important; gap: 8px !important; } 
+      
+      .pdf-bottom-section {
+         display: flex !important;
+         flex-direction: row !important;
+         justify-content: space-between !important;
+         gap: 15px !important;
       }
-
-      /* Allow the green header to print */
-      nav { display: block !important; margin-bottom: 20px; }
-
-      /* Hide interactive UI Elements */
-      .no-print, button, .modal-overlay { display: none !important; }
       
-      /* Expand Containers */
+      .pdf-chart-container { width: 60% !important; }
+      .pdf-sidebar-data { width: 38% !important; display: block !important; border: 1px solid #eee; padding: 5px; }
+      
+      /* Ensure Side-by-Side Data tables in Print */
+      .pdf-data-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+
+      .print-hidden { display: none !important; }
+      .print-visible { display: block !important; }
+      
+      input[type=range] { display: none !important; }
       .overflow-y-auto { overflow: visible !important; height: auto !important; max-height: none !important; }
-      .custom-scroll { overflow: visible !important; height: auto !important; max-height: none !important; }
       
-      /* Styling Adjustments for Report */
-      .shadow-sm, .shadow-lg { box-shadow: none !important; border: 1px solid #cbd5e1 !important; }
-      .bg-slate-50 { background-color: #f8fafc !important; }
-      
-      /* Make Inputs look like text */
-      input { 
-        background: transparent !important; 
-        border: none !important; 
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-        font-weight: 600 !important;
-      }
-      
-      /* Ensure Charts Resize */
-      canvas { max-width: 100% !important; max-height: 400px !important; }
-      
-      /* Force Page Breaks */
-      .print-break-avoid { break-inside: avoid; }
-      
-      /* Reset margins/padding on main content as page margin handles it */
-      main, footer { padding-left: 0 !important; padding-right: 0 !important; width: 100% !important; max-width: none !important; }
+      /* Specific print sizing overrides */
+      .data-row { font-size: 8px !important; border-bottom: 1px solid #eee; padding: 1px 0; }
+      h4 { font-size: 10px !important; font-weight: bold; margin-bottom: 5px; color: #006858; }
     }
   </style>
 </head>
@@ -102,7 +205,7 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef, useLayoutEffect } = React;
 
-    // --- ICONS COMPONENT (Optimized) ---
+    // --- ICONS COMPONENT ---
     const Icon = ({ name, size = 18, className = "" }) => {
       return <i data-lucide={name} width={size} height={size} className={className}></i>;
     };
@@ -115,19 +218,19 @@
     // --- HELPER: S-CURVE GENERATOR ---
     const generateSLine = (total, periods) => {
       const data = [];
-      // Logistic function for S-Curve
       for (let i = 1; i <= periods; i++) {
         const x = (i / periods) * 10 - 5; 
         const val = 1 / (1 + Math.exp(-x));
         data.push(val);
       }
       const lastVal = data[data.length - 1];
-      const normalized = data.map(v => (v / lastVal) * total);
-      return { cumulative: normalized, periodic: normalized.map((v, i) => i === 0 ? v : v - normalized[i - 1]) };
+      const normalized = data.map(v => Math.round((v / lastVal) * total));
+      const periodic = normalized.map((v, i) => i === 0 ? v : v - normalized[i - 1]);
+      return { cumulative: normalized, periodic };
     };
 
-    // --- COMPONENT: MONEY INPUT (Handles Commas) ---
-    const MoneyInput = ({ value, onChange, className, placeholder }) => {
+    // --- COMPONENT: MONEY INPUT ---
+    const MoneyInput = ({ value, onChange, className, placeholder, disabled }) => {
       const [localValue, setLocalValue] = useState('');
       const inputRef = useRef(null);
 
@@ -142,11 +245,10 @@
       }, [value]);
 
       const handleChange = (e) => {
+        if (disabled) return;
         const raw = e.target.value;
         setLocalValue(raw); 
-
         const cleanVal = raw.replace(/,/g, '');
-        
         if (cleanVal === '') {
              onChange(0);
         } else if (!isNaN(cleanVal)) {
@@ -171,8 +273,9 @@
           value={localValue}
           onChange={handleChange}
           onBlur={handleBlur}
-          className={className}
+          className={`${className} ${disabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}`}
           placeholder={placeholder}
+          disabled={disabled}
         />
       );
     };
@@ -197,9 +300,9 @@
 
     // --- TOOLTIP COMPONENT ---
     const Tooltip = ({ text }) => (
-      <div className="group relative inline-block ml-2 cursor-help no-print">
+      <div className="group relative inline-block ml-2 cursor-help no-print z-50">
         <Icon name="info" size={14} className="text-slate-400 hover:text-[#006858]" />
-        <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-[10px] rounded w-48 text-center z-10 shadow-lg pointer-events-none">
+        <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-[10px] rounded w-56 text-center shadow-lg pointer-events-none z-50">
           {text}
           <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
         </div>
@@ -208,47 +311,36 @@
 
     function App() {
       // --- STATE & DATA ---
-      const STORAGE_KEY = 'HSE_CASHFLOW_V4';
+      const STORAGE_KEY = 'HSE_CASHFLOW_V29'; 
       
       const [config, setConfig] = useState(() => {
         if (window.HSE_PRELOADED_DATA && window.HSE_PRELOADED_DATA.config) return window.HSE_PRELOADED_DATA.config;
         const saved = localStorage.getItem(STORAGE_KEY);
         return saved ? JSON.parse(saved) : {
-          projectName: 'Example Project',
+          projectName: 'Capital Project A',
           budget: 2500000,
           duration: 24,
-          fundingMonthly: 120000,
           contingencyPercent: 10,
-          milestones: [{ month: 6, label: 'Planning Permission' }, { month: 12, label: 'Shell Complete' }],
-          eacMethod: 'plan_adherence'
+          milestones: [{ month: 6, label: 'Planning Permission' }, { month: 12, label: 'Shell Complete' }]
         };
       });
 
-      // ACTUALS STATE
       const [actuals, setActuals] = useState(() => {
         if (window.HSE_PRELOADED_DATA && window.HSE_PRELOADED_DATA.actuals) return window.HSE_PRELOADED_DATA.actuals;
-        
         const saved = localStorage.getItem(STORAGE_KEY + '_ACTUALS');
-        if (saved) {
-             const parsed = JSON.parse(saved);
-             if (parsed.length > 0 && typeof parsed[0] === 'number') {
-                 return parsed.map(val => ({ value: val, comment: '' }));
-             }
-             return parsed;
-        }
-
-        const oldSaved = localStorage.getItem('HSE_CASHFLOW_V3_ACTUALS');
-        if (oldSaved) {
-            const parsed = JSON.parse(oldSaved);
-            return parsed.map(val => ({ value: val, comment: '' }));
-        }
-
+        if (saved) return JSON.parse(saved);
         return [
             { value: 85000, comment: 'Initial Mobilisation' },
             { value: 92000, comment: '' },
             { value: 105000, comment: '' },
             { value: 110000, comment: '' }
         ];
+      });
+
+      const [customPlanned, setCustomPlanned] = useState(() => {
+        if (window.HSE_PRELOADED_DATA && window.HSE_PRELOADED_DATA.customPlanned) return window.HSE_PRELOADED_DATA.customPlanned;
+        const saved = localStorage.getItem(STORAGE_KEY + '_CUSTOM_PLANNED');
+        return saved ? JSON.parse(saved) : null;
       });
 
       const [progress, setProgress] = useState(() => {
@@ -258,225 +350,338 @@
       });
 
       const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-      
-      const [activeTab, setActiveTab] = useState(() => {
-         if (window.HSE_PRELOADED_DATA && window.HSE_PRELOADED_DATA.activeTab) return window.HSE_PRELOADED_DATA.activeTab;
-         return 'logs';
-      });
+      const [activeTab, setActiveTab] = useState('logs');
+      const [showPerformanceView, setShowPerformanceView] = useState(false);
+      const [isPdfGenerating, setIsPdfGenerating] = useState(false);
 
-      // Persist Data
       useEffect(() => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
         localStorage.setItem(STORAGE_KEY + '_ACTUALS', JSON.stringify(actuals));
+        localStorage.setItem(STORAGE_KEY + '_CUSTOM_PLANNED', JSON.stringify(customPlanned));
         localStorage.setItem(STORAGE_KEY + '_PROGRESS', progress);
-      }, [config, actuals, progress]);
+      }, [config, actuals, customPlanned, progress]);
 
-      // Optimized Icon Loading
       useEffect(() => {
         if (window.lucide) window.lucide.createIcons();
-      }, [activeTab, isSettingsOpen, actuals.length, config.milestones.length, config]);
+      }, [activeTab, isSettingsOpen, actuals.length, config.milestones.length, config, customPlanned, showPerformanceView, progress, isPdfGenerating]);
+
+      useEffect(() => {
+        if (customPlanned) {
+            const planTotal = customPlanned.reduce((sum, item) => sum + (item.value || 0), 0);
+            if (Math.abs(planTotal - config.budget) > 0.01) {
+                setConfig(prev => ({ ...prev, budget: planTotal }));
+            }
+        }
+      }, [customPlanned, config.budget]);
 
       // --- CALCULATIONS ---
-      const baseline = useMemo(() => generateSLine(config.budget, config.duration), [config.budget, config.duration]);
-      
+
+      const baseline = useMemo(() => {
+        if (customPlanned) {
+            const cumulative = [];
+            let sum = 0;
+            const periodic = customPlanned.map((item) => {
+                const val = item.value || 0;
+                sum += val;
+                cumulative.push(sum);
+                return val;
+            });
+            return { periodic, cumulative, isCustom: true, total: sum, rawData: customPlanned };
+        }
+        const sCurve = generateSLine(config.budget, config.duration);
+        return { ...sCurve, isCustom: false, total: config.budget, rawData: sCurve.periodic.map(v => ({ value: v, comment: '' })) };
+      }, [config.budget, config.duration, customPlanned]);
+
       const stats = useMemo(() => {
         const ac = actuals.reduce((a, b) => a + (b.value || 0), 0); 
         const monthIndex = actuals.length - 1;
-        const pv = monthIndex >= 0 ? baseline.cumulative[monthIndex] : 0; 
-        const ev = config.budget * (progress / 100); 
+        const pv = monthIndex >= 0 && monthIndex < baseline.cumulative.length ? baseline.cumulative[monthIndex] : 0; 
         
-        const cpiRaw = ac > 0 ? ev / ac : 1; 
-        const cpi = Math.min(Math.max(cpiRaw, 0.1), 10);
+        // EV Calculation
+        const ev = baseline.total * (progress / 100); 
+        const cpi = ac > 0 ? ev / ac : 1;
         const spi = pv > 0 ? ev / pv : 1; 
         
-        let eac = 0;
-        let eacLabel = "";
+        // Variance
+        const costVariance = ac - pv;
+        const costVariancePercent = pv > 0 ? (costVariance / pv) * 100 : 0;
 
-        if (config.eacMethod === 'linear_burn') {
-            const avgBurn = actuals.length > 0 ? ac / actuals.length : 0;
-            const remainingMonths = Math.max(config.duration - actuals.length, 0);
-            eac = ac + (avgBurn * remainingMonths);
-            eacLabel = "Linear Trend";
-        } else if (config.eacMethod === 'standard_cpi') {
-             eac = ac + (config.budget - ev) / cpi;
-             eacLabel = "Performance (CPI)";
-        } else {
-            eac = ac + (config.budget - ev);
-            eacLabel = "Plan Adherence";
+        // 1. CASH FLOW TREND
+        let avgMonthlyVariance = 0;
+        if (monthIndex >= 0) {
+            const currentVariance = ac - pv; 
+            const monthsElapsed = monthIndex + 1;
+            avgMonthlyVariance = currentVariance / monthsElapsed;
         }
+        const remainingMonths = Math.max(0, config.duration - (monthIndex + 1));
+        const projectedVariance = avgMonthlyVariance * remainingMonths;
+        const totalProjectedVariance = (ac - pv) + projectedVariance;
+        const eacTrend = baseline.total + totalProjectedVariance;
 
-        const variance = eac - config.budget;
-        const variancePercent = (variance / config.budget) * 100;
+        // 2. EFFICIENCY FORECAST (Standard EVM)
+        const safeCPI = cpi === 0 ? 0.001 : cpi; // Prevent divide by zero only
+        const eacEfficiency = config.budget / safeCPI;
+
+        // Primary is ALWAYS efficiency
+        const eacPrimary = eacEfficiency;
+        const eacLabel = "Based on Efficiency (CPI)";
+
+        const variance = eacPrimary - baseline.total;
+        const variancePercent = baseline.total > 0 ? (variance / baseline.total) * 100 : 0;
         
         let statusColor = 'text-emerald-600';
-        let statusText = 'On Track';
-        
-        if (variancePercent > config.contingencyPercent) {
-          statusColor = 'text-red-600';
-          statusText = 'Breach Likely';
-        } else if (variancePercent > 0) {
-          statusColor = 'text-amber-500';
-          statusText = 'Over Budget';
-        } else if (variancePercent < -5) {
-          statusText = 'Under Spend';
-        }
+        if (variancePercent > config.contingencyPercent) statusColor = 'text-red-600';
+        else if (variancePercent > 0) statusColor = 'text-amber-500';
 
-        return { ac, pv, ev, cpi, spi, eac, eacLabel, variance, variancePercent, statusColor, statusText };
+        const projectedCPI = eacPrimary > 0 ? config.budget / eacPrimary : cpi;
+        const projectedDuration = spi > 0 ? config.duration / spi : config.duration;
+        const projectedDelay = projectedDuration - config.duration;
+
+        return { 
+            ac, pv, ev, 
+            cpi, spi, costVariance, costVariancePercent,
+            eacPrimary, eacTrend, eacEfficiency, eacLabel, 
+            variance, variancePercent, statusColor, avgMonthlyVariance,
+            projectedCPI, projectedDuration, projectedDelay
+        };
       }, [actuals, baseline, config, progress]);
 
-      // --- TIME FORECAST ALERT LOGIC ---
       const timeAlert = useMemo(() => {
         if (stats.spi >= 0.98 || stats.spi === 0) return null;
+        const delayMonths = stats.projectedDelay;
+        return delayMonths >= 1.0 ? { monthsLate: Math.round(delayMonths), newDuration: Math.round(stats.projectedDuration) } : null;
+      }, [stats.spi, stats.projectedDuration, stats.projectedDelay]);
 
-        const projectedDuration = config.duration / stats.spi;
-        const delayMonths = projectedDuration - config.duration;
-
-        if (delayMonths < 1.0) return null;
-
-        return {
-            monthsLate: Math.round(delayMonths),
-            newDuration: Math.round(projectedDuration)
-        };
-      }, [stats.spi, config.duration]);
-
-      // --- CHART LOGIC ---
+      // --- CHART ---
       const chartRef = useRef(null);
-
       useEffect(() => {
+        // We render two charts potentially: one main, one for PDF ghost
+        // The PDF ghost chart logic is handled by the PDF generator creating a static snapshot
+        // But we need to make sure the Main Chart is live
         const ctx = document.getElementById('mainChart');
         if (!ctx) return;
         if (chartRef.current) chartRef.current.destroy();
 
-        const labels = Array.from({ length: config.duration }, (_, i) => `Month ${i + 1}`);
-        
-        const actualsPlot = new Array(config.duration).fill(null);
+        const currentMonthCount = actuals.length;
+        const maxMonth = showPerformanceView ? Math.max(currentMonthCount, 1) : config.duration;
+        const labels = Array.from({ length: maxMonth }, (_, i) => `Month ${i + 1}`);
+
+        const actualsPlot = new Array(maxMonth).fill(null);
         let runSum = 0;
-        actuals.forEach((item, i) => actualsPlot[i] = (runSum += item.value));
+        actuals.forEach((item, i) => {
+            if (i < maxMonth) actualsPlot[i] = (runSum += item.value);
+        });
 
-        const forecastPlot = new Array(config.duration).fill(null);
-        const lastActualIndex = actuals.length - 1;
-        const remainingMonths = config.duration - actuals.length;
+        const planData = baseline.cumulative.slice(0, maxMonth);
 
-        if (remainingMonths > 0) {
-            forecastPlot[lastActualIndex] = stats.ac; 
-            
-            const remainingCostToForecast = stats.eac - stats.ac;
-            const futureBaselinePeriodic = baseline.periodic.slice(actuals.length);
-            const sumFutureBaseline = futureBaselinePeriodic.reduce((a,b) => a+b, 0);
+        let cleanForecastPlot = [];
+        if (!showPerformanceView) {
+            const forecastPlot = new Array(config.duration).fill(null);
+            const lastActualIndex = actuals.length - 1;
+            const remainingMonths = config.duration - actuals.length;
 
-            let accumulatedForecast = stats.ac;
-            
-            for(let i=0; i < remainingMonths; i++) {
-                const monthIndex = actuals.length + i;
-                const baselineShare = sumFutureBaseline > 0 ? (futureBaselinePeriodic[i] / sumFutureBaseline) : (1/remainingMonths);
-                accumulatedForecast += remainingCostToForecast * baselineShare;
-                forecastPlot[monthIndex] = accumulatedForecast;
+            if (remainingMonths > 0) {
+                forecastPlot[lastActualIndex] = stats.ac; 
+                const futureBaselinePeriodic = baseline.periodic.slice(actuals.length);
+                let accumulatedForecast = stats.ac;
+                
+                // FORECAST LINE LOGIC - LOCKED TO EFFICIENCY
+                for(let i=0; i < remainingMonths; i++) {
+                    const costFactor = stats.cpi > 0.1 ? (1 / stats.cpi) : 1;
+                    const monthlyPrediction = futureBaselinePeriodic[i] * costFactor;
+                    accumulatedForecast += monthlyPrediction;
+                    forecastPlot[actuals.length + i] = accumulatedForecast;
+                }
             }
+            cleanForecastPlot = forecastPlot.map((v, i) => i < lastActualIndex ? null : v);
         }
 
         const milestoneAnnotations = {};
         config.milestones.forEach((m, i) => {
-            milestoneAnnotations[`m${i}`] = {
-                type: 'line', xMin: m.month - 1, xMax: m.month - 1,
-                borderColor: '#cbd5e1', borderDash: [4, 4], borderWidth: 2,
-                label: { display: true, content: m.label, position: 'start', backgroundColor: '#f1f5f9', color: '#64748b', font: {size: 10} }
-            };
+            if (m.month <= maxMonth) {
+                milestoneAnnotations[`m${i}`] = {
+                    type: 'line', xMin: m.month - 1, xMax: m.month - 1,
+                    borderColor: '#cbd5e1', borderDash: [4, 4], borderWidth: 2,
+                    label: { display: true, content: m.label, position: 'start', backgroundColor: '#f1f5f9', color: '#64748b', font: {size: 10} }
+                };
+            }
         });
 
-        chartRef.current = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [
-              { label: 'Baseline (Planned)', data: baseline.cumulative, borderColor: '#94a3b8', borderDash: [5,5], borderWidth: 2, pointRadius: 0, tension: 0.4 },
-              { label: 'Actual Spend', data: actualsPlot, borderColor: '#006858', backgroundColor: '#006858', borderWidth: 3, pointRadius: 4, tension: 0.1 },
-              { label: `Forecast (${stats.eacLabel})`, data: forecastPlot, borderColor: '#f59e0b', borderDash: [2,2], borderWidth: 2, pointRadius: 0, tension: 0.4 }
-            ]
-          },
+        const datasets = [
+              { type: 'line', label: 'Plan', data: planData, borderColor: '#94a3b8', borderDash: [5,5], borderWidth: 2, pointRadius: showPerformanceView ? 3 : 0, tension: 0.4, order: 2 },
+              { type: 'line', label: 'Actual', data: actualsPlot, borderColor: '#006858', backgroundColor: '#006858', borderWidth: 3, pointRadius: 5, tension: 0.1, order: 1 }
+        ];
+
+        if (!showPerformanceView) {
+            datasets.push({ type: 'line', label: 'Forecast (EVM)', data: cleanForecastPlot, borderColor: '#f59e0b', borderDash: [2,2], borderWidth: 2, pointRadius: 0, tension: 0.4, spanGaps: true, order: 1 });
+        }
+
+        const chartConfig = {
+          data: { labels, datasets: datasets },
           options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            responsive: true, maintainAspectRatio: false,
+            animation: false, // Disable animation for easier PDF capture
             interaction: { mode: 'index', intersect: false },
             plugins: {
-              legend: { position: 'bottom' },
-              tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${formatEuro(c.raw)}` } },
+              legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10, font: {size: 10} } },
+              tooltip: {
+                  backgroundColor: 'rgba(15, 23, 42, 0.9)', padding: 12, cornerRadius: 8,
+                  callbacks: { 
+                      label: (c) => ` ${c.dataset.label}: ${formatEuro(c.raw)}`,
+                      afterBody: (tooltipItems) => {
+                          const idx = tooltipItems[0].dataIndex;
+                          if (idx < actuals.length) {
+                             const actualMonthly = actuals[idx] ? actuals[idx].value : 0;
+                             const planMonthly = baseline.periodic[idx];
+                             const monthlyDiff = actualMonthly - planMonthly;
+                             const monthlyPct = planMonthly > 0 ? (monthlyDiff / planMonthly) * 100 : 0;
+                             return [
+                                 `------------------`,
+                                 `Mth Var: ${monthlyDiff > 0 ? '+' : ''}${formatEuro(monthlyDiff)} (${monthlyDiff > 0 ? '+' : ''}${monthlyPct.toFixed(1)}%)`
+                             ];
+                          }
+                          return [];
+                      }
+                  } 
+              },
               annotation: { annotations: milestoneAnnotations }
             },
             scales: {
-              y: { ticks: { callback: (v) => '€' + (v/1000000).toFixed(1) + 'm' }, grid: { color: '#f1f5f9' } },
-              x: { grid: { display: false } }
+              y: { ticks: { callback: (v) => '€' + (v/1000000).toFixed(1) + 'm', font: {size: 10} }, grid: { color: '#f1f5f9' } },
+              x: { grid: { display: false }, ticks: { font: {size: 10} } }
             }
           }
-        });
+        };
 
-      }, [config, actuals, stats, baseline]);
+        chartRef.current = new Chart(ctx, chartConfig);
+        
+        // --- HELPER FOR PDF CHART ---
+        // We attach the config to the window so the clone can access it easily to recreate the chart
+        window.currentChartConfig = chartConfig;
 
-      // --- ACTIONS ---
+      }, [config, actuals, stats, baseline, showPerformanceView]);
+
       const handleDownloadCSV = () => {
-        const headers = ["Month", "Planned Value", "Actual Cost", "Cumulative Actual", "Comment"];
+        const headers = ["Month", "Planned (M)", "Planned (C)", "Actual (M)", "Actual (C)", "Var %"];
         let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n";
-        
-        let cumActual = 0;
-        baseline.cumulative.forEach((pv, idx) => {
-           const item = actuals[idx];
-           const ac = item ? item.value : 0;
-           if(item) cumActual += ac;
-           
-           const row = [
-             `Month ${idx+1}`, 
-             pv.toFixed(2), 
-             item !== undefined ? ac : "", 
-             item !== undefined ? cumActual : "",
-             item !== undefined ? (item.comment || "").replace(/,/g, ' ') : "" 
-           ];
-           csvContent += row.join(",") + "\n";
+        let acCum = 0;
+        baseline.cumulative.forEach((pvC, idx) => {
+           const ac = actuals[idx] ? actuals[idx].value : 0;
+           if(actuals[idx]) acCum += ac;
+           csvContent += [`Month ${idx+1}`, baseline.periodic[idx].toFixed(2), pvC.toFixed(2), actuals[idx] ? ac : "", actuals[idx] ? acCum : "", actuals[idx] ? (((ac - baseline.periodic[idx])/baseline.periodic[idx])*100).toFixed(2) + '%' : ''].join(",") + "\n";
         });
-        
-        const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `${config.projectName.replace(/\s+/g, '_')}_Cashflow.csv`);
-        document.body.appendChild(link);
+        link.href = encodeURI(csvContent);
+        link.download = `${config.projectName.replace(/\s+/g, '_')}_Cashflow.csv`;
         link.click();
       };
 
-      const handleSaveHTML = () => {
-        // 1. Serialize Data Safely
-        const data = { config, actuals, progress, activeTab };
+      // --- HIGH QUALITY SNAPSHOT PDF GENERATOR (LANDSCAPE) ---
+      const handleDownloadPDF = async () => {
+        setIsPdfGenerating(true);
+        
+        // 1. Create a deep clone of the report element
+        const originalElement = document.getElementById('main-report-content');
+        const clone = originalElement.cloneNode(true);
+        
+        // 2. Setup the Ghost Container (WAY Off-screen to prevent jump)
+        const ghostContainer = document.createElement('div');
+        ghostContainer.style.position = 'fixed';
+        ghostContainer.style.left = '-5000px'; 
+        ghostContainer.style.top = '0';
+        ghostContainer.style.zIndex = '-100';
+        
+        // 3. Apply the PDF Mode class to the clone (Compact styles)
+        clone.classList.add('pdf-mode');
+        ghostContainer.appendChild(clone);
+        document.body.appendChild(ghostContainer);
+
+        // 4. Re-render Canvas in Clone
+        const oldCanvas = originalElement.querySelector('canvas');
+        const newCanvas = clone.querySelector('canvas');
+        if (oldCanvas && newCanvas && window.currentChartConfig) {
+             // We need to wait a tick for the clone to be in DOM
+             await new Promise(r => setTimeout(r, 100));
+             new Chart(newCanvas, {
+                 ...window.currentChartConfig,
+                 options: { 
+                     ...window.currentChartConfig.options, 
+                     animation: false,
+                     responsive: false // Important for fixed size export
+                 }
+             });
+             // Add a small paint delay to ensure chart is rendered before snapshot
+             await new Promise(r => setTimeout(r, 200));
+        }
+        
+        // 5. Generate PDF from Ghost (LANDSCAPE)
+        const opt = {
+          margin: [10, 10, 10, 10], // Margins: Top, Left, Bottom, Right
+          filename: `${config.projectName.replace(/\s+/g, '_')}_Report.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          // SCALE 4 is the key for "High Quality" - higher res image
+          html2canvas: { scale: 4, useCORS: true, logging: false, scrollY: 0 },
+          // Change to LANDSCAPE
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        };
+
+        try {
+            await html2pdf().set(opt).from(clone).save();
+        } catch(e) {
+            console.error("PDF Generation Error", e);
+            alert("Error generating PDF. Please check console.");
+        } finally {
+             // 6. Cleanup
+             document.body.removeChild(ghostContainer);
+             setIsPdfGenerating(false);
+        }
+      };
+
+      const handleNativePrint = () => {
+          window.print();
+      };
+
+      // --- SAVE HANDLER (File) ---
+      const handleSaveHTML = async () => {
+        const data = { config, actuals, customPlanned, progress };
+        // Minify JSON to save space
         const safeJson = JSON.stringify(data).replace(/<\/script>/g, '<\\/script>');
         
-        // 2. Clone the DOM
         const clone = document.documentElement.cloneNode(true);
-        
-        // 3. Remove old script if exists in clone
         const oldScript = clone.querySelector('script#hse-preloaded-data');
         if (oldScript) oldScript.remove();
         
-        // 4. Wipe the Root Div (This cleans the display so React can re-render fresh)
         const root = clone.querySelector('#root');
-        if (root) root.innerHTML = '';
+        if (root) root.innerHTML = ''; // This wipes the rendered app, preventing duplication
         
-        // 5. Create New Script
         const newScript = document.createElement('script');
         newScript.id = 'hse-preloaded-data';
         newScript.textContent = `window.HSE_PRELOADED_DATA = ${safeJson};`;
         
-        // 6. Inject into Clone Head
         const head = clone.querySelector('head');
-        if (head) {
-            head.appendChild(newScript);
-        } else {
-            clone.appendChild(newScript);
-        }
+        head.appendChild(newScript);
         
-        // 7. Download
         const finalHtml = '<!DOCTYPE html>\n' + clone.outerHTML;
-        
+
+        if (window.showSaveFilePicker) {
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: `${config.projectName.replace(/[^a-z0-9]/gi, '_')}_HSE_Report.html`,
+                    types: [{ description: 'HTML Project File', accept: { 'text/html': ['.html'] } }],
+                });
+                const writable = await handle.createWritable();
+                await writable.write(finalHtml);
+                await writable.close();
+                return;
+            } catch (err) { if (err.name === 'AbortError') return; }
+        }
+
         const blob = new Blob([finalHtml], {type: 'text/html'});
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${config.projectName.replace(/[^a-z0-9]/gi, '_')}_HSE_Project.html`;
+        link.download = `${config.projectName.replace(/[^a-z0-9]/gi, '_')}_HSE_Report.html`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -484,435 +689,393 @@
       };
 
       const handleFactoryReset = () => {
-         if (!confirm("FULL WIPE: This will delete the Project Name, Budget, Duration, and ALL data. \n\nAre you sure you want to start completely fresh?")) return;
-
-         const emptyConfig = {
-            projectName: 'Example Project',
-            budget: 0,
-            duration: 12,
-            fundingMonthly: 0,
-            contingencyPercent: 0,
-            milestones: [],
-            eacMethod: 'plan_adherence'
-         };
-         setConfig(emptyConfig);
-         setActuals([]);
-         setProgress(0);
-         setIsSettingsOpen(false);
+         if (!confirm("Wipe all data?")) return;
+         setConfig({ projectName: 'New Project', budget: 0, duration: 12, milestones: [], contingencyPercent: 10 });
+         setActuals([]); setCustomPlanned(null); setProgress(0); setIsSettingsOpen(false);
       };
 
-      const handleClearTracked = () => {
-         if(!confirm('Reset all actuals and progress? (Project settings will remain)')) return;
-         setActuals([]); 
-         setProgress(0); 
-         setIsSettingsOpen(false);
-      }
-
-      const updateActualValue = (index, val) => {
-        const newActuals = [...actuals];
-        newActuals[index] = { ...newActuals[index], value: Number(val) };
-        setActuals(newActuals);
+      const calculatePlannedProgress = (currentMonthCount) => {
+         if (currentMonthCount === 0 || baseline.total === 0) return 0;
+         const planCumul = baseline.cumulative[Math.min(currentMonthCount - 1, baseline.cumulative.length - 1)];
+         return Math.min(Number(((planCumul / baseline.total) * 100).toFixed(2)), 100);
       };
 
-      const updateActualComment = (index, text) => {
-        const newActuals = [...actuals];
-        newActuals[index] = { ...newActuals[index], comment: text };
-        setActuals(newActuals);
-      };
+      const plannedProgressToDate = useMemo(() => {
+          return calculatePlannedProgress(actuals.length);
+      }, [actuals.length, baseline]);
 
-      const addMonth = () => {
+      const addActualMonth = () => {
           if (actuals.length < config.duration) {
-              const nextMonthIndex = actuals.length;
-              const suggestedValue = baseline.periodic[nextMonthIndex];
-              setActuals([...actuals, { value: Math.round(suggestedValue), comment: '' }]);
+              const nextIndex = actuals.length;
+              const newA = [...actuals, { value: Math.round(baseline.periodic[nextIndex] || 0), comment: '' }];
+              setActuals(newA);
+              const newProgress = calculatePlannedProgress(newA.length);
+              setProgress(newProgress);
           }
       };
 
+      const ensureCustomMode = () => {
+          if (!customPlanned) {
+              const init = baseline.periodic.map(v => ({ value: v, comment: '' }));
+              setCustomPlanned(init); return init;
+          }
+          return [...customPlanned];
+      };
+
+      const resetProgressToPlan = () => { setProgress(plannedProgressToDate); };
+
+      const displayCPI = showPerformanceView ? stats.cpi : stats.projectedCPI;
+      const displayDuration = showPerformanceView ? stats.spi.toFixed(2) : Math.round(stats.projectedDuration) + " Mo";
+      const cpiStatus = displayCPI >= 1 ? 'text-emerald-600' : 'text-red-600';
+      
+      const eacDelta = stats.eacEfficiency - stats.eacTrend;
+      const showRiskWarning = eacDelta > (config.budget * 0.02); 
+
+      const durationDelta = Math.round(stats.projectedDuration - config.duration);
+      const isDelayed = durationDelta > 0;
+      const isAhead = durationDelta < 0;
+
       return (
         <div className="min-h-screen pb-20 print:pb-0">
-          
-          {/* TOP NAV */}
-          <nav className="bg-[#006858] text-white px-6 py-4 shadow-lg">
-            <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-              {/* LEFT: Logo & Titles */}
-              <div className="flex items-center gap-4 w-full md:w-auto">
-                <div className="bg-white p-1.5 rounded-lg shrink-0">
-                   <img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-8 md:h-10" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold leading-tight">HSE Capital & Estates</h1>
-                  <p className="text-xs text-emerald-100 opacity-80 uppercase tracking-widest">Cash Flow Analysis</p>
-                </div>
+          <nav className="bg-[#006858] text-white px-6 py-4 shadow-lg print:shadow-none">
+            <div className="max-w-7xl mx-auto flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <div className="bg-white p-1 rounded"><img src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" alt="HSE" className="h-8" /></div>
+                <div><h1 className="text-xl font-bold">HSE Capital & Estates</h1><p className="text-[10px] opacity-75 uppercase tracking-wider">Analysis v2.93</p></div>
               </div>
-              {/* RIGHT: Buttons - Hidden on Print */}
-              <div className="flex items-center gap-2 w-full md:w-auto justify-end print:hidden">
-                <button onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition border border-white/10">
-                  <Icon name="settings" size={16} /> <span className="hidden sm:inline">Settings</span>
-                </button>
-                <button onClick={handleSaveHTML} className="flex items-center gap-2 px-3 py-2 bg-emerald-700 hover:bg-emerald-600 rounded-lg text-sm font-medium transition border border-white/20 shadow-lg">
-                  <Icon name="save" size={16} /> <span className="hidden sm:inline">Save Project</span>
-                </button>
-                <button onClick={() => window.print()} className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition border border-white/10" title="Print Report">
-                  <Icon name="printer" size={18} />
-                </button>
+              <div className="flex gap-2 no-print">
+                <button onClick={() => setIsSettingsOpen(true)} className="px-3 py-2 bg-white/10 rounded-lg text-sm border border-white/10 hover:bg-white/20 transition"><Icon name="settings" size={16} /></button>
+                <button onClick={handleSaveHTML} className="px-3 py-2 bg-emerald-700 rounded-lg text-sm border border-white/20 hover:bg-emerald-600 transition shadow-md flex items-center gap-2"><Icon name="save" size={16} /> Save</button>
+                
+                {/* SPLIT BUTTON: DOWNLOAD & PRINT */}
+                <div className="flex rounded-lg bg-white/10 border border-white/10 overflow-hidden">
+                    <button onClick={handleDownloadPDF} disabled={isPdfGenerating} className="px-3 py-2 hover:bg-white/20 transition flex items-center gap-2 border-r border-white/10">
+                        {isPdfGenerating ? <Icon name="loader" size={16} className="animate-spin" /> : <Icon name="download" size={16} />} 
+                        <span className="text-xs font-bold">{isPdfGenerating ? "Generating..." : "Report"}</span>
+                    </button>
+                    <button onClick={handleNativePrint} className="px-3 py-2 hover:bg-white/20 transition flex items-center gap-2" title="Open Native Print Dialog (Best for Vector PDF)">
+                         <Icon name="printer" size={16} />
+                    </button>
+                </div>
+
               </div>
             </div>
           </nav>
 
-          <main className="max-w-7xl mx-auto p-6 space-y-6">
+          {/* MAIN CONTENT WRAPPER FOR PDF GENERATION */}
+          <main id="main-report-content" className={`max-w-7xl mx-auto p-6 space-y-6`}>
+            <div className="flex justify-between items-end border-b border-slate-200 pb-4">
+               <div><span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Project Name</span><h2 className="text-2xl font-black text-slate-800">{config.projectName}</h2></div>
+               <div className="text-right"><div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Report Date</div><div className="font-bold text-slate-700">{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</div></div>
+            </div>
             
-            {/* PROJECT HEADER (Print Friendly) */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-slate-200 pb-4">
-               <div className="flex items-center gap-4">
-                  {/* Print-only Logo REMOVED - Using main nav now */}
-                  <div>
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Project Control</span>
-                      <h2 className="text-2xl font-black text-slate-800">{config.projectName}</h2>
+            <div className={`grid grid-cols-2 lg:grid-cols-4 gap-4 print-grid pdf-grid pdf-top-cards`}>
+               
+               {/* Card 1: Budget */}
+               <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 pdf-shadow-none pdf-compact-card">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                      {showPerformanceView ? 'Planned to Date (PV)' : 'Budget (BAC)'}
+                  </span>
+                  <div className="text-2xl font-bold text-slate-800">
+                      {formatEuro(showPerformanceView ? stats.pv : config.budget)}
                   </div>
-               </div>
-               <div className="text-left mt-2 md:mt-0">
-                  <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">Report Date</div>
-                  <div className="font-bold text-slate-700">{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-               </div>
-            </div>
-
-            {/* KEY METRICS CARDS */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-               <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 print-shadow-none print-break-avoid">
-                  <div className="flex justify-between items-start mb-2">
-                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Budget (BAC)</span>
-                     <Icon name="briefcase" size={16} className="text-slate-300" />
+                  <div className="text-xs text-slate-500 mt-1">
+                      {showPerformanceView ? `Month 1 to ${actuals.length}` : `${config.duration} Months Total`}
                   </div>
-                  <div className="text-2xl font-bold text-slate-800">{formatEuro(config.budget)}</div>
-                  <div className="text-xs text-slate-500 mt-1">Duration: {config.duration} Months</div>
                </div>
                
-               <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 print-shadow-none print-break-avoid relative">
-                  <div className={`absolute top-0 right-0 p-2 opacity-10 ${stats.variancePercent > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+               {/* Card 2: Projected */}
+               <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 relative group pdf-shadow-none pdf-compact-card">
+                   {showPerformanceView ? (
+                       <>
+                           <div className="flex items-center">
+                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Spent to Date (AC)</span>
+                             <Tooltip text="Total actual expenditure logged so far." />
+                           </div>
+                           <div className={`text-2xl font-bold ${stats.statusColor}`}>{formatEuro(stats.ac)}</div>
+                           <div className="text-xs text-slate-500 mt-1">Actuals vs Plan Period</div>
+                       </>
+                   ) : (
+                       <>
+                           <div className="flex justify-between items-start">
+                               <div className="flex items-center gap-1">
+                                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Projected (EAC)</span>
+                                   <Tooltip text="Standard EVM Forecast based on current Efficiency (CPI)." />
+                               </div>
+                           </div>
+                           
+                           <div className={`text-2xl font-bold ${stats.statusColor} transition-all`}>
+                               {formatEuro(stats.eacPrimary)}
+                           </div>
+                           
+                           <div className="flex items-center justify-between mt-1">
+                               <span className="text-[10px] font-bold text-slate-500">{stats.eacLabel}</span>
+                               {showRiskWarning && (
+                                   <span className="text-[9px] bg-red-50 text-red-600 px-1.5 rounded border border-red-100 font-bold" title={`Difference between efficiency-based EAC and cash-trend EAC`}>
+                                       Efficiency Gap: +{formatEuro(eacDelta)}
+                                   </span>
+                               )}
+                           </div>
+                           
+                           <div className="mt-2 pt-2 border-t border-slate-100">
+                               <div className="flex justify-between text-[10px] text-slate-400">
+                                   <div className="flex items-center gap-1">
+                                       <span>Cash Trend:</span>
+                                       {/* NEW INFO ICON FOR BURN RATE */}
+                                       <Tooltip text="Burn Rate Forecast: How much the project will cost if your current monthly spending rate continues to the end." />
+                                   </div>
+                                   <span className="font-mono text-slate-600">{formatEuro(stats.eacTrend)}</span>
+                               </div>
+                           </div>
+                       </>
+                   )}
+               </div>
+
+               {/* Card 3: CPI - NOW WITH VARIANCE % */}
+               <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 relative pdf-shadow-none pdf-compact-card">
+                   <div className={`absolute top-0 right-0 p-2 opacity-10 ${cpiStatus}`}>
                       <Icon name="trending-up" size={48} />
+                   </div>
+                  <div className="flex items-center">
+                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                        {showPerformanceView ? 'Current Efficiency (CPI)' : 'Projected Final CPI'}
+                     </span>
+                     <Tooltip text={showPerformanceView ? "Cost Performance Index (EV/AC). < 1.0 means for every €1 spent, you got less than €1 of value." : "Predicted CPI at completion."} />
                   </div>
-                  <div className="flex justify-between items-start mb-2">
-                     <div className="flex items-center">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Forecast (EAC)</span>
-                        <Tooltip text="Estimated cost at completion based on chosen forecasting method." />
-                     </div>
+                  <div className={`text-2xl font-bold ${cpiStatus}`}>
+                      {displayCPI.toFixed(2)}
                   </div>
-                  <div className={`text-2xl font-bold ${stats.statusColor}`}>{formatEuro(stats.eac)}</div>
-                  <div className="text-xs font-bold mt-1 flex items-center gap-1">
-                      <span className={stats.variance > 0 ? 'text-red-600' : 'text-emerald-600'}>
-                         {stats.variance > 0 ? '+' : ''}{stats.variancePercent.toFixed(1)}%
-                      </span>
-                      <span className="text-slate-400 font-normal">Variance ({stats.eacLabel})</span>
-                  </div>
-               </div>
 
-               <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 print-shadow-none print-break-avoid">
-                  <div className="flex justify-between items-start mb-2">
-                     <div className="flex items-center">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Cost Efficiency (CPI)</span>
-                        <Tooltip text="Value received for every €1 spent. >1 is good. Low CPI may indicate billing lag or overspend." />
-                     </div>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                      <div className={`text-2xl font-bold ${stats.cpi < 0.95 ? 'text-red-500' : 'text-emerald-600'}`}>
-                        {stats.cpi.toFixed(2)}
+                  <div className="flex justify-between items-end mt-1">
+                      <div className="text-xs font-medium text-slate-500">
+                          {displayCPI >= 1 ? 'Efficient Spend' : 'Inefficient Spend'}
                       </div>
-                      <span className="text-xs text-slate-400">Target: 1.00</span>
-                  </div>
-                  <div className="w-full bg-slate-100 h-1.5 mt-3 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full ${stats.cpi < 1 ? 'bg-red-400' : 'bg-emerald-500'}`} style={{width: `${Math.min(stats.cpi * 50, 100)}%`}}></div>
+                      
+                      {/* --- CASH VARIANCE DISPLAY WITH % --- */}
+                      <div className={`text-xs font-bold ${stats.costVariance > 0 ? 'text-red-600' : 'text-emerald-600'} text-right`}>
+                           <div>
+                               Var: {stats.costVariance > 0 ? '+' : ''}{formatEuro(stats.costVariance)}
+                           </div>
+                           <div className="text-[10px]">
+                               ({stats.costVariance > 0 ? '+' : ''}{Math.round(stats.costVariancePercent)}%)
+                           </div>
+                      </div>
                   </div>
                </div>
 
-               <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 print-shadow-none print-break-avoid">
-                  <div className="flex justify-between items-start mb-2">
-                     <div className="flex items-center">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Schedule (SPI)</span>
-                        <Tooltip text="Progress achieved vs planned. Below 1.00 means behind schedule." />
-                     </div>
+               {/* Card 4: SPI */}
+               <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between pdf-shadow-none pdf-compact-card">
+                  <div>
+                    <div className="flex items-center">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                            {showPerformanceView ? 'Current Schedule (SPI)' : 'Projected Duration'}
+                        </span>
+                        <Tooltip text={showPerformanceView ? "Progress vs Plan (EV/PV). < 1.0 means behind schedule." : "Estimated project duration based on current work rate."} />
+                    </div>
+                    <div className="text-2xl font-bold text-blue-600">
+                        {displayDuration}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1">
+                        {showPerformanceView ? `${progress}% Comp.` : `SPI: ${stats.spi.toFixed(2)}`}
+                    </div>
                   </div>
-                  <div className="text-2xl font-bold text-blue-600">{stats.spi.toFixed(2)}</div>
-                  <div className="text-xs text-slate-500 mt-1">Based on {progress}% Physical Comp.</div>
+                  
+                  {!showPerformanceView && (
+                    <div className="mt-3">
+                        {isDelayed && (
+                            <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-red-50 border border-red-100 rounded text-[10px] font-bold text-red-700 animate-pulse print:animate-none">
+                                <Icon name="alert-circle" size={12} />
+                                {durationDelta} Months Delay
+                            </div>
+                        )}
+                        {isAhead && (
+                            <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-emerald-50 border border-emerald-100 rounded text-[10px] font-bold text-emerald-700">
+                                <Icon name="check-circle" size={12} />
+                                {Math.abs(durationDelta)} Months Ahead
+                            </div>
+                        )}
+                        {durationDelta === 0 && (
+                            <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-50 border border-slate-100 rounded text-[10px] font-bold text-slate-500">
+                                <Icon name="check" size={12} />
+                                On Schedule
+                            </div>
+                        )}
+                    </div>
+                  )}
                </div>
             </div>
 
-            {/* MAIN DASHBOARD CONTENT */}
-            <div className="grid lg:grid-cols-3 gap-6">
-               
-               {/* LEFT COL: CHART */}
-               <div className="lg:col-span-2 space-y-6">
-                  
-                  {/* CHART CARD */}
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print-shadow-none print-break-avoid">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                            <Icon name="bar-chart-2" size={18} className="text-[#006858]"/> 
-                            Performance S-Curve
-                        </h3>
-                        <div className="flex gap-2 text-xs font-medium bg-slate-100 p-1 rounded-lg">
-                            <div className="px-3 py-1 bg-white shadow-sm rounded text-[#006858]">Cumulative</div>
+            <div className={`grid lg:grid-cols-3 gap-6 print-grid pdf-grid pdf-bottom-section`}>
+               <div className="lg:col-span-2 space-y-6 pdf-chart-container">
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 pdf-shadow-none pdf-compact-card">
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
+                        <div className="flex flex-col">
+                             <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                                <Icon name="bar-chart-2" size={18} className="text-[#006858]"/> 
+                                {showPerformanceView ? 'Performance to Date' : 'Expenditure Forecast'}
+                            </h3>
+                            {!showPerformanceView && <span className="text-[10px] text-slate-400 ml-6 uppercase font-bold tracking-wide">Standard EVM Forecast</span>}
+                        </div>
+                        
+                        <div className="flex items-center gap-2 no-print bg-slate-100 p-1 rounded-lg print-hidden">
+                           <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded transition ${!showPerformanceView ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}>Forecast View</span>
+                           <div className="relative inline-block w-10 mr-2 align-middle select-none">
+                                <input 
+                                    type="checkbox" 
+                                    name="toggle" 
+                                    id="toggle" 
+                                    className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer transform left-0 border-slate-300"
+                                    checked={showPerformanceView}
+                                    onChange={() => setShowPerformanceView(!showPerformanceView)}
+                                />
+                                <label htmlFor="toggle" className="toggle-label block overflow-hidden h-5 rounded-full bg-slate-300 cursor-pointer"></label>
+                           </div>
+                           <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded transition ${showPerformanceView ? 'bg-white text-[#006858] shadow-sm' : 'text-slate-400'}`}>Performance View</span>
                         </div>
                     </div>
-                    <div className="h-[350px] w-full">
-                        <canvas id="mainChart"></canvas>
-                    </div>
+
+                    <div className="h-[400px] w-full"><canvas id="mainChart"></canvas></div>
                     
-                    {/* Physical Progress Slider */}
-                    <div className="mt-8 bg-slate-50 p-4 rounded-lg border border-slate-100 no-print">
-                        <div className="flex justify-between mb-2">
-                            <label className="text-xs font-bold text-slate-600 uppercase">Reported Physical Progress (Site)</label>
-                            <span className="text-sm font-black text-[#006858]">{progress}%</span>
+                    <div className="mt-8 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                        <div className="flex justify-between items-end mb-2">
+                             <div>
+                                 <label className="text-xs font-bold text-slate-600 uppercase">Total Project Physical Completion (%)</label>
+                                 <div className="text-[10px] text-slate-400 mt-0.5">
+                                    Plan expects: <strong>{plannedProgressToDate.toFixed(2)}%</strong> by Month {actuals.length}
+                                 </div>
+                             </div>
+                             <span className={`text-sm font-black ${progress > plannedProgressToDate + 5 ? 'text-emerald-600' : progress < plannedProgressToDate - 5 ? 'text-red-600' : 'text-slate-700'}`}>
+                                 {progress.toFixed(2)}%
+                             </span>
                         </div>
-                        <input 
-                            type="range" min="0" max="100" step="1" 
-                            value={progress} 
-                            onChange={(e) => setProgress(Number(e.target.value))}
-                            className="w-full cursor-pointer"
-                        />
-                        <p className="text-[10px] text-slate-400 mt-2 flex items-center gap-1">
-                            <Icon name="info" size={10} /> 
-                            Adjusting this recalculates Earned Value (EV) and SPI.
-                        </p>
+                        <div className="flex items-center gap-2">
+                            <input type="range" min="0" max="100" step="0.01" value={progress} onChange={(e) => setProgress(Number(e.target.value))} className="w-full cursor-pointer print:hidden" />
+                            <button onClick={resetProgressToPlan} className="px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded text-[10px] font-bold hover:bg-slate-50 hover:text-[#006858] transition shrink-0 shadow-sm print:hidden" title={`Reset progress to planned ${plannedProgressToDate}%`}>Sync to Plan</button>
+                        </div>
                     </div>
                   </div>
-
-                  {/* TIME RISK ALERT - Moved here to prevent layout jumping */}
-                  {timeAlert && (
-                    <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg shadow-sm flex items-start gap-4 animate-fade-in-up">
-                        <div className="bg-orange-100 p-2 rounded-full text-orange-600 mt-1">
-                        <Icon name="clock" size={24} />
-                        </div>
+                  
+                  {timeAlert && !showPerformanceView && (
+                    <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded shadow-sm flex items-start gap-4">
+                        <div className="text-orange-600"><Icon name="clock" size={24} /></div>
                         <div>
-                        <h4 className="text-sm font-black text-orange-800 uppercase tracking-wide">
-                            Schedule Delay Warning
-                        </h4>
-                        <p className="text-sm text-orange-800 mt-1">
-                            Current progress (SPI {stats.spi.toFixed(2)}) suggests this project will miss the 
-                            <strong> Month {config.duration}</strong> deadline.
-                        </p>
-                        <div className="mt-2 text-xs font-bold text-orange-700 bg-orange-100 inline-block px-2 py-1 rounded">
-                            Forecast Delay: +{timeAlert.monthsLate} Months (Total: {timeAlert.newDuration} Months)
-                        </div>
+                           <h4 className="text-sm font-black text-orange-800 uppercase">Delay Warning</h4>
+                           <p className="text-sm text-orange-800">Current SPI suggests a <strong>+{timeAlert.monthsLate} month</strong> delay.</p>
+                           <p className="text-xs text-orange-700 mt-1">If this delay causes inefficiency, the final cost could increase by <strong>{formatEuro(stats.eacEfficiency - stats.eacTrend)}</strong> (Efficiency Gap).</p>
                         </div>
                     </div>
                   )}
-
                </div>
 
-               {/* RIGHT COL: INPUTS */}
-               <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-full print-shadow-none print-break-avoid">
-                  {/* Tabs */}
-                  <div className="flex border-b border-slate-100 no-print">
-                     <button 
-                        onClick={() => setActiveTab('logs')}
-                        className={`flex-1 py-3 text-xs font-bold uppercase tracking-wide transition-colors ${activeTab === 'logs' ? 'text-[#006858] border-b-2 border-[#006858]' : 'text-slate-400 hover:text-slate-600'}`}
-                     >
-                        Monthly Actuals
-                     </button>
-                     <button 
-                        onClick={() => setActiveTab('milestones')}
-                        className={`flex-1 py-3 text-xs font-bold uppercase tracking-wide transition-colors ${activeTab === 'milestones' ? 'text-[#006858] border-b-2 border-[#006858]' : 'text-slate-400 hover:text-slate-600'}`}
-                     >
-                        Milestones
-                     </button>
-                  </div>
+               <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden print:overflow-visible print:border-none print:shadow-none pdf-shadow-none pdf-compact-card pdf-sidebar-data">
                   
-                  {/* Print Only Title for List */}
-                  <h3 className="hidden print:block text-sm font-bold text-slate-700 mb-2 px-2 pt-2 border-b">
-                     {activeTab === 'logs' ? 'Monthly Expenditure' : 'Milestone Schedule'}
-                  </h3>
+                  {/* TABS (Hidden during PDF Generation) */}
+                  <div className="flex border-b border-slate-100 tab-nav print-hidden">
+                     {['logs', 'planned', 'milestones'].map(t => (
+                        <button key={t} onClick={() => setActiveTab(t)} className={`flex-1 py-3 text-[10px] font-bold uppercase transition-colors ${activeTab === t ? 'text-[#006858] border-b-2 border-[#006858]' : 'text-slate-400 hover:text-slate-600'}`}>{t}</button>
+                     ))}
+                  </div>
 
-                  {/* Content Area */}
-                  <div className="p-4 flex-1 overflow-y-auto max-h-[500px] custom-scroll bg-slate-50/50">
-                     
+                  {/* SCREEN VIEW (SCROLLABLE) - Hidden during PDF generation via class 'print-hidden' */}
+                  <div className="p-4 flex-1 overflow-y-auto max-h-[500px] custom-scroll bg-slate-50/50 print:hidden print-hidden">
                      {activeTab === 'logs' && (
                         <div className="space-y-3">
-                           {actuals.map((item, i) => {
-                              const milestone = config.milestones.find(m => m.month === i + 1);
-                              return (
-                                <div key={i} className="flex flex-col gap-1 bg-white p-2 rounded-lg border border-slate-100 shadow-sm animate-fade-in-up print-break-avoid" style={{animationDelay: `${i*50}ms`}}>
-                                   {/* Row 1: Amount */}
-                                   <div className="flex items-center gap-2">
-                                       <div className="w-16 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500 shrink-0 uppercase">
-                                          Month {i+1}
-                                       </div>
-                                       <div className="flex-1 relative">
-                                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs no-print">€</span>
-                                          <span className="hidden print:inline absolute left-1 top-1/2 -translate-y-1/2 text-slate-600 text-xs font-bold">€</span>
-                                          <MoneyInput 
-                                             value={item.value} 
-                                             onChange={(val) => updateActualValue(i, val)}
-                                             className="w-full pl-6 pr-3 py-1.5 text-sm border border-slate-200 rounded focus:outline-none focus:border-[#006858] font-medium print:pl-8"
-                                          />
-                                       </div>
-                                       {milestone && (
-                                          <div className="no-print hidden sm:flex items-center gap-1 bg-green-50 text-green-700 px-2 py-1 rounded text-[10px] font-bold border border-green-100" title={milestone.label}>
-                                             <Icon name="flag" size={10} className="text-green-600"/>
-                                             <span className="truncate max-w-[80px]">{milestone.label}</span>
-                                          </div>
-                                       )}
-                                       <button 
-                                          onClick={() => setActuals(actuals.filter((_, idx) => idx !== i))}
-                                          className="p-2 text-slate-300 hover:text-red-500 transition no-print"
-                                       >
-                                          <Icon name="trash-2" size={16} />
-                                       </button>
-                                   </div>
-                                   {/* Row 2: Milestone Display (Print Optimized) */}
-                                   {milestone && (
-                                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 px-1 py-0.5 sm:hidden print:flex">
-                                         <Icon name="flag" size={10} />
-                                         <span>MILESTONE: {milestone.label}</span>
-                                      </div>
-                                   )}
-                                   {/* Row 3: Comment */}
-                                   <input 
-                                      type="text"
-                                      placeholder="Add comment (e.g., Foundation Complete)"
-                                      value={item.comment || ''}
-                                      onChange={(e) => updateActualComment(i, e.target.value)}
-                                      className="w-full text-[11px] text-slate-600 bg-slate-50 px-2 py-1 rounded border-transparent focus:border-slate-300 focus:outline-none focus:bg-white transition"
-                                   />
+                           {actuals.map((item, i) => (
+                             <div key={i} className="flex flex-col gap-1 bg-white p-2 rounded-lg border border-slate-100 shadow-sm animate-fade-in-up">
+                                <div className="flex items-center gap-2">
+                                   <div className="w-12 h-8 rounded bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 uppercase">M{i+1}</div>
+                                   <div className="flex-1 relative"><span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300 text-xs">€</span><MoneyInput value={item.value} onChange={(v) => { const n = [...actuals]; n[i].value = v; setActuals(n); }} className="w-full pl-5 pr-2 py-1.5 text-sm border border-slate-200 rounded outline-none focus:border-[#006858]" /></div>
+                                   <button onClick={() => { const n = actuals.filter((_, idx) => idx !== i); setActuals(n); setProgress(calculatePlannedProgress(n.length)); }} className="p-2 text-slate-200 hover:text-red-500 transition no-print"><Icon name="trash-2" size={16} /></button>
                                 </div>
-                              );
-                           })}
-                           
-                           {actuals.length < config.duration ? (
-                              <button 
-                                onClick={addMonth}
-                                className="w-full py-3 mt-4 border-2 border-dashed border-slate-300 rounded-xl text-slate-400 text-xs font-bold uppercase hover:border-[#006858] hover:text-[#006858] transition flex items-center justify-center gap-2 no-print"
-                              >
-                                <Icon name="plus-circle" size={16} /> Log Month {actuals.length + 1}
-                              </button>
-                           ) : (
-                              <div className="p-4 text-center text-xs text-emerald-600 font-bold bg-emerald-50 rounded-lg mt-4 border border-emerald-100">
-                                 Project Duration Complete
-                              </div>
-                           )}
+                                <input type="text" placeholder="Comment..." value={item.comment || ''} onChange={(e) => { const n = [...actuals]; n[i].comment = e.target.value; setActuals(n); }} className="w-full text-[10px] text-slate-500 bg-slate-50/50 px-2 py-1 rounded border-transparent focus:border-slate-200 outline-none" />
+                             </div>
+                           ))}
+                           {actuals.length < config.duration && <button onClick={addActualMonth} className="w-full py-3 border-2 border-dashed border-slate-200 rounded text-slate-400 text-[10px] font-bold uppercase hover:border-[#006858] hover:text-[#006858] transition">+ Log Month {actuals.length+1}</button>}
+                        </div>
+                     )}
+
+                     {activeTab === 'planned' && (
+                        <div className="space-y-3">
+                           {(customPlanned || baseline.rawData).map((item, i) => (
+                             <div key={i} className="flex flex-col gap-1 bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
+                                <div className="flex items-center gap-2">
+                                   <div className="w-12 h-8 rounded bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400">M{i+1}</div>
+                                   <div className="flex-1 relative"><span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300 text-xs">€</span><MoneyInput value={item.value} onChange={(v) => { const n = ensureCustomMode(); n[i].value = v; setCustomPlanned(n); }} className="w-full pl-5 pr-2 py-1.5 text-sm border border-slate-200 rounded outline-none focus:border-[#006858]" /></div>
+                                   <button onClick={() => { const n = ensureCustomMode(); if(n.length>1){n.splice(i,1); setCustomPlanned(n); setConfig({...config, duration: n.length});} }} className="p-2 text-slate-200 hover:text-red-500 transition no-print"><Icon name="trash-2" size={16} /></button>
+                                </div>
+                                <input type="text" placeholder="Plan note..." value={item.comment || ''} onChange={(e) => { const n = ensureCustomMode(); n[i].comment = e.target.value; setCustomPlanned(n); }} className="w-full text-[10px] text-slate-500 bg-slate-50/50 px-2 py-1 rounded outline-none" />
+                             </div>
+                           ))}
+                           <button onClick={() => { const n = ensureCustomMode(); n.push({value:0,comment:''}); setCustomPlanned(n); setConfig({...config, duration: n.length}); }} className="w-full py-3 border-2 border-dashed border-slate-200 rounded text-slate-400 text-[10px] font-bold uppercase hover:text-[#006858] hover:border-[#006858]">+ Add Planned Month</button>
                         </div>
                      )}
 
                      {activeTab === 'milestones' && (
                         <div className="space-y-3">
                            {config.milestones.map((m, i) => (
-                              <div key={i} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm print-break-avoid">
-                                 <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-[10px] font-black bg-slate-100 px-2 py-0.5 rounded text-slate-500">MONTH</span>
-                                    <input 
-                                       type="number" value={m.month}
-                                       onChange={(e) => {
-                                          const val = Math.min(Math.max(Number(e.target.value), 1), config.duration);
-                                          const newM = [...config.milestones];
-                                          newM[i].month = val;
-                                          setConfig({...config, milestones: newM});
-                                       }}
-                                       className="w-16 border-b border-slate-200 text-sm font-bold text-center focus:outline-none focus:border-[#006858]"
-                                    />
-                                 </div>
-                                 <input 
-                                    type="text" value={m.label}
-                                    onChange={(e) => {
-                                       const newM = [...config.milestones];
-                                       newM[i].label = e.target.value;
-                                       setConfig({...config, milestones: newM});
-                                    }}
-                                    className="w-full text-sm text-slate-700 font-medium focus:outline-none border-b border-transparent focus:border-slate-300 placeholder-slate-300"
-                                    placeholder="Milestone Name"
-                                 />
-                                 <div className="flex justify-end mt-2">
-                                     <button 
-                                       onClick={() => {
-                                          const newM = config.milestones.filter((_, idx) => idx !== i);
-                                          setConfig({...config, milestones: newM});
-                                       }}
-                                       className="text-[10px] text-red-400 hover:text-red-600 uppercase font-bold tracking-wider"
-                                     >Delete</button>
-                                 </div>
+                              <div key={i} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm space-y-2">
+                                 <div className="flex items-center gap-2"><span className="text-[10px] font-bold text-slate-400 uppercase">Month</span><input type="number" value={m.month} onChange={(e) => { const n = [...config.milestones]; n[i].month = Number(e.target.value); setConfig({...config, milestones: n}); }} className="w-16 border-b text-sm font-bold outline-none focus:border-[#006858]" /></div>
+                                 <input type="text" value={m.label} onChange={(e) => { const n = [...config.milestones]; n[i].label = e.target.value; setConfig({...config, milestones: n}); }} className="w-full text-sm outline-none border-b border-transparent focus:border-slate-300" placeholder="Milestone Name" />
+                                 <button onClick={() => setConfig({...config, milestones: config.milestones.filter((_, idx) => idx !== i)})} className="text-[10px] text-red-400 font-bold hover:underline">Delete</button>
                               </div>
                            ))}
-                           <button 
-                              onClick={() => setConfig({...config, milestones: [...config.milestones, {month: 12, label: 'New Event'}]})}
-                              className="w-full py-2 text-xs font-bold text-[#006858] bg-[#006858]/10 rounded-lg hover:bg-[#006858]/20 transition"
-                           >
-                              + Add Milestone
-                           </button>
+                           <button onClick={() => setConfig({...config, milestones: [...config.milestones, {month: 12, label: 'New Milestone'}]})} className="w-full py-2 bg-emerald-50 rounded text-emerald-700 text-xs font-bold hover:bg-emerald-100">+ Add Milestone</button>
                         </div>
                      )}
                   </div>
-
-                  {/* Export Bar */}
-                  <div className="p-4 border-t border-slate-200 bg-slate-50 rounded-b-xl no-print">
-                      <button onClick={handleDownloadCSV} className="w-full flex items-center justify-center gap-2 py-2 bg-white border border-slate-300 shadow-sm rounded-lg text-slate-700 text-sm font-bold hover:bg-slate-50 hover:text-[#006858] transition">
-                        <Icon name="download" size={16} /> Export CSV Data
-                      </button>
+                  
+                  {/* PRINT & PDF VIEW (SIDE BY SIDE DATA) */}
+                  <div className="hidden print:block print-visible p-0 text-xs pdf-data-grid">
+                     <div className="mb-0">
+                        <h4 className="font-bold text-slate-700 border-b mb-2 pb-1 uppercase">Actuals Log</h4>
+                        {actuals.map((item, i) => (
+                          <div key={i} className="data-row flex justify-between py-1 border-b border-slate-100">
+                             <span className="font-mono text-slate-500 w-8">M{i+1}</span>
+                             <span className="font-bold">{formatEuro(item.value)}</span>
+                          </div>
+                        ))}
+                     </div>
+                     <div>
+                        <h4 className="font-bold text-slate-700 border-b mb-2 pb-1 uppercase">Planned Data</h4>
+                        {(customPlanned || baseline.rawData).slice(0, Math.min(config.duration, 24)).map((item, i) => (
+                          <div key={i} className="data-row flex justify-between py-1 border-b border-slate-100">
+                             <span className="font-mono text-slate-500 w-8">M{i+1}</span>
+                             <span className="font-bold">{formatEuro(item.value)}</span>
+                          </div>
+                        ))}
+                        {config.duration > 24 && <div className="text-center italic text-slate-400 mt-2">... {config.duration - 24} more months</div>}
+                     </div>
                   </div>
+
+                  <div className="p-4 border-t bg-slate-50 no-print print-hidden"><button onClick={handleDownloadCSV} className="w-full py-2 bg-white border rounded text-slate-700 text-sm font-bold shadow-sm hover:text-[#006858] transition flex items-center justify-center gap-2"><Icon name="download" size={16} /> Export CSV</button></div>
                </div>
             </div>
-          </main>
-          
-          <footer className="max-w-7xl mx-auto px-6 py-10 text-center">
-              <p className="text-slate-600 font-bold text-sm">Created by Dave Maher</p>
-              <p className="text-[10px] text-slate-400 mt-2 max-w-lg mx-auto leading-relaxed">
-                  All intellectual property rights associated with this application, its calculation logic, and its interface design belong to Dave Maher. &copy; 2026
-              </p>
-          </footer>
+            
+            <footer className="max-w-7xl mx-auto px-6 py-6 text-center text-[10px] text-slate-400 no-print print-hidden">
+               <p>© {new Date().getFullYear()} HSE Capital & Estates | Created by Dave Maher</p>
+               <p>Intellectual Property of Dave Maher. All rights reserved.</p>
+            </footer>
 
-          {/* SETTINGS MODAL */}
+          </main>
+
           <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="Project Configuration">
             <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Project Name</label>
-                <input type="text" value={config.projectName} onChange={(e) => setConfig({...config, projectName: e.target.value})} className="w-full p-2 border border-slate-300 rounded font-medium focus:ring-2 focus:ring-[#006858] outline-none" />
-              </div>
+              <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Project Name</label><input type="text" value={config.projectName} onChange={(e) => setConfig({...config, projectName: e.target.value})} className="w-full p-2 border rounded outline-none focus:ring-1 focus:ring-[#006858]" /></div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Total Budget (€)</label>
-                  <MoneyInput 
-                     value={config.budget} 
-                     onChange={(val) => setConfig({...config, budget: Number(val)})} 
-                     className="w-full p-2 border border-slate-300 rounded font-medium focus:ring-2 focus:ring-[#006858] outline-none" 
-                  />
+                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Budget (€)</label>
+                    <MoneyInput value={config.budget} onChange={(v) => setConfig({...config, budget: v})} disabled={!!customPlanned} className="w-full p-2 border rounded outline-none focus:ring-1 focus:ring-[#006858]" />
+                    {customPlanned && <p className="text-[10px] text-emerald-600 mt-1 italic">Synced to Custom Plan</p>}
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Duration (Months)</label>
-                  <input type="number" value={config.duration} onChange={(e) => setConfig({...config, duration: Number(e.target.value)})} className="w-full p-2 border border-slate-300 rounded font-medium focus:ring-2 focus:ring-[#006858] outline-none" />
-                </div>
+                <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Duration (Months)</label><input type="number" value={config.duration} onChange={(e) => setConfig({...config, duration: Number(e.target.value)})} className="w-full p-2 border rounded outline-none focus:ring-1 focus:ring-[#006858]" /></div>
               </div>
-              
-              <div>
-                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Forecast Method (EAC)</label>
-                 <select 
-                    value={config.eacMethod || 'plan_adherence'} 
-                    onChange={(e) => setConfig({...config, eacMethod: e.target.value})}
-                    className="w-full p-2 border border-slate-300 rounded font-medium focus:ring-2 focus:ring-[#006858] outline-none bg-white"
-                 >
-                    <option value="plan_adherence">Plan Adherence (Safe) - Decouples CPI</option>
-                    <option value="standard_cpi">Standard Performance (CPI) - Volatile</option>
-                    <option value="linear_burn">Linear Burn - Simple Extrapolation</option>
-                 </select>
-                 <p className="text-[10px] text-slate-400 mt-1">
-                    "Plan Adherence" assumes remaining work will cost what was originally budgeted, preventing instability when billing lags behind physical progress.
-                 </p>
+              <div className="bg-amber-50 p-3 rounded-lg border border-amber-100 space-y-2">
+                 <h4 className="text-xs font-bold text-amber-800 flex items-center gap-1"><Icon name="alert-triangle" size={12}/> Reset Project</h4>
+                 <button onClick={handleFactoryReset} className="w-full py-2 bg-red-600 text-white rounded text-[10px] font-bold hover:bg-red-700 transition">Factory Reset</button>
               </div>
-
-              <div className="bg-amber-50 p-4 rounded-lg border border-amber-100 space-y-3">
-                 <h4 className="text-sm font-bold text-amber-800 flex items-center gap-2"><Icon name="alert-triangle" size={14}/> Danger Zone</h4>
-                 
-                 <div className="flex flex-col gap-2">
-                    <button onClick={handleClearTracked} className="w-full py-2 bg-white border border-amber-200 text-amber-700 rounded font-semibold text-xs hover:bg-amber-50 transition">
-                       Clear Tracked Data (Keep Settings)
-                    </button>
-                    <button onClick={handleFactoryReset} className="w-full py-2 bg-red-600 text-white rounded font-semibold text-xs hover:bg-red-700 transition">
-                       Factory Reset (Wipe Everything)
-                    </button>
-                 </div>
-              </div>
-              <button onClick={() => setIsSettingsOpen(false)} className="w-full py-3 bg-[#006858] text-white rounded-lg font-bold shadow-lg hover:shadow-xl transition transform active:scale-95">
-                Save Changes
-              </button>
+              <button onClick={() => setIsSettingsOpen(false)} className="w-full py-3 bg-[#006858] text-white rounded-lg font-bold shadow-lg">Save Settings</button>
             </div>
           </Modal>
-
         </div>
       );
     }
