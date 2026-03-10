@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HSE Solutions | App Portal</title>
+    
+    <link rel="icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        
+        body { 
+            font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+            -webkit-font-smoothing: antialiased;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            color: #1e293b;
+        }
+        
+        :root {
+            --hse-primary: #006858;
+            --hse-secondary: #00bfa5;
+            --hse-dark: #004d42;
+        }
+
+        .hse-gradient {
+            background: linear-gradient(135deg, #004d42 0%, #006858 50%, #00917a 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hse-gradient::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            opacity: 0.4;
+        }
+
+        .app-card {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background: linear-gradient(to bottom, #ffffff, #fefefe);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+
+        .app-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 25px 50px -12px rgba(0, 104, 88, 0.15), 0 10px 20px -8px rgba(0, 0, 0, 0.1);
+            border-color: rgba(0, 191, 165, 0.3);
+        }
+
+        .app-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--hse-primary), var(--hse-secondary));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .app-card:hover::before {
+            opacity: 1;
+        }
+
+        /* Premium Glass Effect for Filter Tabs */
+        .filter-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { 
+            background: linear-gradient(135deg, #cbd5e1, #94a3b8); 
+            border-radius: 10px; 
+        }
+        ::-webkit-scrollbar-thumb:hover { background: linear-gradient(135deg, #94a3b8, #64748b); }
+
+        .animate-fade-in {
+            animation: fadeIn 0.6s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .pulse-glow {
+            animation: pulseGlow 2s ease-in-out infinite;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 5px rgba(16, 185, 129, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.8); }
+        }
+
+        .category-badge {
+            backdrop-filter: blur(8px);
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+
+        .shimmer {
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            animation: shimmer 3s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        const Icon = ({ name, size = 18, className = "" }) => {
+            return <i data-lucide={name} width={size} height={size} className={className}></i>;
+        };
+
+        const AppCard = ({ app }) => {
+            const getIconStyle = (categories) => {
+                const primaryCategory = Array.isArray(categories) ? categories[0] : categories;
+                switch(primaryCategory) {
+                    case 'Analytics': return 'bg-gradient-to-br from-purple-50 to-purple-100 text-purple-600 shadow-purple-200/50';
+                    case 'Operations': return 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-600 shadow-blue-200/50';
+                    case 'Clinical Strategy': return 'bg-gradient-to-br from-rose-50 to-rose-100 text-rose-600 shadow-rose-200/50';
+                    case 'Financial': return 'bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600 shadow-emerald-200/50';
+                    case 'Demographics': return 'bg-gradient-to-br from-amber-50 to-amber-100 text-amber-600 shadow-amber-200/50';
+                    default: return 'bg-gradient-to-br from-slate-50 to-slate-100 text-slate-600 shadow-slate-200/50';
+                }
+            };
+
+            const categories = Array.isArray(app.category) ? app.category : [app.category];
+            
+            return (
+                <div className="app-card bg-white rounded-2xl overflow-hidden flex flex-col h-full animate-fade-in relative shadow-lg">
+                    <div className="p-6 flex-1">
+                        <div className="flex justify-between items-start mb-4">
+                            <div className={`p-4 rounded-2xl shadow-lg ${getIconStyle(app.category)}`}>
+                                <Icon name={app.icon} size={28} />
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg shadow-sm">
+                                {app.tag}
+                            </span>
+                        </div>
+                        
+                        <h3 className="text-xl font-black text-slate-900 mb-3 leading-tight">
+                            {app.title}
+                        </h3>
+                        
+                        <p className="text-slate-600 text-sm leading-relaxed mb-4">
+                            {app.description}
+                        </p>
+
+                        <div className="flex flex-wrap gap-1.5 mt-3">
+                            {categories.map(cat => (
+                                <span key={cat} className="category-badge text-[9px] font-bold uppercase tracking-wider text-slate-600 px-2 py-1 rounded-md shadow-sm">
+                                    {cat}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    <div className="px-6 py-5 bg-gradient-to-r from-slate-50 to-slate-100/50 border-t border-slate-200/60 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                             <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 pulse-glow"></div>
+                             <span className="text-[10px] font-black text-slate-600 uppercase tracking-wide">Live System</span>
+                        </div>
+                        <a 
+                            href={app.url}
+                            target="_blank"
+                            className="flex items-center gap-2 text-sm font-black text-[#006858] hover:text-[#00bfa5] transition-all hover:gap-3"
+                        >
+                            Launch <Icon name="arrow-right" size={16} />
+                        </a>
+                    </div>
+                </div>
+            );
+        };
+
+        function App() {
+            const [selectedCategory, setSelectedCategory] = useState("All");
+
+            const myApps = [
+                {
+                    id: 1,
+                    title: "Overcrowding Monitor",
+                    url: "https://hse-estates.github.io/BC/Trolleys/",
+                    description: "Advanced analytics platform for tracking hospital strain, monitoring daily trolley figures, delayed transfers of care, and extended patient wait times. Applies Statistical Process Control and a True Gridlock Index to identify bottlenecks.",
+                    category: ["Analytics", "Clinical Strategy"],
+                    tag: "Hospital Strain",
+                    icon: "activity"
+                },
+                {
+                    id: 2,
+                    title: "Bed Capacity Dashboard",
+                    url: "https://hse-estates.github.io/BC/Beds/",
+                    description: "Interactive overview and executive reporting mechanism for tracking open, temporarily closed, and permanently closed beds. Calculates financial opportunity costs in Euros and generates specialised corporate PDF reports.",
+                    category: ["Operations", "Financial"],
+                    tag: "Capacity Tracking",
+                    icon: "bed"
+                },
+                {
+                    id: 3,
+                    title: "Respite Insight Dashboard",
+                    url: "https://hse-estates.github.io/BC/",
+                    description: "Demographic and capacity engine overlaying facility data with census demographics. Identifies areas of unmet need, calculates local catchment areas, and reviews strategic risk factors through interactive maps.",
+                    category: ["Demographics", "Analytics"],
+                    tag: "Demographic Engine",
+                    icon: "map"
+                }
+            ];
+
+            const sortedApps = useMemo(() => {
+                return [...myApps].sort((a, b) => a.title.localeCompare(b.title));
+            }, []);
+
+            const categories = useMemo(() => {
+                const allCategories = sortedApps.flatMap(app => 
+                    Array.isArray(app.category) ? app.category : [app.category]
+                );
+                return ["All", ...new Set(allCategories)];
+            }, [sortedApps]);
+
+            const displayedApps = useMemo(() => {
+                if (selectedCategory === "All") return sortedApps;
+                return sortedApps.filter(app => {
+                    const categories = Array.isArray(app.category) ? app.category : [app.category];
+                    return categories.includes(selectedCategory);
+                });
+            }, [sortedApps, selectedCategory]);
+
+            useEffect(() => {
+                if (window.lucide) {
+                    try {
+                        window.lucide.createIcons();
+                    } catch (e) {
+                        console.warn("Lucide icons failed to load:", e);
+                    }
+                }
+            }, [displayedApps]);
+
+            return (
+                <div className="min-h-screen flex flex-col">
+                    {/* Header */}
+                    <header className="hse-gradient text-white pt-10 pb-24 px-6 relative">
+                        <div className="max-w-7xl mx-auto relative z-10">
+                            <nav className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-white p-2 sm:p-3 rounded-2xl shadow-2xl shrink-0">
+                                        <img 
+                                            src="https://www.esther.ie/wp-content/uploads/2022/05/HSE-Logo-Green-NEW-no-background.png" 
+                                            alt="HSE Logo" 
+                                            className="h-8 sm:h-11"
+                                        />
+                                    </div>
+                                    <div className="border-l-2 border-white/30 pl-4">
+                                        <h1 className="text-xl sm:text-2xl font-black tracking-tight">HSE Solutions</h1>
+                                        <p className="text-[9px] sm:text-[10px] text-emerald-100 font-bold uppercase tracking-widest leading-tight mt-1">
+                                            Office of the National Director<br className="hidden sm:block" /> Access and Integration
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="hidden md:block text-right">
+                                    <p className="text-xs font-black text-emerald-200 uppercase tracking-wider">Principal Developer</p>
+                                    <p className="text-base font-bold">Dave Maher</p>
+                                </div>
+                            </nav>
+
+                            <div className="max-w-2xl">
+                                <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-5 leading-tight">
+                                    Specialist Analytics & <br/>Decision Support Tools
+                                </h2>
+                                <p className="text-emerald-50/90 text-base md:text-lg leading-relaxed font-medium">
+                                    A central directory of custom-built applications designed to support strategic planning, 
+                                    capacity monitoring, and clinical strategy delivery within the HSE.
+                                </p>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Main Content */}
+                    <main className="max-w-7xl mx-auto px-6 -mt-16 flex-1 w-full relative z-10">
+                        
+                        {/* Filter Tabs */}
+                        <div className="flex flex-wrap gap-2 sm:gap-3 mb-10 filter-container p-2 sm:p-3 rounded-2xl w-fit shadow-xl">
+                            {categories.map(cat => (
+                                <button
+                                    key={cat}
+                                    onClick={() => setSelectedCategory(cat)}
+                                    className={`px-4 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-xs font-black rounded-xl transition-all ${
+                                        selectedCategory === cat 
+                                        ? 'bg-gradient-to-r from-[#006858] to-[#00917a] text-white shadow-xl transform scale-105' 
+                                        : 'bg-transparent text-slate-600 hover:bg-slate-100 hover:shadow-md'
+                                    }`}
+                                >
+                                    {cat}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            {displayedApps.map(app => (
+                                <AppCard key={app.id} app={app} />
+                            ))}
+                        </div>
+
+                        {displayedApps.length === 0 && (
+                            <div className="text-center py-20 text-slate-400">
+                                <Icon name="inbox" size={48} className="mx-auto mb-4 opacity-30" />
+                                <p className="font-semibold">No apps found in this category.</p>
+                            </div>
+                        )}
+
+                        {/* Additional Info Section */}
+                        <div className="mt-20 bg-gradient-to-br from-white to-slate-50 p-6 md:p-10 rounded-3xl border border-slate-200 shadow-2xl flex flex-col md:flex-row items-center gap-6 md:gap-10 text-center md:text-left">
+                            <div className="p-6 bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600 rounded-3xl shadow-xl shrink-0">
+                                <Icon name="shield-check" size={48} />
+                            </div>
+                            <div>
+                                <h4 className="text-xl md:text-2xl font-black text-slate-900 mb-3">Governance & Reliability</h4>
+                                <p className="text-sm md:text-base text-slate-600 leading-relaxed">
+                                    These tools utilise client-side logic for maximum security and performance. 
+                                    Data is processed locally on your device or via secure integrations, ensuring no 
+                                    sensitive patient or financial data is compromised.
+                                </p>
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="mt-24 border-t border-slate-300 bg-gradient-to-b from-white to-slate-50 py-12 px-6">
+                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
+                            <div className="text-center md:text-left">
+                                <div className="flex items-center justify-center md:justify-start gap-3 mb-3">
+                                    <div className="w-8 h-8 bg-gradient-to-br from-[#006858] to-[#004d42] rounded-lg flex items-center justify-center shadow-lg shrink-0">
+                                        <img src="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico" className="w-5 h-5 brightness-0 invert" alt=""/>
+                                    </div>
+                                    <span className="font-black text-slate-900 text-lg">HSE Solutions</span>
+                                </div>
+                                <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-widest mb-1">Office of the National Director Access and Integration</p>
+                                <p className="text-xs text-slate-400 font-medium">&copy; 2026 Dave Maher. All rights reserved.</p>
+                            </div>
+
+                            <div className="text-center md:text-right">
+                                <p className="text-sm font-black text-slate-800">Digital Solutions Developed by Dave Maher</p>
+                                <p className="text-xs text-[#006858] mt-1 uppercase tracking-widest font-bold">HSE Solutions</p>
+                            </div>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
