@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HSE Capital & Estates | Project Document Tracker</title>
+    
+    <link rel="icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        
+        body { 
+            font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+            -webkit-font-smoothing: antialiased;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- ICONS (Inlined to avoid external module dependencies in raw HTML) ---
+        const CheckCircle = (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>;
+        const Circle = (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><circle cx="12" cy="12" r="10"></circle></svg>;
+        const LinkIcon = (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>;
+        const ExternalLink = (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>;
+        const ChevronDown = (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><polyline points="6 9 12 15 18 9"></polyline></svg>;
+        const ChevronUp = (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><polyline points="18 15 12 9 6 15"></polyline></svg>;
+        const CloudUpload = (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="M12 12v9"></path><path d="m16 16-4-4-4 4"></path></svg>;
+        const LogOut = (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>;
+        const FileText = (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>;
+        const AlertCircle = (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>;
+        const Lock = (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>;
+        const Mail = (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>;
+        const Loader2 = (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>;
+        const UserPlus = (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>;
+        // -------------------------------------------------------------------------
+
+        // --- IMPORTANT: PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL HERE ---
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbz_REPLACE_THIS_WITH_YOUR_URL/exec";
+
+        // HSE Logo URL
+        const LOGO_URL = "https://raw.githubusercontent.com/HSE-Estates/HSE-Estates.github.io/refs/heads/main/HSE-Logo-Green-NEW-no-background.png";
+
+        // Pre-populated default data
+        const defaultData = [
+          {
+            id: "stage-init", title: "Project Initiation",
+            documents: [
+              { id: "pi1", name: "Project Initiation Form", mandatory: "YES", link: "", done: false },
+              { id: "pi2", name: "Service Business Case (For Infrastructural Risk use relevant report)", mandatory: "YES", link: "", done: false },
+              { id: "pi3", name: "SHIF Alignment: Form", mandatory: "YES (UNLESS SHIF ALIGNED)", link: "", done: false }
+            ]
+          },
+          {
+            id: "stage-pr1", title: "PR1",
+            documents: [
+              { id: "pr1_1", name: "Project Review 1 Form", mandatory: "YES", link: "", done: false },
+              { id: "pr1_2", name: "Design Team Tender Report (incl. confirmation DT established via Regional Framework)", mandatory: "YES", link: "", done: false },
+              { id: "pr1_3", name: "Tender Evaluation Matrix", mandatory: "YES", link: "", done: false },
+              { id: "pr1_4", name: "Service Business Case (For Infrastructural Risk use relevant report)", mandatory: "", link: "", done: false },
+              { id: "pr1_5", name: "Outline Project Brief", mandatory: "YES", link: "", done: false }
+            ]
+          },
+          {
+            id: "stage-pr2", title: "PR2",
+            documents: [
+              { id: "pr2_1", name: "Project Review 2 Form", mandatory: "YES", link: "", done: false },
+              { id: "pr2_2", name: "Full Stage 1 Report", mandatory: "YES", link: "", done: false },
+              { id: "pr2_3", name: "Definitive Procurement Strategy", mandatory: "", link: "", done: false },
+              { id: "pr2_4", name: "Feasibility Report including Cost Study, Site Reports, confirming Definitive Project Brief", mandatory: "", link: "", done: false },
+              { id: "pr2_5", name: "Budget verification", mandatory: "", link: "", done: false },
+              { id: "pr2_6", name: "All surveys/site investigations completed and associated cost impact captured", mandatory: "", link: "", done: false },
+              { id: "pr2_7", name: "Management Control Plan", mandatory: "", link: "", done: false },
+              { id: "pr2_8", name: "Project Energy Balance Report & Energy Efficiency Design (EED) Summary Report", mandatory: "", link: "", done: false },
+              { id: "pr2_9", name: "Preliminary H&S Plan", mandatory: "", link: "", done: false }
+            ]
+          },
+          {
+            id: "stage-pr3", title: "PR3",
+            documents: [
+              { id: "pr3_1", name: "Project Review 3 Form", mandatory: "YES", link: "", done: false },
+              { id: "pr3_2", name: "Stage 2a Report", mandatory: "", link: "", done: false },
+              { id: "pr3_3", name: "Elemental Cost Plan detailing adherence to Budget Allocation", mandatory: "", link: "", done: false },
+              { id: "pr3_4", name: "Site Appraisal & Preliminary Report", mandatory: "", link: "", done: false },
+              { id: "pr3_5", name: "Scheme Design Drawings; Floor Plans 1:200; Elevations", mandatory: "", link: "", done: false },
+              { id: "pr3_6", name: "Preliminary Specification", mandatory: "", link: "", done: false },
+              { id: "pr3_7", name: "Engineering Reports including EED Summary Report", mandatory: "", link: "", done: false },
+              { id: "pr3_8", name: "Medical equipment requirements plus associated servicing/installation", mandatory: "", link: "", done: false },
+              { id: "pr3_9", name: "Statutory Approval Submissions", mandatory: "", link: "", done: false }
+            ]
+          },
+          {
+            id: "stage-handover", title: "Handover & Completion",
+            documents: [
+              { id: "ho_1", name: "Confirmation that all 'as-built' drawings, commissioning certificates, H&S documentation, and manuals handed-over", mandatory: "", link: "", done: false },
+              { id: "ho_2", name: "Confirmation that Property Database is updated accordingly", mandatory: "", link: "", done: false },
+              { id: "ho_3", name: "Draft Project Completion Report as per Infrastructure Guidelines", mandatory: "", link: "", done: false }
+            ]
+          },
+          {
+            id: "workflow-shif", title: "Strategic Healthcare Investment Framework (SHIF)",
+            documents: [
+              { id: "shif_1", name: "Returned from the service", mandatory: "", link: "", done: false },
+              { id: "shif_2", name: "Part B (completed by Estates)", mandatory: "", link: "", done: false },
+              { id: "shif_3", name: "Signed off (4 signatures)", mandatory: "", link: "", done: false },
+              { id: "shif_4", name: "Submitted by Estates", mandatory: "", link: "", done: false },
+              { id: "shif_5", name: "Approved", mandatory: "", link: "", done: false }
+            ]
+          },
+          {
+            id: "workflow-docb", title: "Doc B – Brief & SoA",
+            documents: [
+              { id: "docb_1", name: "Returned from the service", mandatory: "", link: "", done: false },
+              { id: "docb_2", name: "Submitted by Estates on Acconex", mandatory: "", link: "", done: false }
+            ]
+          },
+          {
+            id: "workflow-docc", title: "Doc C - Appraisal Form Capital Project Appraisal",
+            documents: [
+              { id: "docc_1", name: "Completed by Local C&E", mandatory: "", link: "", done: false },
+              { id: "docc_2", name: "Signed off", mandatory: "", link: "", done: false },
+              { id: "docc_3", name: "Submitted by Estates on Acconex", mandatory: "", link: "", done: false },
+              { id: "docc_4", name: "Approved", mandatory: "", link: "", done: false }
+            ]
+          },
+          {
+            id: "workflow-doch", title: "Doc H – Programme",
+            documents: [
+              { id: "doch_1", name: "Completed by Local C&E", mandatory: "", link: "", done: false },
+              { id: "doch_2", name: "Approved", mandatory: "", link: "", done: false }
+            ]
+          }
+        ];
+
+        function App() {
+          // Auth State
+          const [isAuthenticated, setIsAuthenticated] = useState(false);
+          const [credentials, setCredentials] = useState({ email: '', password: '' });
+          const [authLoading, setAuthLoading] = useState(false);
+          const [authError, setAuthError] = useState('');
+
+          // App State
+          const [stages, setStages] = useState(defaultData);
+          const [expandedStages, setExpandedStages] = useState(
+            defaultData.reduce((acc, stage) => ({ ...acc, [stage.id]: true }), {})
+          );
+          const [saveStatus, setSaveStatus] = useState('');
+
+          const handleLogin = async (e) => {
+            e.preventDefault();
+            if (!credentials.email || !credentials.password) {
+              setAuthError('Please enter both email and password.');
+              return;
+            }
+            
+            setAuthLoading(true);
+            setAuthError('');
+            
+            try {
+              const response = await fetch(GAS_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                  action: 'login',
+                  email: credentials.email,
+                  password: credentials.password
+                })
+              });
+
+              const result = await response.json();
+              
+              if (result.success) {
+                if (result.data) {
+                  setStages(result.data); 
+                } else {
+                  setStages(defaultData); 
+                }
+                setIsAuthenticated(true);
+              } else {
+                setAuthError(result.error || 'Login failed. Please check credentials.');
+              }
+            } catch (error) {
+              console.error(error);
+              setAuthError('Network error. Ensure your GAS_URL is correct and deployed as a Web App.');
+            } finally {
+              setAuthLoading(false);
+            }
+          };
+
+          const handleSaveToCloud = async () => {
+            setSaveStatus('Saving...');
+            try {
+              const response = await fetch(GAS_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                  action: 'save',
+                  email: credentials.email,
+                  password: credentials.password,
+                  data: stages
+                })
+              });
+
+              const result = await response.json();
+              
+              if (result.success) {
+                setSaveStatus('Saved successfully!');
+                setTimeout(() => setSaveStatus(''), 3000);
+              } else {
+                setSaveStatus('Error saving: ' + result.error);
+              }
+            } catch (error) {
+              setSaveStatus('Network error while saving.');
+            }
+          };
+
+          const handleLogout = () => {
+            setIsAuthenticated(false);
+            setCredentials({ email: '', password: '' });
+            setStages(defaultData);
+            setAuthError('');
+          };
+
+          const toggleStage = (stageId) => {
+            setExpandedStages(prev => ({
+              ...prev,
+              [stageId]: !prev[stageId]
+            }));
+          };
+
+          const toggleDocumentDone = (stageId, docId) => {
+            setStages(prevStages => 
+              prevStages.map(stage => {
+                if (stage.id !== stageId) return stage;
+                return {
+                  ...stage,
+                  documents: stage.documents.map(doc => {
+                    if (doc.id !== docId) return doc;
+                    return { ...doc, done: !doc.done };
+                  })
+                };
+              })
+            );
+          };
+
+          const updateDocumentLink = (stageId, docId, newLink) => {
+            setStages(prevStages => 
+              prevStages.map(stage => {
+                if (stage.id !== stageId) return stage;
+                return {
+                  ...stage,
+                  documents: stage.documents.map(doc => {
+                    if (doc.id !== docId) return doc;
+                    return { ...doc, link: newLink };
+                  })
+                };
+              })
+            );
+          };
+
+          const { totalDocs, completedDocs, progressPercentage } = useMemo(() => {
+            let total = 0;
+            let completed = 0;
+            stages.forEach(stage => {
+              stage.documents.forEach(doc => {
+                total++;
+                if (doc.done) completed++;
+              });
+            });
+            return {
+              totalDocs: total,
+              completedDocs: completed,
+              progressPercentage: total === 0 ? 0 : Math.round((completed / total) * 100)
+            };
+          }, [stages]);
+
+          if (!isAuthenticated) {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#e2e8f0] flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
+                <div className="sm:mx-auto sm:w-full sm:max-w-md">
+                  <div className="flex justify-center mb-6">
+                     <div className="w-16 h-16 bg-gradient-to-br from-[#006858] to-[#004d42] rounded-2xl flex items-center justify-center shadow-xl">
+                         <FileText className="w-10 h-10 text-white" />
+                     </div>
+                  </div>
+                  <h2 className="mt-2 text-center text-3xl font-black text-slate-900 tracking-tight">
+                    Sign in to your portal
+                  </h2>
+                  <p className="mt-2 text-center text-sm text-slate-600">
+                    Project Document Tracker
+                  </p>
+                </div>
+
+                <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+                  <div className="bg-white py-8 px-4 shadow-xl shadow-slate-200/50 sm:rounded-2xl sm:px-10 border border-slate-100">
+                    <form className="space-y-6" onSubmit={handleLogin}>
+                      {authError && (
+                        <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm flex items-center gap-2 border border-red-100">
+                          <AlertCircle size={16} /> {authError}
+                        </div>
+                      )}
+                      
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700">Email address</label>
+                        <div className="mt-1 relative rounded-md shadow-sm">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Mail className="h-5 w-5 text-slate-400" />
+                          </div>
+                          <input
+                            type="email"
+                            required
+                            value={credentials.email}
+                            onChange={(e) => setCredentials({...credentials, email: e.target.value})}
+                            className="block w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg focus:ring-[#006858] focus:border-[#006858] sm:text-sm bg-slate-50 focus:bg-white transition-colors"
+                            placeholder="name@example.com"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700">Project ID / Password</label>
+                        <div className="mt-1 relative rounded-md shadow-sm">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Lock className="h-5 w-5 text-slate-400" />
+                          </div>
+                          <input
+                            type="password"
+                            required
+                            value={credentials.password}
+                            onChange={(e) => setCredentials({...credentials, password: e.target.value})}
+                            className="block w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg focus:ring-[#006858] focus:border-[#006858] sm:text-sm bg-slate-50 focus:bg-white transition-colors"
+                            placeholder="••••••••"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <button
+                          type="submit"
+                          disabled={authLoading}
+                          className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-gradient-to-r from-[#006858] to-[#004d42] hover:from-[#005a4c] hover:to-[#003d34] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#006858] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                        >
+                          {authLoading ? <Loader2 className="animate-spin h-5 w-5" /> : 'Access Portal'}
+                        </button>
+                      </div>
+                    </form>
+
+                    <div className="mt-6 flex flex-col gap-4">
+                      <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-slate-200"></div>
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                          <span className="px-2 bg-white text-slate-500">Need help?</span>
+                        </div>
+                      </div>
+
+                      <a 
+                        href="mailto:dave.maher@hse.ie?subject=New%20Project%20Tracker%20Access%20Request&body=Hi%20Admin,%0D%0A%0D%0APlease%20set%20up%20a%20new%20project%20on%20the%20Document%20Tracker.%0D%0A%0D%0AUser%20Email:%20%0D%0AProject%20Name:%20%0D%0ACapital%20Reference%20Number:%20"
+                        className="flex items-center justify-center gap-2 w-full py-2.5 px-4 border border-slate-300 rounded-lg shadow-sm text-sm font-bold text-slate-700 bg-white hover:bg-slate-50 transition-colors"
+                      >
+                        <UserPlus size={18} className="text-slate-500"/>
+                        Request New Project ID
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col">
+              {/* Header */}
+              <header className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <div className="flex items-center gap-4">
+                    <img src={LOGO_URL} className="h-10 w-auto object-contain" alt="HSE Logo"/>
+                    <div className="border-l-2 border-slate-200 pl-4">
+                      <h1 className="text-xl font-black text-slate-900 tracking-tight">Project Document Tracker</h1>
+                      <p className="text-sm text-slate-500 font-medium">Project ID: <span className="text-[#006858]">{credentials.password}</span></p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-slate-500 mr-2 hidden sm:block">{credentials.email}</span>
+                    <button 
+                      onClick={handleSaveToCloud}
+                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#006858] to-[#004d42] text-white rounded-md text-sm font-semibold shadow-sm hover:from-[#005a4c] hover:to-[#003d34] transition-all"
+                    >
+                      <CloudUpload size={16} />
+                      Save to Cloud
+                    </button>
+                    <button 
+                      onClick={handleLogout}
+                      className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-md text-sm font-semibold hover:bg-slate-50 text-slate-700 transition-colors"
+                    >
+                      <LogOut size={16} />
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+                {/* Status bar */}
+                {saveStatus && (
+                  <div className="bg-[#006858]/10 text-[#006858] text-center text-xs font-bold py-1">
+                    {saveStatus}
+                  </div>
+                )}
+              </header>
+
+              <main className="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-8 flex-grow">
+                {/* Overall Progress */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
+                  <div className="flex justify-between items-end mb-2">
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-800 tracking-tight">Overall Progress</h2>
+                      <p className="text-sm text-slate-500 font-medium">{completedDocs} of {totalDocs} tasks completed</p>
+                    </div>
+                    <span className="text-3xl font-black text-[#006858]">{progressPercentage}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-3">
+                    <div 
+                      className="bg-gradient-to-r from-[#006858] to-[#004d42] h-3 rounded-full transition-all duration-500 ease-out shadow-sm" 
+                      style={{ width: `${progressPercentage}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                {/* Checklist Sections */}
+                <div className="space-y-6 pb-12">
+                  {stages.map((stage) => {
+                    const stageCompleted = stage.documents.filter(d => d.done).length;
+                    const stageTotal = stage.documents.length;
+                    const isExpanded = expandedStages[stage.id];
+
+                    return (
+                      <div key={stage.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        {/* Stage Header */}
+                        <div 
+                          className="px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
+                          onClick={() => toggleStage(stage.id)}
+                        >
+                          <div className="flex items-center gap-4">
+                            <button className="text-slate-400 hover:text-slate-600">
+                              {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                            </button>
+                            <h3 className="text-lg font-bold text-slate-800 tracking-tight">{stage.title}</h3>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-bold px-3 py-1 bg-slate-100 text-[#006858] rounded-full">
+                              {stageCompleted} / {stageTotal}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Documents List */}
+                        {isExpanded && (
+                          <div className="border-t border-slate-200 divide-y divide-slate-100">
+                            {stage.documents.map((doc) => (
+                              <div 
+                                key={doc.id} 
+                                className={`p-4 sm:px-6 flex flex-col sm:flex-row gap-4 sm:items-center justify-between transition-colors ${doc.done ? 'bg-slate-50' : 'bg-white'}`}
+                              >
+                                {/* Checkbox and Title */}
+                                <div className="flex items-start gap-3 flex-1">
+                                  <button 
+                                    onClick={() => toggleDocumentDone(stage.id, doc.id)}
+                                    className={`mt-1 flex-shrink-0 transition-colors ${doc.done ? 'text-[#006858]' : 'text-slate-300 hover:text-slate-400'}`}
+                                  >
+                                    {doc.done ? <CheckCircle size={24} className="fill-[#006858]/10" /> : <Circle size={24} />}
+                                  </button>
+                                  <div>
+                                    <p className={`font-semibold ${doc.done ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                                      {doc.name}
+                                    </p>
+                                    {doc.mandatory && (
+                                      <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 uppercase tracking-wider">
+                                        <AlertCircle size={12} />
+                                        Mandatory
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Link Input area */}
+                                <div className="flex items-center gap-2 w-full sm:w-auto sm:min-w-[300px]">
+                                  <div className="relative flex-1">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                      <LinkIcon size={14} className="text-slate-400" />
+                                    </div>
+                                    <input
+                                      type="text"
+                                      value={doc.link}
+                                      onChange={(e) => updateDocumentLink(stage.id, doc.id, e.target.value)}
+                                      placeholder="Add document link..."
+                                      className={`block w-full pl-9 pr-3 py-2 border rounded-lg text-sm font-medium focus:ring-[#006858] focus:border-[#006858] transition-colors ${
+                                        doc.link ? 'border-[#006858]/30 bg-[#006858]/5' : 'border-slate-300 bg-white'
+                                      }`}
+                                    />
+                                  </div>
+                                  {doc.link && (
+                                    <a 
+                                      href={doc.link.startsWith('http') ? doc.link : `https://${doc.link}`} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="p-2 text-[#006858] hover:bg-[#006858]/10 rounded-lg transition-colors flex-shrink-0"
+                                      title="Open link"
+                                    >
+                                      <ExternalLink size={18} />
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </main>
+
+              {/* Footer */}
+              <footer className="bg-white border-t border-slate-200 py-8 mt-auto">
+                  <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                      <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                          <div className="flex flex-col items-center md:items-start gap-3">
+                              <div className="flex items-center gap-3">
+                                  <img src={LOGO_URL} className="h-8 w-auto object-contain" alt="HSE Logo"/>
+                                  <span className="font-black text-slate-900 text-lg tracking-tight border-l-2 border-slate-200 pl-3">Capital & Estates</span>
+                              </div>
+                              <p className="text-xs text-slate-500 font-medium">&copy; 2026 Health Service Executive. All rights reserved.</p>
+                          </div>
+
+                          <div className="text-center md:text-right">
+                              <p className="text-sm font-black text-slate-800">Digital Solutions Developed by Dave Maher</p>
+                              <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest font-bold">HSE Estates Infrastructure Intelligence</p>
+                          </div>
+                      </div>
+                  </div>
+              </footer>
+            </div>
+          );
+        }
+
+        // Render the app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
