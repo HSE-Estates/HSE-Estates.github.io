@@ -48,7 +48,6 @@
       .bg-slate-900 { background-color: #0f172a !important; color: white !important; }
       .print-visible-section { display: block !important; opacity: 1 !important; visibility: visible !important; }
       .external-influences-card { page-break-before: always !important; margin-top: 0 !important; }
-      /* Added 2cm margin to top of page 3 and 4 breaks to prevent cutoff */
       .print-page-3-break { page-break-before: always !important; margin-top: 2cm !important; }
       .print-page-4-break { page-break-before: always !important; margin-top: 2cm !important; }
       header, .no-print, .fixed-summary, input[type=range], button, .tab-navigation { display: none !important; }
@@ -75,24 +74,16 @@
     /* ========================================================================================
       DATA CONFIGURATION TABLE
       ========================================================================================
-      Instructions:
-      1. To update values, simply edit the numbers in the table below.
-      2. 'ns_d' = Non-Standard Duration, 'ns_c' = Non-Standard Capex
-      3. 's_d'  = Standard Duration,     's_c'  = Standard Capex
-      4. Do not change the 'section' IDs (e.g., 'procurement') as logic depends on them.
-      ========================================================================================
     */
 
     const PROJECT_DATA_LOOKUP = {
       buildings: {
         id: 'buildings',
         name: 'Buildings Projects',
-        // Upper Bound Optimism Bias (The 'starting point' percentages)
         upperBound: { 
           ns: { duration: 39, capex: 51 }, 
           s:  { duration: 4,  capex: 24 } 
         },
-        // Risk Factors Table
         data: [
           // PROCUREMENT
           { section: 'procurement', name: 'Complexity of Contract Structure',      ns_d: 3,  ns_c: 1,  s_d: 1,  s_c: 0  },
@@ -318,7 +309,6 @@
         return initial;
       });
       
-      // Effect to reset mitigations when switching categories if they don't match
       useEffect(() => {
         setMitigations(prev => {
            const newMits = { ...prev };
@@ -391,7 +381,6 @@
           });
         });
 
-        // Safe division check
         const safeDiv = (num, den) => den === 0 ? 0 : num / den;
 
         const nDur = currentCategoryData.upper.ns.duration * safeDiv(nsd, mnsd);
@@ -420,17 +409,18 @@
             for (let m = 0; m < mc; m++) om.push(mon); 
         });
 
-        // Determine Effective Envelope (Actual span of the budget profile)
+        // Calculate accurate revised duration based STRICTLY on original duration to fix display math
+        const revD = Math.ceil(originalDuration * (1 + tOver));
+
+        // Determine Effective Envelope for proper cashflow stretching (without cutting off costs mapped later)
         let lastMonthWithCost = 0;
         for (let i = om.length - 1; i >= 0; i--) { if (om[i] > 0) { lastMonthWithCost = i + 1; break; } }
-        const effectiveSpan = Math.max(originalDuration, lastMonthWithCost);
+        const profileSpan = Math.max(originalDuration, lastMonthWithCost);
+        const profileRevD = Math.ceil(profileSpan * (1 + tOver));
         
-        // Revised Envelope based on Time Overrun Factor applied to the span
-        const revD = Math.ceil(effectiveSpan * (1 + tOver));
-        
-        let rm = new Array(revD).fill(0); 
-        const scale = effectiveSpan / revD; 
-        for (let i = 0; i < revD; i++) {
+        let rm = new Array(profileRevD).fill(0); 
+        const scale = profileSpan / profileRevD; 
+        for (let i = 0; i < profileRevD; i++) {
           rm[i] = om[Math.min(Math.floor(i * scale), om.length - 1)];
         }
         
@@ -449,9 +439,9 @@
         return { 
           totalOriginalCost: tOrig, 
           totalRevisedCost: tRev, 
-          revisedDuration: revD, 
+          revisedDuration: revD, // Strictly driven by user input
           revisedYearly: ry, 
-          originalMonthly: om.slice(0, effectiveSpan), 
+          originalMonthly: om.slice(0, profileSpan), 
           revisedMonthly: rm 
         };
       }, [results, linkTimeOB, manualTimeOB, linkCostOB, manualCostOB, originalCosts, startMonth, originalDuration]);
@@ -587,7 +577,6 @@
                           </div>
                           <div className="space-y-6">
                             {factors.map((factor, idx) => {
-                              // Filter out rows where all values are zero
                               if (factor.ns.d === 0 && factor.ns.c === 0 && factor.s.d === 0 && factor.s.c === 0) return null;
 
                               const id = `${areaKey}-${factor.name}`; 
@@ -637,7 +626,6 @@
                           </div>
                           <div className="space-y-6">
                             {factors.map((factor, idx) => {
-                              // Filter out rows where all values are zero
                               if (factor.ns.d === 0 && factor.ns.c === 0 && factor.s.d === 0 && factor.s.c === 0) return null;
 
                               const id = `${areaKey}-${factor.name}`; 
@@ -711,9 +699,17 @@
                           <input type="checkbox" checked={linkTimeOB} onChange={(e) => setLinkTimeOB(e.target.checked)} className="no-print h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
                           Link Duration OB
                         </span>
-                        <div className="text-right">
-                          <span className="text-xs font-bold text-slate-400 uppercase block leading-none mb-1">Calculated OB</span>
-                          <span className="text-lg font-black">{linkTimeOB ? results.finalDurOB.toFixed(1) : manualTimeOB}%</span>
+                        <div className="text-right flex flex-col items-end">
+                          <span className="text-xs font-bold text-slate-400 uppercase block leading-none mb-1">{linkTimeOB ? "Calculated OB" : "Manual OB"}</span>
+                          {linkTimeOB ? (
+                            <span className="text-lg font-black">{results.finalDurOB.toFixed(1)}%</span>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <input type="number" value={manualTimeOB} onChange={(e) => setManualTimeOB(Number(e.target.value))} className="w-16 text-right border border-slate-300 rounded px-1 text-lg font-black bg-white no-print focus:outline-none focus:border-slate-500" />
+                              <span className="text-lg font-black print-only hidden">{manualTimeOB}</span>
+                              <span className="text-lg font-black">%</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center justify-between">
@@ -721,9 +717,17 @@
                           <input type="checkbox" checked={linkCostOB} onChange={(e) => setLinkCostOB(e.target.checked)} className="no-print h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
                           Link Capex OB
                         </span>
-                        <div className="text-right">
-                          <span className="text-xs font-bold text-slate-400 uppercase block leading-none mb-1">Calculated OB</span>
-                          <span className="text-lg font-black text-emerald-600">{linkCostOB ? results.finalCapOB.toFixed(1) : manualCostOB}%</span>
+                        <div className="text-right flex flex-col items-end">
+                          <span className="text-xs font-bold text-slate-400 uppercase block leading-none mb-1">{linkCostOB ? "Calculated OB" : "Manual OB"}</span>
+                          {linkCostOB ? (
+                            <span className="text-lg font-black text-emerald-600">{results.finalCapOB.toFixed(1)}%</span>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <input type="number" value={manualCostOB} onChange={(e) => setManualCostOB(Number(e.target.value))} className="w-16 text-right border border-slate-300 rounded px-1 text-lg font-black text-emerald-600 bg-white no-print focus:outline-none focus:border-emerald-500" />
+                              <span className="text-lg font-black text-emerald-600 print-only hidden">{manualCostOB}</span>
+                              <span className="text-lg font-black text-emerald-600">%</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
