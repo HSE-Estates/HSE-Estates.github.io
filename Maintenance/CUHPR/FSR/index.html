@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CUH Fire Safety Register | HSE Capital & Estates</title>
+    <title>HSE Capital & Estates | App Portal</title>
     
     <link rel="icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico">
     
@@ -25,50 +25,6 @@
             font-family: 'Inter', system-ui, -apple-system, sans-serif; 
             -webkit-font-smoothing: antialiased;
             background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-            color: #1e293b;
-        }
-        
-        :root {
-            --hse-primary: #006858;
-            --hse-secondary: #00bfa5;
-            --hse-dark: #004d42;
-        }
-
-        .hse-gradient {
-            background: linear-gradient(135deg, #004d42 0%, #006858 50%, #00917a 100%);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .hse-gradient::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-            opacity: 0.4;
-        }
-
-        .glass-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-        }
-
-        .animate-fade-in {
-            animation: fadeIn 0.6s ease-out forwards;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        canvas {
-            touch-action: none; /* Prevents scrolling while signing on mobile */
         }
     </style>
 </head>
@@ -76,10 +32,35 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useRef, useEffect } = React;
 
-        const Icon = ({ name, size = 18, className = "" }) => {
-            return <i data-lucide={name} width={size} height={size} className={className}></i>;
+        const Icon = ({ name, size = 24, className = "" }) => {
+            const iconRef = useRef(null);
+            useEffect(() => {
+                if (window.lucide && iconRef.current) {
+                    window.lucide.createIcons({
+                        icons: { [name]: window.lucide.icons[name] },
+                        nameAttr: 'data-lucide',
+                        attrs: {
+                            class: className,
+                            width: size,
+                            height: size,
+                            stroke: "currentColor",
+                            "stroke-width": 2,
+                            "stroke-linecap": "round",
+                            "stroke-linejoin": "round"
+                        }
+                    });
+                    
+                    const iconNode = window.lucide.icons[name];
+                    if (iconNode) {
+                        const svgString = window.lucide.renderIcon(iconNode, { width: size, height: size, class: className });
+                        iconRef.current.innerHTML = svgString;
+                    }
+                }
+            }, [name, size, className]);
+
+            return <span ref={iconRef} className={className} />;
         };
 
         const CHECKLIST_SECTIONS = [
@@ -101,8 +82,8 @@
                 id: 'storage',
                 title: 'Storage & Housekeeping',
                 icon: "file-text",
-                iconColor: "text-[#006858]",
-                iconBg: "bg-emerald-50",
+                iconColor: "text-blue-500",
+                iconBg: "bg-blue-50",
                 items: [
                     "1. Is the Plantroom free from combustible storage/materials?",
                     "2. Cardboard/paper/packaging removed?",
@@ -202,21 +183,15 @@
 
             const [submitted, setSubmitted] = useState(false);
             const [isSubmitting, setIsSubmitting] = useState(false);
-            const [submitError, setSubmitError] = useState("");
+            const [submitError, setSubmitError] = useState(null);
             
+            // Signature Pad State & Refs
             const canvasRef = useRef(null);
             const [isDrawing, setIsDrawing] = useState(false);
 
-            // Re-render Icons whenever state changes
-            useEffect(() => {
-                if (window.lucide) {
-                    window.lucide.createIcons();
-                }
-            });
-
             useEffect(() => {
                 const canvas = canvasRef.current;
-                if (canvas && !submitted) {
+                if (canvas) {
                     const ctx = canvas.getContext('2d');
                     const rect = canvas.getBoundingClientRect();
                     canvas.width = rect.width * 2;
@@ -224,18 +199,31 @@
                     ctx.scale(2, 2);
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
-                    ctx.strokeStyle = '#004d42'; // HSE Dark Green
+                    ctx.strokeStyle = '#006858';
                     ctx.lineWidth = 3;
                 }
-            }, [submitted]);
+            }, []);
 
             const getCoordinates = (e) => {
                 const canvas = canvasRef.current;
                 const rect = canvas.getBoundingClientRect();
+                
+                const scaleX = canvas.width / (rect.width * 2);
+                const scaleY = canvas.height / (rect.height * 2);
+
+                let clientX, clientY;
                 if (e.touches && e.touches.length > 0) {
-                    return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
                 }
-                return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+                
+                return { 
+                    x: (clientX - rect.left) * scaleX, 
+                    y: (clientY - rect.top) * scaleY 
+                };
             };
 
             const startDrawing = (e) => {
@@ -293,7 +281,7 @@
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 setIsSubmitting(true);
-                setSubmitError("");
+                setSubmitError(null);
 
                 const signatureImage = canvasRef.current.toDataURL('image/png');
 
@@ -334,6 +322,7 @@
                 }
 
                 const payload = new URLSearchParams();
+                
                 payload.append('formID', '261652530107045');
                 
                 const [year, month, day] = formData.date.split('-');
@@ -351,7 +340,7 @@
                 try {
                     await fetch('https://eu-submit.jotform.com/submit/261652530107045', {
                         method: 'POST',
-                        mode: 'no-cors', 
+                        mode: 'no-cors',
                         headers: {
                             'Content-Type': 'application/x-www-form-urlencoded'
                         },
@@ -370,18 +359,19 @@
 
             if (submitted) {
                 return (
-                    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-3xl shadow-2xl p-10 max-w-md w-full text-center border-t-8 border-[#006858]">
-                            <div className="mx-auto bg-emerald-50 w-24 h-24 rounded-full flex items-center justify-center mb-6">
-                                <Icon name="check-circle" size={48} className="text-[#006858]" />
+                    <div className="min-h-screen flex items-center justify-center p-4">
+                        <div className="bg-white rounded-[2rem] shadow-2xl p-8 max-w-md w-full text-center border border-slate-100 relative overflow-hidden">
+                            <div className="absolute top-0 left-0 right-0 h-2 bg-[#00bfa5]"></div>
+                            <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <Icon name="check-circle" size={48} className="text-[#00bfa5]" />
                             </div>
-                            <h2 className="text-3xl font-black text-slate-900 mb-3 tracking-tight">Checklist Submitted</h2>
-                            <p className="text-slate-600 mb-8 leading-relaxed font-medium">
-                                The daily fire safety register for <strong className="text-slate-800">{formData.location || 'the plantroom'}</strong> has been securely logged to Jotform.
+                            <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">Checklist Submitted</h2>
+                            <p className="text-slate-500 mb-8 font-medium">
+                                The daily fire safety register for <strong className="text-slate-800">{formData.location || 'the plantroom'}</strong> has been securely logged to the database.
                             </p>
                             <button 
                                 onClick={() => window.location.reload()}
-                                className="w-full bg-gradient-to-r from-[#004d42] to-[#006858] hover:from-[#006858] hover:to-[#00917a] text-white font-black uppercase tracking-widest text-sm py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl hover:-translate-y-1"
+                                className="w-full bg-[#006858] hover:bg-[#004d42] text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl focus:ring-4 focus:ring-[#00bfa5]/30"
                             >
                                 Start New Checklist
                             </button>
@@ -391,82 +381,71 @@
             }
 
             return (
-                <div className="min-h-screen flex flex-col">
-                    {/* Header */}
-                    <header className="hse-gradient text-white pt-10 pb-20 px-4 sm:px-6 relative">
-                        <div className="max-w-4xl mx-auto relative z-10">
-                            <nav className="flex justify-between items-center mb-10">
-                                <div className="flex items-center gap-5">
-                                    <div className="bg-white p-3.5 rounded-2xl shadow-2xl transform transition hover:scale-105">
-                                        <img 
-                                            src="https://raw.githubusercontent.com/HSE-Estates/HSE-Estates.github.io/refs/heads/main/HSE-Logo-Green-NEW-no-background.png" 
-                                            alt="HSE Logo" 
-                                            className="h-10 sm:h-12 object-contain"
-                                        />
+                <div className="min-h-screen py-6 sm:py-12 px-4 sm:px-6 lg:px-8">
+                    <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
+                        
+                        {/* HEADER */}
+                        <div className="bg-white rounded-[2rem] shadow-xl border border-slate-200 p-6 sm:p-10 relative overflow-hidden">
+                            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#004d42] via-[#00bfa5] to-[#00917a]"></div>
+                            
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm hidden sm:block">
+                                        <img src="https://raw.githubusercontent.com/HSE-Estates/HSE-Estates.github.io/refs/heads/main/HSE-Logo-Green-NEW-no-background.png" alt="HSE Logo" className="h-12 w-auto object-contain" />
                                     </div>
-                                    <div className="border-l-2 border-white/20 pl-5">
-                                        <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-none mb-1.5">
+                                    <div>
+                                        <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tighter">
                                             Fire Safety Register
                                         </h1>
-                                        <p className="text-[#00bfa5] font-bold text-[10px] sm:text-xs uppercase tracking-widest">
-                                            Plantroom Daily Checklist
-                                        </p>
+                                        <p className="text-[#006858] font-bold text-lg mt-1 tracking-tight">Plantroom Daily Checklist</p>
                                     </div>
                                 </div>
-                                <div className="hidden sm:block bg-black/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/10 text-xs text-white font-bold tracking-widest uppercase shadow-inner">
-                                    REV 04: 11/06/2026
+                                <div className="bg-[#006858] px-4 py-2 rounded-xl text-xs text-white font-black tracking-widest uppercase shadow-md">
+                                    REV 04 &bull; 11/06/2026
                                 </div>
-                            </nav>
+                            </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 relative z-10 glass-card p-6 rounded-2xl">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-10 p-6 bg-slate-50 rounded-2xl border border-slate-100">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Date of Inspection</label>
-                                    <input 
-                                        type="date" 
-                                        name="date" 
-                                        value={formData.date} 
-                                        onChange={handleInputChange} 
-                                        className="w-full rounded-xl border-slate-300 shadow-sm p-3 bg-white text-slate-800 focus:ring-4 focus:ring-[#00bfa5]/30 focus:border-[#006858] font-medium transition-all" 
-                                        required 
-                                    />
+                                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                        <Icon name="calendar" size={14} /> Date of Inspection
+                                    </label>
+                                    <input type="date" name="date" value={formData.date} onChange={handleInputChange} className="w-full rounded-xl bg-white border-slate-300 shadow-sm p-3 border focus:ring-4 focus:ring-[#00bfa5]/20 focus:border-[#006858] font-medium text-slate-800" required />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Plantroom Location</label>
-                                    <input 
-                                        type="text" 
-                                        name="location" 
-                                        placeholder="e.g., Boiler Room 2" 
-                                        value={formData.location} 
-                                        onChange={handleInputChange} 
-                                        className="w-full rounded-xl border-slate-300 shadow-sm p-3 bg-white text-slate-800 placeholder-slate-400 focus:ring-4 focus:ring-[#00bfa5]/30 focus:border-[#006858] font-medium transition-all" 
-                                        required 
-                                    />
+                                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                        <Icon name="map-pin" size={14} /> Plantroom Location
+                                    </label>
+                                    <input type="text" name="location" placeholder="e.g., Boiler Room 2" value={formData.location} onChange={handleInputChange} className="w-full rounded-xl bg-white border-slate-300 shadow-sm p-3 border focus:ring-4 focus:ring-[#00bfa5]/20 focus:border-[#006858] font-medium text-slate-800" required />
                                 </div>
                             </div>
                         </div>
-                    </header>
 
-                    {}
-                    <main className="max-w-4xl mx-auto px-4 sm:px-6 -mt-10 flex-1 w-full relative z-10 pb-20">
-                        <form onSubmit={handleSubmit} className="space-y-8">
+                        <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">
                             
+                            {/* DYNAMIC CHECKLIST SECTIONS */}
                             {CHECKLIST_SECTIONS.map((section) => (
-                                <div key={section.id} className="bg-white rounded-3xl shadow-lg border border-slate-200/60 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-                                    <div className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 p-5 sm:p-6 flex items-center gap-4">
-                                        <div className={`p-3 ${section.iconBg} rounded-xl shadow-sm`}>
-                                            <Icon name={section.icon} size={24} className={section.iconColor} />
+                                <div key={section.id} className="bg-white rounded-[2rem] shadow-md border border-slate-200 overflow-hidden group hover:shadow-lg transition-shadow">
+                                    <div className="border-b border-slate-100 p-5 sm:p-6 flex items-center gap-4 bg-slate-50/50">
+                                        <div className={`${section.iconBg} ${section.iconColor} p-3 rounded-xl shadow-sm border border-slate-100/50`}>
+                                            <Icon name={section.icon} size={24} />
                                         </div>
                                         <h3 className="text-xl font-black text-slate-800 tracking-tight">{section.title}</h3>
                                     </div>
                                     
                                     <div className="p-5 sm:p-8">
-                                        <div className="bg-[#f8fafc] rounded-2xl p-5 mb-8 border border-slate-200/60">
-                                            <p className="text-[10px] font-black text-[#006858] uppercase tracking-widest mb-3">Items to verify:</p>
-                                            <ul className="space-y-2.5 text-sm font-medium text-slate-600">
+                                        {/* Reference list of items to check */}
+                                        <div className="bg-slate-50 rounded-2xl p-5 mb-8 border border-slate-100">
+                                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                <Icon name="list-checks" size={14} /> Items to verify
+                                            </p>
+                                            <ul className="space-y-3 text-sm text-slate-600 font-medium">
                                                 {section.items.map((item, idx) => (
-                                                    <li key={idx} className="flex gap-3 leading-relaxed">
-                                                        <span className="shrink-0 text-[#00bfa5] font-bold mt-0.5">•</span>
-                                                        <span>{item}</span>
+                                                    <li key={idx} className="flex gap-3 items-start">
+                                                        <span className={`shrink-0 mt-0.5 ${section.iconColor}`}>
+                                                            <Icon name="check" size={16} />
+                                                        </span>
+                                                        <span className="leading-snug">{item}</span>
                                                     </li>
                                                 ))}
                                             </ul>
@@ -474,28 +453,34 @@
 
                                         <div className="space-y-6">
                                             <div>
-                                                <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Status</label>
+                                                <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Inspection Status</label>
                                                 <div className="flex flex-col sm:flex-row gap-4">
-                                                    <label className={`flex-1 flex items-center justify-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${formData.sections[section.id].status === 'Normal' ? 'bg-emerald-50 border-emerald-500 text-emerald-800 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-200 hover:bg-slate-50'}`}>
+                                                    <label className={`flex-1 flex items-center justify-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${formData.sections[section.id].status === 'Normal' ? 'bg-emerald-50 border-[#00bfa5] text-[#006858] shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}`}>
                                                         <input type="radio" name={`${section.id}-status`} value="Normal" checked={formData.sections[section.id].status === 'Normal'} onChange={() => handleSectionChange(section.id, 'status', 'Normal')} className="sr-only" />
-                                                        <Icon name="check-circle" size={20} className={formData.sections[section.id].status === 'Normal' ? 'text-emerald-500' : 'text-slate-400'} /> 
-                                                        <span className="font-black tracking-wide">NORMAL</span>
+                                                        <Icon name="check-circle-2" size={20} className={formData.sections[section.id].status === 'Normal' ? "text-[#00bfa5]" : ""} /> 
+                                                        <span className="font-bold">Normal</span>
                                                     </label>
-                                                    <label className={`flex-1 flex items-center justify-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${formData.sections[section.id].status === 'Fault' ? 'bg-red-50 border-red-500 text-red-800 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-red-200 hover:bg-slate-50'}`}>
+                                                    <label className={`flex-1 flex items-center justify-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${formData.sections[section.id].status === 'Fault' ? 'bg-red-50 border-red-500 text-red-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}`}>
                                                         <input type="radio" name={`${section.id}-status`} value="Fault" checked={formData.sections[section.id].status === 'Fault'} onChange={() => handleSectionChange(section.id, 'status', 'Fault')} className="sr-only" />
-                                                        <Icon name="alert-triangle" size={20} className={formData.sections[section.id].status === 'Fault' ? 'text-red-500' : 'text-slate-400'} /> 
-                                                        <span className="font-black tracking-wide">FAULT</span>
+                                                        <Icon name="alert-octagon" size={20} className={formData.sections[section.id].status === 'Fault' ? "text-red-500" : ""} /> 
+                                                        <span className="font-bold">Fault Detected</span>
                                                     </label>
                                                 </div>
                                             </div>
 
                                             {formData.sections[section.id].status === 'Fault' && (
-                                                <div className="bg-orange-50 rounded-2xl p-6 border border-orange-200 space-y-5 animate-fade-in shadow-inner">
-                                                    <label className="flex items-center gap-4 cursor-pointer bg-white p-4 rounded-xl border border-orange-100 shadow-sm">
-                                                        <input type="checkbox" checked={formData.sections[section.id].tririgaLogged} onChange={(e) => handleSectionChange(section.id, 'tririgaLogged', e.target.checked)} className="w-6 h-6 text-[#006858] border-gray-300 rounded-md focus:ring-[#00bfa5]" />
-                                                        <span className="text-sm font-black text-slate-800 uppercase tracking-wide">Fault Logged on Tririga?</span>
+                                                <div className="bg-red-50/50 rounded-2xl p-6 border border-red-100 space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
+                                                    <label className="flex items-start gap-4 cursor-pointer p-4 bg-white rounded-xl border border-red-100 shadow-sm hover:border-red-200 transition-colors">
+                                                        <input type="checkbox" checked={formData.sections[section.id].tririgaLogged} onChange={(e) => handleSectionChange(section.id, 'tririgaLogged', e.target.checked)} className="mt-1 w-6 h-6 text-red-600 border-gray-300 rounded focus:ring-red-500" />
+                                                        <div>
+                                                            <span className="text-sm font-black text-slate-800 tracking-tight">Fault Logged on Tririga?</span>
+                                                            <p className="text-xs text-slate-500 font-medium mt-1">Check this box if the issue has been reported.</p>
+                                                        </div>
                                                     </label>
-                                                    <textarea rows="3" value={formData.sections[section.id].comments} onChange={(e) => handleSectionChange(section.id, 'comments', e.target.value)} placeholder="Describe the fault and exact location..." className="w-full rounded-xl border-slate-200 shadow-sm p-4 border focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 text-slate-700 placeholder-slate-400 font-medium" required />
+                                                    <div>
+                                                        <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Fault Details & Comments</label>
+                                                        <textarea rows="3" value={formData.sections[section.id].comments} onChange={(e) => handleSectionChange(section.id, 'comments', e.target.value)} placeholder="Describe the fault and exact location in detail..." className="w-full rounded-xl bg-white border-red-200 shadow-sm p-4 border focus:ring-4 focus:ring-red-500/20 focus:border-red-500 text-sm font-medium text-slate-800 placeholder-slate-400" required />
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -503,28 +488,32 @@
                                 </div>
                             ))}
 
-                            {}
-                            <div className="bg-white rounded-3xl shadow-lg border border-slate-200/60 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-                                <div className="bg-gradient-to-r from-red-50 to-white border-b border-red-100 p-5 sm:p-6 flex items-center justify-between">
+                            {/* FIRE ALARM SYSTEM LOG */}
+                            <div className="bg-white rounded-[2rem] shadow-md border border-slate-200 overflow-hidden">
+                                <div className="bg-slate-50/50 border-b border-slate-100 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                     <div className="flex items-center gap-4">
-                                        <div className="p-3 bg-red-100 rounded-xl shadow-sm">
-                                            <Icon name="activity" size={24} className="text-red-600" />
+                                        <div className="bg-indigo-50 text-indigo-600 p-3 rounded-xl shadow-sm border border-indigo-100">
+                                            <Icon name="bell-ring" size={24} />
                                         </div>
-                                        <h3 className="text-xl font-black text-slate-800 tracking-tight">Fire Alarm System Log</h3>
+                                        <h3 className="text-xl font-black text-slate-800 tracking-tight">Fire Alarm System Events</h3>
                                     </div>
                                     <button 
                                         type="button" 
                                         onClick={addAlarmEvent}
-                                        className="text-xs bg-white border border-red-200 text-red-700 font-black uppercase tracking-widest py-2 px-4 rounded-xl shadow-sm hover:bg-red-50 hover:border-red-300 flex items-center gap-2 transition-all"
+                                        className="text-sm bg-white border border-slate-200 text-slate-700 font-bold py-2 px-4 rounded-xl hover:bg-slate-50 flex items-center justify-center gap-2 transition-all shadow-sm"
                                     >
-                                        <Icon name="plus" size={16} /> Add Event
+                                        <Icon name="plus" size={16} /> Add Event Log
                                     </button>
                                 </div>
                                 
-                                <div className="p-5 sm:p-8 space-y-6">
+                                <div className="p-5 sm:p-8 space-y-8">
                                     {formData.alarmEvents.length === 0 ? (
                                         <div className="text-center py-10 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl">
-                                            <p className="text-slate-500 font-medium text-sm">No fire alarm events or tests to log for this week.</p>
+                                            <div className="bg-white w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm border border-slate-100">
+                                                <Icon name="clipboard-list" size={20} className="text-slate-400" />
+                                            </div>
+                                            <p className="text-slate-500 font-bold tracking-tight">No fire alarm events logged.</p>
+                                            <p className="text-sm text-slate-400 mt-1">Click "Add Event Log" if a test or incident occurred.</p>
                                         </div>
                                     ) : (
                                         <div className="space-y-4">
@@ -533,24 +522,24 @@
                                                     <button 
                                                         type="button" 
                                                         onClick={() => removeAlarmEvent(index)}
-                                                        className="absolute -top-3 -right-3 bg-white text-red-500 p-2 rounded-full shadow-md border border-slate-100 hover:bg-red-50 hover:text-red-600 transition-all z-10"
+                                                        className="absolute -top-3 -right-3 bg-red-50 text-red-600 p-2 rounded-full shadow-md border border-red-100 hover:bg-red-100 transition-colors"
                                                     >
                                                         <Icon name="trash-2" size={16} />
                                                     </button>
                                                     
                                                     <div className="w-full sm:w-1/4">
-                                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Date</label>
-                                                        <input type="date" value={event.date} onChange={(e) => updateAlarmEvent(index, 'date', e.target.value)} className="w-full rounded-xl border-slate-200 text-sm p-3 border focus:ring-4 focus:ring-red-500/20 focus:border-red-500 shadow-sm font-medium" required />
+                                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Date</label>
+                                                        <input type="date" value={event.date} onChange={(e) => updateAlarmEvent(index, 'date', e.target.value)} className="w-full rounded-xl bg-slate-50 border-slate-200 text-sm p-3 border focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium" required />
                                                     </div>
                                                     <div className="w-full sm:w-1/4">
-                                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Area</label>
-                                                        <input type="text" value={event.area} placeholder="e.g. Ward 2B" onChange={(e) => updateAlarmEvent(index, 'area', e.target.value)} className="w-full rounded-xl border-slate-200 text-sm p-3 border focus:ring-4 focus:ring-red-500/20 focus:border-red-500 shadow-sm font-medium" required />
+                                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Area</label>
+                                                        <input type="text" value={event.area} placeholder="e.g. Ward 2B" onChange={(e) => updateAlarmEvent(index, 'area', e.target.value)} className="w-full rounded-xl bg-slate-50 border-slate-200 text-sm p-3 border focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium" required />
                                                     </div>
                                                     <div className="w-full sm:w-2/4">
-                                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Event & Action</label>
+                                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Event & Action</label>
                                                         <div className="space-y-3">
-                                                            <input type="text" value={event.description} placeholder="Event Description..." onChange={(e) => updateAlarmEvent(index, 'description', e.target.value)} className="w-full rounded-xl border-slate-200 text-sm p-3 border focus:ring-4 focus:ring-red-500/20 focus:border-red-500 shadow-sm font-medium" required />
-                                                            <input type="text" value={event.action} placeholder="Action Required..." onChange={(e) => updateAlarmEvent(index, 'action', e.target.value)} className="w-full rounded-xl border-slate-200 text-sm p-3 border focus:ring-4 focus:ring-red-500/20 focus:border-red-500 shadow-sm font-medium" required />
+                                                            <input type="text" value={event.description} placeholder="Event Description..." onChange={(e) => updateAlarmEvent(index, 'description', e.target.value)} className="w-full rounded-xl bg-slate-50 border-slate-200 text-sm p-3 border focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium" required />
+                                                            <input type="text" value={event.action} placeholder="Action Required..." onChange={(e) => updateAlarmEvent(index, 'action', e.target.value)} className="w-full rounded-xl bg-slate-50 border-slate-200 text-sm p-3 border focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium" required />
                                                         </div>
                                                     </div>
                                                 </div>
@@ -558,16 +547,16 @@
                                         </div>
                                     )}
 
-                                    <div className="w-full h-px bg-slate-200 my-6"></div>
+                                    <div className="h-px bg-slate-100 my-6"></div>
 
                                     <div className="space-y-4">
-                                        <label className="flex items-start gap-4 cursor-pointer p-5 border border-slate-200 bg-slate-50/50 rounded-2xl hover:bg-slate-50 hover:border-emerald-200 transition-all shadow-sm">
+                                        <label className="flex items-start gap-4 cursor-pointer p-5 border border-slate-200 bg-slate-50/50 rounded-2xl hover:bg-slate-50 hover:border-indigo-200 transition-all shadow-sm">
                                             <div className="flex items-center h-5 mt-1">
-                                                <input type="checkbox" name="alarmTested" checked={formData.alarmTested} onChange={handleInputChange} className="w-6 h-6 text-[#006858] border-gray-300 rounded-md focus:ring-[#00bfa5]" />
+                                                <input type="checkbox" name="alarmTested" checked={formData.alarmTested} onChange={handleInputChange} className="w-6 h-6 text-indigo-600 border-gray-300 rounded-md focus:ring-indigo-500" />
                                             </div>
                                             <div>
-                                                <span className="font-black text-slate-800 tracking-tight">Weekly Fire detection Alarm System Testing Activated</span>
-                                                <p className="text-sm text-slate-500 font-medium mt-1">Tick if the system was tested in your department.</p>
+                                                <span className="font-black text-slate-800 tracking-tight">System Testing Activated</span>
+                                                <p className="text-sm text-slate-500 font-medium mt-1">Tick if the weekly fire detection alarm system was tested in your department.</p>
                                             </div>
                                         </label>
 
@@ -584,7 +573,6 @@
                                 </div>
                             </div>
 
-                            {}
                             <div className="bg-gradient-to-br from-[#ffffff] to-[#f8fafc] rounded-[2rem] shadow-2xl border border-slate-200 p-5 sm:p-10 relative overflow-hidden">
                                 <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#004d42] via-[#00bfa5] to-[#00917a]"></div>
                                 
@@ -606,14 +594,15 @@
                                     </div>
                                 </div>
 
-                                <div className="mb-10 bg-slate-50 p-4 sm:p-6 rounded-2xl border border-slate-200">
-                                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex justify-between items-end">
+                                {/* SIGNATURE PAD - Widened for mobile */}
+                                <div className="-mx-2 sm:mx-0 mb-10 bg-slate-50 p-2 sm:p-6 rounded-2xl border border-slate-200">
+                                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-4 px-2 flex justify-between items-end">
                                         <span>Inspector Signature</span>
                                         <button type="button" onClick={clearSignature} className="text-[#006858] hover:text-[#004d42] flex items-center gap-1.5 transition-colors bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100">
                                             <Icon name="eraser" size={14} /> Clear Signature
                                         </button>
                                     </label>
-                                    <div className="bg-white rounded-xl p-1 sm:p-2 touch-none shadow-sm border border-slate-300">
+                                    <div className="bg-white rounded-xl p-0 sm:p-2 shadow-sm border border-slate-300 overflow-hidden">
                                         <canvas
                                             ref={canvasRef}
                                             onMouseDown={startDrawing}
@@ -623,11 +612,12 @@
                                             onTouchStart={startDrawing}
                                             onTouchMove={draw}
                                             onTouchEnd={stopDrawing}
-                                            className="w-full h-56 sm:h-64 rounded bg-transparent cursor-crosshair"
+                                            className="w-full h-64 rounded bg-transparent cursor-crosshair touch-none"
+                                            style={{ touchAction: 'none' }}
                                         />
                                     </div>
-                                    <p className="text-xs text-slate-400 mt-3 font-medium flex items-center justify-center gap-2">
-                                        <Icon name="info" size={14} /> Please sign inside the box using your mouse or finger.
+                                    <p className="text-xs text-slate-400 mt-3 px-2 font-medium flex items-center justify-center gap-2 text-center">
+                                        <Icon name="info" size={14} className="shrink-0" /> Please sign inside the box using your mouse or finger.
                                     </p>
                                 </div>
 
@@ -641,30 +631,38 @@
                                 <button 
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className={`w-full flex items-center justify-center gap-3 bg-gradient-to-r from-[#006858] to-[#00917a] hover:from-[#004d42] hover:to-[#006858] text-white font-black uppercase tracking-widest text-sm py-5 px-8 rounded-xl transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 ${isSubmitting ? 'opacity-70 cursor-not-allowed scale-95' : ''}`}
+                                    className={`w-full flex items-center justify-center gap-3 bg-[#006858] hover:bg-[#004d42] text-white font-bold text-lg py-5 px-8 rounded-2xl transition-all shadow-xl hover:shadow-2xl focus:ring-4 focus:ring-[#00bfa5]/30 ${isSubmitting ? 'opacity-70 cursor-not-allowed scale-[0.98]' : 'hover:-translate-y-1'}`}
                                 >
-                                    <Icon name="send" size={20} />
-                                    {isSubmitting ? 'Transmitting Securely...' : 'Submit Daily Register'}
+                                    {isSubmitting ? (
+                                        <Icon name="loader-2" className="animate-spin" />
+                                    ) : (
+                                        <Icon name="send" />
+                                    )}
+                                    {isSubmitting ? 'Pushing to Database...' : 'Submit Daily Register'}
                                 </button>
                             </div>
                         </form>
-                        
-                        {}
-                        <footer className="mt-16 text-center border-t border-slate-300/50 pt-8">
-                            <div className="inline-flex items-center gap-2 mb-3">
-                                <div className="w-6 h-6 bg-gradient-to-br from-[#006858] to-[#004d42] rounded flex items-center justify-center shadow-md">
-                                    <img src="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico" className="w-3.5 h-3.5 brightness-0 invert" alt=""/>
+                    </div>
+
+                    {/* Footer */}
+                    <footer className="max-w-4xl mx-auto mt-12 pb-8">
+                        <div className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col md:flex-row justify-between items-center gap-4 shadow-sm">
+                            <div className="flex flex-col items-center md:items-start gap-2">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 bg-gradient-to-br from-[#006858] to-[#004d42] rounded-lg flex items-center justify-center shadow-lg">
+                                        <img src="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico" className="w-5 h-5 brightness-0 invert" alt=""/>
+                                    </div>
+                                    <span className="font-black text-slate-900 text-lg">HSE Capital & Estates</span>
                                 </div>
-                                <span className="font-black text-slate-700 text-sm tracking-tight">HSE Capital & Estates</span>
+                                <p className="text-xs text-slate-500 font-medium">&copy; 2026 Health Service Executive. All rights reserved.</p>
                             </div>
-                            <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">
-                                Digital Solutions Developed by Dave Maher
-                            </p>
-                            <p className="text-[9px] text-emerald-600/80 uppercase tracking-[0.2em] font-bold mt-1.5">
-                                HSE Estates Infrastructure Intelligence
-                            </p>
-                        </footer>
-                    </main>
+
+                            <div className="text-center md:text-right">
+                                <p className="text-sm font-black text-slate-800">Digital Solutions Developed by Dave Maher</p>
+                                <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest font-bold">HSE Estates Infrastructure Intelligence</p>
+                            </div>
+                        </div>
+                    </footer>
                 </div>
             );
         }
@@ -672,5 +670,6 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
+    
 </body>
 </html>
