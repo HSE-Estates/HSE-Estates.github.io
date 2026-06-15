@@ -237,27 +237,19 @@
                     const canvas = canvasRef.current;
                     if (!canvas) return;
                     
-                    canvas.style.width = '100%';
-                    canvas.style.height = '100%';
-                    
-                    const rect = canvas.getBoundingClientRect();
-                    const dpr = window.devicePixelRatio || 1;
-                    
-                    canvas.width = rect.width * dpr;
-                    canvas.height = rect.height * dpr;
+                    // FIXED internal high-res buffer to prevent clearing on rotation
+                    canvas.width = 1200;
+                    canvas.height = 600;
                     
                     const ctx = canvas.getContext('2d');
-                    ctx.scale(dpr, dpr);
-                    
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
                     ctx.strokeStyle = '#004d42'; // HSE Dark Green
-                    ctx.lineWidth = 3;
+                    ctx.lineWidth = 5; // Slightly thicker for high-res buffer
                 };
 
                 initCanvas();
-                window.addEventListener('resize', initCanvas);
-                return () => window.removeEventListener('resize', initCanvas);
+                // Removed the resize listener so the canvas buffer is never wiped when device is rotated
             }, [submitted]);
 
             const getCoordinates = (e) => {
@@ -273,10 +265,13 @@
                     clientY = e.clientY;
                 }
                 
-                // No multiplier needed because context is correctly scaled to device pixel ratio
+                // Map visual CSS size to the internal fixed buffer size (1200x600)
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                
                 return { 
-                    x: clientX - rect.left, 
-                    y: clientY - rect.top 
+                    x: (clientX - rect.left) * scaleX, 
+                    y: (clientY - rect.top) * scaleY 
                 };
             };
 
@@ -652,14 +647,14 @@
                                     </div>
                                 </div>
 
-                                <div className="mb-10 bg-slate-50 p-4 sm:p-6 rounded-2xl border border-slate-200">
-                                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex justify-between items-end">
+                                <div className="-mx-5 sm:mx-0 mb-10 bg-slate-50 py-4 sm:p-6 sm:rounded-2xl border-y sm:border border-slate-200">
+                                    <label className="px-5 sm:px-0 block text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex justify-between items-end">
                                         <span>Inspector Signature</span>
-                                        <button type="button" onClick={clearSignature} className="text-[#006858] hover:text-[#004d42] flex items-center gap-1.5 transition-colors bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100">
+                                        <button type="button" onClick={clearSignature} className="text-[#006858] hover:text-[#004d42] flex items-center gap-1.5 transition-colors bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 shadow-sm">
                                             <Icon name="eraser" size={14} /> Clear Signature
                                         </button>
                                     </label>
-                                    <div className="bg-white rounded-xl p-1 sm:p-2 touch-none shadow-sm border border-slate-300">
+                                    <div className="bg-white sm:rounded-xl p-0 sm:p-2 touch-none shadow-inner border-y sm:border border-slate-300">
                                         <canvas
                                             ref={canvasRef}
                                             onMouseDown={startDrawing}
@@ -669,10 +664,11 @@
                                             onTouchStart={startDrawing}
                                             onTouchMove={draw}
                                             onTouchEnd={stopDrawing}
-                                            className="w-full h-56 sm:h-64 rounded bg-transparent cursor-crosshair touch-none"
+                                            className="w-full h-64 bg-transparent cursor-crosshair touch-none"
+                                            style={{ touchAction: 'none' }}
                                         />
                                     </div>
-                                    <p className="text-xs text-slate-400 mt-3 font-medium flex items-center justify-center gap-2">
+                                    <p className="px-5 sm:px-0 text-xs text-slate-400 mt-3 font-medium flex items-center justify-center gap-2">
                                         <Icon name="info" size={14} /> Please sign inside the box using your mouse or finger.
                                     </p>
                                 </div>
