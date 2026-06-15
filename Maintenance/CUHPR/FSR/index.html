@@ -585,7 +585,7 @@
                             </div>
 
                             {}
-                            <div className="bg-gradient-to-br from-[#ffffff] to-[#f8fafc] rounded-[2rem] shadow-2xl border border-slate-200 p-8 sm:p-10 relative overflow-hidden">
+                            <div className="bg-gradient-to-br from-[#ffffff] to-[#f8fafc] rounded-[2rem] shadow-2xl border border-slate-200 p-5 sm:p-10 relative overflow-hidden">
                                 <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#004d42] via-[#00bfa5] to-[#00917a]"></div>
                                 
                                 <h3 className="text-2xl font-black mb-8 flex items-center gap-3 text-slate-800 tracking-tight">
@@ -606,14 +606,14 @@
                                     </div>
                                 </div>
 
-                                <div className="mb-10 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                                <div className="mb-10 bg-slate-50 p-4 sm:p-6 rounded-2xl border border-slate-200">
                                     <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex justify-between items-end">
                                         <span>Inspector Signature</span>
                                         <button type="button" onClick={clearSignature} className="text-[#006858] hover:text-[#004d42] flex items-center gap-1.5 transition-colors bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100">
                                             <Icon name="eraser" size={14} /> Clear Signature
                                         </button>
                                     </label>
-                                    <div className="bg-white rounded-xl p-2 touch-none shadow-sm border border-slate-300">
+                                    <div className="bg-white rounded-xl p-1 sm:p-2 touch-none shadow-sm border border-slate-300">
                                         <canvas
                                             ref={canvasRef}
                                             onMouseDown={startDrawing}
@@ -623,7 +623,7 @@
                                             onTouchStart={startDrawing}
                                             onTouchMove={draw}
                                             onTouchEnd={stopDrawing}
-                                            className="w-full h-48 rounded bg-transparent cursor-crosshair"
+                                            className="w-full h-56 sm:h-64 rounded bg-transparent cursor-crosshair"
                                         />
                                     </div>
                                     <p className="text-xs text-slate-400 mt-3 font-medium flex items-center justify-center gap-2">
