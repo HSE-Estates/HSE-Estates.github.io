@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CUH Fire Safety Register | HSE Capital & Estates</title>
+    
+    <link rel="icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        
+        body { 
+            font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+            -webkit-font-smoothing: antialiased;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            color: #1e293b;
+        }
+        
+        :root {
+            --hse-primary: #006858;
+            --hse-secondary: #00bfa5;
+            --hse-dark: #004d42;
+        }
+
+        .hse-gradient {
+            background: linear-gradient(135deg, #004d42 0%, #006858 50%, #00917a 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hse-gradient::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            opacity: 0.4;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.6s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        canvas {
+            touch-action: none; /* Prevents scrolling while signing on mobile */
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const Icon = ({ name, size = 18, className = "" }) => {
+            return <i data-lucide={name} width={size} height={size} className={className}></i>;
+        };
+
+        const CHECKLIST_SECTIONS = [
+            {
+                id: 'fireDoors',
+                title: 'Fire Doors',
+                icon: "shield-alert",
+                iconColor: "text-red-500",
+                iconBg: "bg-red-50",
+                items: [
+                    "1. ANY fire doors held open by automatic release mechanisms must be released daily.",
+                    "2. Check previous day log to ensure any damage/ faults rectified.",
+                    "3. Any new damage observed to be reported on Tririga.",
+                    "4. Ensure no doors are held open with wedges / props.",
+                    "5. Note door numbers via inventory."
+                ]
+            },
+            {
+                id: 'storage',
+                title: 'Storage & Housekeeping',
+                icon: "file-text",
+                iconColor: "text-[#006858]",
+                iconBg: "bg-emerald-50",
+                items: [
+                    "1. Is the Plantroom free from combustible storage/materials?",
+                    "2. Cardboard/paper/packaging removed?",
+                    "3. Is there any unauthorised storage?",
+                    "4. Plant access routes unobstructed?",
+                    "5. Contractor materials removed after works?",
+                    "6. Flammable liquids stored properly?",
+                    "7. General condition satisfactory?"
+                ]
+            },
+            {
+                id: 'extinguishers',
+                title: 'Portable Fire Extinguishers',
+                icon: "alert-triangle",
+                iconColor: "text-orange-500",
+                iconBg: "bg-orange-50",
+                items: [
+                    "1. Are Extinguishers in the correct location and in date?",
+                    "2. Are any Extinguishers missing?",
+                    "3. Is the seal intact?",
+                    "4. Extinguishers free from dust and dirt?",
+                    "5. Are all fire extinguishers unobstructed and ready for use?",
+                    "6. Is the pressure needle in green section?",
+                    "7. Is there any sign of wear and tear or physical damage?"
+                ]
+            },
+            {
+                id: 'escapeRoutes',
+                title: 'Escape Routes',
+                icon: "activity",
+                iconColor: "text-emerald-500",
+                iconBg: "bg-emerald-50",
+                items: [
+                    "1. Check escape routes are not obstructed and are immediately available for use.",
+                    "2. Batteries or battery powered machines should not be charged in common corridors, stairways or landings.",
+                    "3. Are Escape routes clearly illuminated, sign posted and adequately indicated?",
+                    "4. Are the final exit doors / gates across routes easily and immediately openable?",
+                    "5. Are Curtains, drapes or hangings not placed across or along an escape route in a manner which would obstruct or impede escape?",
+                    "6. Check Mirrors are not placed across an escape route or adjacent to an exit as to not confuse the direction of escape?",
+                    "7. Check that floor coverings, rugs and mats are fixed or laid so that they do not present a trip or slip hazard during an evacuation.",
+                    "8. Check floor coverings rugs and mats are not used to prop open doors.",
+                    "9. Check Fire resisting doors are kept closed at all times unless they are fitted with hold open devices.",
+                    "10. All external areas and external walkways are kept free of obstructions as to allow unimpeded escape to a place of safety."
+                ]
+            },
+            {
+                id: 'emergencyLighting',
+                title: 'Emergency Lighting (Visual Check)',
+                icon: "info",
+                iconColor: "text-yellow-500",
+                iconBg: "bg-yellow-50",
+                items: [
+                    "1. Visually check the lighting on each running man is illuminated/green LED (battery backup illuminated).",
+                    "2. Check the emergency running man and other emergency lighting is not damaged."
+                ]
+            },
+            {
+                id: 'breakglass',
+                title: 'Breakglass Units',
+                icon: "alert-triangle",
+                iconColor: "text-red-600",
+                iconBg: "bg-red-50",
+                items: [
+                    "1. Visual Inspection: Is the unit physically damaged or obstructed?"
+                ]
+            },
+            {
+                id: 'security',
+                title: 'Plantroom Security & Access',
+                icon: "check-circle",
+                iconColor: "text-slate-500",
+                iconBg: "bg-slate-100",
+                items: [
+                    "1. Is the plant room door secure and functioning?",
+                    "2. Is 'Authorised personnel only' sign visible?",
+                    "3. Evidence of unauthorised entry?",
+                    "4. Are emergency isolation points accessible?",
+                    "5. Are Elec panels and plant unobstructed?"
+                ]
+            }
+        ];
+
+        function App() {
+            const [formData, setFormData] = useState({
+                date: new Date().toISOString().split('T')[0],
+                location: '',
+                inspectorName: '',
+                wardManager: '',
+                sections: CHECKLIST_SECTIONS.reduce((acc, section) => {
+                    acc[section.id] = { status: 'Normal', tririgaLogged: false, comments: '' };
+                    return acc;
+                }, {}),
+                alarmEvents: [],
+                alarmTested: false,
+                sounderIssue: false
+            });
+
+            const [submitted, setSubmitted] = useState(false);
+            const [isSubmitting, setIsSubmitting] = useState(false);
+            const [submitError, setSubmitError] = useState("");
+            
+            const canvasRef = useRef(null);
+            const [isDrawing, setIsDrawing] = useState(false);
+
+            // Re-render Icons whenever state changes
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            });
+
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (canvas && !submitted) {
+                    const ctx = canvas.getContext('2d');
+                    const rect = canvas.getBoundingClientRect();
+                    canvas.width = rect.width * 2;
+                    canvas.height = rect.height * 2;
+                    ctx.scale(2, 2);
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.strokeStyle = '#004d42'; // HSE Dark Green
+                    ctx.lineWidth = 3;
+                }
+            }, [submitted]);
+
+            const getCoordinates = (e) => {
+                const canvas = canvasRef.current;
+                const rect = canvas.getBoundingClientRect();
+                if (e.touches && e.touches.length > 0) {
+                    return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+                }
+                return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            };
+
+            const startDrawing = (e) => {
+                e.preventDefault();
+                setIsDrawing(true);
+                const { x, y } = getCoordinates(e);
+                const ctx = canvasRef.current.getContext('2d');
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+            };
+
+            const draw = (e) => {
+                e.preventDefault();
+                if (!isDrawing) return;
+                const { x, y } = getCoordinates(e);
+                const ctx = canvasRef.current.getContext('2d');
+                ctx.lineTo(x, y);
+                ctx.stroke();
+            };
+
+            const stopDrawing = () => setIsDrawing(false);
+
+            const clearSignature = () => {
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            };
+
+            const handleInputChange = (e) => {
+                const { name, value, type, checked } = e.target;
+                setFormData(prev => ({
+                    ...prev,
+                    [name]: type === 'checkbox' ? checked : value
+                }));
+            };
+
+            const handleSectionChange = (sectionId, field, value) => {
+                setFormData(prev => ({
+                    ...prev,
+                    sections: {
+                        ...prev.sections,
+                        [sectionId]: { ...prev.sections[sectionId], [field]: value }
+                    }
+                }));
+            };
+
+            const addAlarmEvent = () => setFormData(prev => ({ ...prev, alarmEvents: [...prev.alarmEvents, { date: '', area: '', description: '', action: '' }] }));
+            const updateAlarmEvent = (index, field, value) => {
+                const newEvents = [...formData.alarmEvents];
+                newEvents[index][field] = value;
+                setFormData(prev => ({ ...prev, alarmEvents: newEvents }));
+            };
+            const removeAlarmEvent = (index) => setFormData(prev => ({ ...prev, alarmEvents: formData.alarmEvents.filter((_, i) => i !== index) }));
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setIsSubmitting(true);
+                setSubmitError("");
+
+                const signatureImage = canvasRef.current.toDataURL('image/png');
+
+                let summaryText = `INSPECTION SUMMARY: ${formData.location.toUpperCase()} ON ${formData.date}\n`;
+                summaryText += `-------------------------------------------------\n`;
+                
+                let faultsFound = 0;
+                CHECKLIST_SECTIONS.forEach(section => {
+                    const data = formData.sections[section.id];
+                    if (data.status === 'Fault') {
+                        faultsFound++;
+                        summaryText += `[FAULT] ${section.title}\n`;
+                        summaryText += ` - Tririga Logged: ${data.tririgaLogged ? 'YES' : 'NO'}\n`;
+                        summaryText += ` - Details: ${data.comments || 'No details provided.'}\n\n`;
+                    } else {
+                        summaryText += `[NORMAL] ${section.title}\n`;
+                    }
+                });
+
+                if (faultsFound === 0) {
+                    summaryText += `\nALL CLEAR: No faults reported in any plantroom section.\n`;
+                }
+
+                let alarmText = `WEEKLY ALARM SYSTEM REPORT\n`;
+                alarmText += `-------------------------------------------------\n`;
+                alarmText += `System Testing Activated in Dept: ${formData.alarmTested ? 'YES' : 'NO'}\n`;
+                alarmText += `Sounder Issues Reported (Tririga): ${formData.sounderIssue ? 'YES' : 'NO'}\n\n`;
+                
+                if (formData.alarmEvents.length > 0) {
+                    alarmText += `LOGGED EVENTS:\n`;
+                    formData.alarmEvents.forEach((event, i) => {
+                        alarmText += `${i + 1}. Date: ${event.date} | Area: ${event.area}\n`;
+                        alarmText += `   Event: ${event.description}\n`;
+                        alarmText += `   Action: ${event.action}\n\n`;
+                    });
+                } else {
+                    alarmText += `No specific alarm events logged for this period.\n`;
+                }
+
+                const payload = new URLSearchParams();
+                payload.append('formID', '261652530107045');
+                
+                const [year, month, day] = formData.date.split('-');
+                payload.append('q2_q2_datetime0[month]', month);
+                payload.append('q2_q2_datetime0[day]', day);
+                payload.append('q2_q2_datetime0[year]', year);
+                
+                payload.append('q3_q3_textbox1', formData.location);
+                payload.append('q4_q4_textbox2', formData.inspectorName);
+                payload.append('q5_q5_textbox3', formData.wardManager);
+                payload.append('q6_q6_textarea4', summaryText);
+                payload.append('q7_q7_textarea5', alarmText);
+                payload.append('q8_q8_signature6', signatureImage);
+
+                try {
+                    await fetch('https://eu-submit.jotform.com/submit/261652530107045', {
+                        method: 'POST',
+                        mode: 'no-cors', 
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        },
+                        body: payload.toString()
+                    });
+                    
+                    setSubmitted(true);
+                    window.scrollTo(0, 0);
+                } catch (error) {
+                    setSubmitError("Submission failed. Please check your internet connection and try again.");
+                    console.error("Jotform submission failed:", error);
+                } finally {
+                    setIsSubmitting(false);
+                }
+            };
+
+            if (submitted) {
+                return (
+                    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl shadow-2xl p-10 max-w-md w-full text-center border-t-8 border-[#006858]">
+                            <div className="mx-auto bg-emerald-50 w-24 h-24 rounded-full flex items-center justify-center mb-6">
+                                <Icon name="check-circle" size={48} className="text-[#006858]" />
+                            </div>
+                            <h2 className="text-3xl font-black text-slate-900 mb-3 tracking-tight">Checklist Submitted</h2>
+                            <p className="text-slate-600 mb-8 leading-relaxed font-medium">
+                                The daily fire safety register for <strong className="text-slate-800">{formData.location || 'the plantroom'}</strong> has been securely logged to Jotform.
+                            </p>
+                            <button 
+                                onClick={() => window.location.reload()}
+                                className="w-full bg-gradient-to-r from-[#004d42] to-[#006858] hover:from-[#006858] hover:to-[#00917a] text-white font-black uppercase tracking-widest text-sm py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl hover:-translate-y-1"
+                            >
+                                Start New Checklist
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen flex flex-col">
+                    {/* Header */}
+                    <header className="hse-gradient text-white pt-10 pb-20 px-4 sm:px-6 relative">
+                        <div className="max-w-4xl mx-auto relative z-10">
+                            <nav className="flex justify-between items-center mb-10">
+                                <div className="flex items-center gap-5">
+                                    <div className="bg-white p-3.5 rounded-2xl shadow-2xl transform transition hover:scale-105">
+                                        <img 
+                                            src="https://raw.githubusercontent.com/HSE-Estates/HSE-Estates.github.io/refs/heads/main/HSE-Logo-Green-NEW-no-background.png" 
+                                            alt="HSE Logo" 
+                                            className="h-10 sm:h-12 object-contain"
+                                        />
+                                    </div>
+                                    <div className="border-l-2 border-white/20 pl-5">
+                                        <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-none mb-1.5">
+                                            Fire Safety Register
+                                        </h1>
+                                        <p className="text-[#00bfa5] font-bold text-[10px] sm:text-xs uppercase tracking-widest">
+                                            Plantroom Daily Checklist
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="hidden sm:block bg-black/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/10 text-xs text-white font-bold tracking-widest uppercase shadow-inner">
+                                    REV 04: 11/06/2026
+                                </div>
+                            </nav>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 relative z-10 glass-card p-6 rounded-2xl">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Date of Inspection</label>
+                                    <input 
+                                        type="date" 
+                                        name="date" 
+                                        value={formData.date} 
+                                        onChange={handleInputChange} 
+                                        className="w-full rounded-xl border-slate-300 shadow-sm p-3 bg-white text-slate-800 focus:ring-4 focus:ring-[#00bfa5]/30 focus:border-[#006858] font-medium transition-all" 
+                                        required 
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Plantroom Location</label>
+                                    <input 
+                                        type="text" 
+                                        name="location" 
+                                        placeholder="e.g., Boiler Room 2" 
+                                        value={formData.location} 
+                                        onChange={handleInputChange} 
+                                        className="w-full rounded-xl border-slate-300 shadow-sm p-3 bg-white text-slate-800 placeholder-slate-400 focus:ring-4 focus:ring-[#00bfa5]/30 focus:border-[#006858] font-medium transition-all" 
+                                        required 
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {}
+                    <main className="max-w-4xl mx-auto px-4 sm:px-6 -mt-10 flex-1 w-full relative z-10 pb-20">
+                        <form onSubmit={handleSubmit} className="space-y-8">
+                            
+                            {CHECKLIST_SECTIONS.map((section) => (
+                                <div key={section.id} className="bg-white rounded-3xl shadow-lg border border-slate-200/60 overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                                    <div className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 p-5 sm:p-6 flex items-center gap-4">
+                                        <div className={`p-3 ${section.iconBg} rounded-xl shadow-sm`}>
+                                            <Icon name={section.icon} size={24} className={section.iconColor} />
+                                        </div>
+                                        <h3 className="text-xl font-black text-slate-800 tracking-tight">{section.title}</h3>
+                                    </div>
+                                    
+                                    <div className="p-5 sm:p-8">
+                                        <div className="bg-[#f8fafc] rounded-2xl p-5 mb-8 border border-slate-200/60">
+                                            <p className="text-[10px] font-black text-[#006858] uppercase tracking-widest mb-3">Items to verify:</p>
+                                            <ul className="space-y-2.5 text-sm font-medium text-slate-600">
+                                                {section.items.map((item, idx) => (
+                                                    <li key={idx} className="flex gap-3 leading-relaxed">
+                                                        <span className="shrink-0 text-[#00bfa5] font-bold mt-0.5">•</span>
+                                                        <span>{item}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+
+                                        <div className="space-y-6">
+                                            <div>
+                                                <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Status</label>
+                                                <div className="flex flex-col sm:flex-row gap-4">
+                                                    <label className={`flex-1 flex items-center justify-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${formData.sections[section.id].status === 'Normal' ? 'bg-emerald-50 border-emerald-500 text-emerald-800 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-200 hover:bg-slate-50'}`}>
+                                                        <input type="radio" name={`${section.id}-status`} value="Normal" checked={formData.sections[section.id].status === 'Normal'} onChange={() => handleSectionChange(section.id, 'status', 'Normal')} className="sr-only" />
+                                                        <Icon name="check-circle" size={20} className={formData.sections[section.id].status === 'Normal' ? 'text-emerald-500' : 'text-slate-400'} /> 
+                                                        <span className="font-black tracking-wide">NORMAL</span>
+                                                    </label>
+                                                    <label className={`flex-1 flex items-center justify-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${formData.sections[section.id].status === 'Fault' ? 'bg-red-50 border-red-500 text-red-800 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-red-200 hover:bg-slate-50'}`}>
+                                                        <input type="radio" name={`${section.id}-status`} value="Fault" checked={formData.sections[section.id].status === 'Fault'} onChange={() => handleSectionChange(section.id, 'status', 'Fault')} className="sr-only" />
+                                                        <Icon name="alert-triangle" size={20} className={formData.sections[section.id].status === 'Fault' ? 'text-red-500' : 'text-slate-400'} /> 
+                                                        <span className="font-black tracking-wide">FAULT</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            {formData.sections[section.id].status === 'Fault' && (
+                                                <div className="bg-orange-50 rounded-2xl p-6 border border-orange-200 space-y-5 animate-fade-in shadow-inner">
+                                                    <label className="flex items-center gap-4 cursor-pointer bg-white p-4 rounded-xl border border-orange-100 shadow-sm">
+                                                        <input type="checkbox" checked={formData.sections[section.id].tririgaLogged} onChange={(e) => handleSectionChange(section.id, 'tririgaLogged', e.target.checked)} className="w-6 h-6 text-[#006858] border-gray-300 rounded-md focus:ring-[#00bfa5]" />
+                                                        <span className="text-sm font-black text-slate-800 uppercase tracking-wide">Fault Logged on Tririga?</span>
+                                                    </label>
+                                                    <textarea rows="3" value={formData.sections[section.id].comments} onChange={(e) => handleSectionChange(section.id, 'comments', e.target.value)} placeholder="Describe the fault and exact location..." className="w-full rounded-xl border-slate-200 shadow-sm p-4 border focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 text-slate-700 placeholder-slate-400 font-medium" required />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+
+                            {}
+                            <div className="bg-white rounded-3xl shadow-lg border border-slate-200/60 overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                                <div className="bg-gradient-to-r from-red-50 to-white border-b border-red-100 p-5 sm:p-6 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-3 bg-red-100 rounded-xl shadow-sm">
+                                            <Icon name="activity" size={24} className="text-red-600" />
+                                        </div>
+                                        <h3 className="text-xl font-black text-slate-800 tracking-tight">Fire Alarm System Log</h3>
+                                    </div>
+                                    <button 
+                                        type="button" 
+                                        onClick={addAlarmEvent}
+                                        className="text-xs bg-white border border-red-200 text-red-700 font-black uppercase tracking-widest py-2 px-4 rounded-xl shadow-sm hover:bg-red-50 hover:border-red-300 flex items-center gap-2 transition-all"
+                                    >
+                                        <Icon name="plus" size={16} /> Add Event
+                                    </button>
+                                </div>
+                                
+                                <div className="p-5 sm:p-8 space-y-6">
+                                    {formData.alarmEvents.length === 0 ? (
+                                        <div className="text-center py-10 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl">
+                                            <p className="text-slate-500 font-medium text-sm">No fire alarm events or tests to log for this week.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {formData.alarmEvents.map((event, index) => (
+                                                <div key={index} className="flex flex-col sm:flex-row gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative group">
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={() => removeAlarmEvent(index)}
+                                                        className="absolute -top-3 -right-3 bg-white text-red-500 p-2 rounded-full shadow-md border border-slate-100 hover:bg-red-50 hover:text-red-600 transition-all z-10"
+                                                    >
+                                                        <Icon name="trash-2" size={16} />
+                                                    </button>
+                                                    
+                                                    <div className="w-full sm:w-1/4">
+                                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Date</label>
+                                                        <input type="date" value={event.date} onChange={(e) => updateAlarmEvent(index, 'date', e.target.value)} className="w-full rounded-xl border-slate-200 text-sm p-3 border focus:ring-4 focus:ring-red-500/20 focus:border-red-500 shadow-sm font-medium" required />
+                                                    </div>
+                                                    <div className="w-full sm:w-1/4">
+                                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Area</label>
+                                                        <input type="text" value={event.area} placeholder="e.g. Ward 2B" onChange={(e) => updateAlarmEvent(index, 'area', e.target.value)} className="w-full rounded-xl border-slate-200 text-sm p-3 border focus:ring-4 focus:ring-red-500/20 focus:border-red-500 shadow-sm font-medium" required />
+                                                    </div>
+                                                    <div className="w-full sm:w-2/4">
+                                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Event & Action</label>
+                                                        <div className="space-y-3">
+                                                            <input type="text" value={event.description} placeholder="Event Description..." onChange={(e) => updateAlarmEvent(index, 'description', e.target.value)} className="w-full rounded-xl border-slate-200 text-sm p-3 border focus:ring-4 focus:ring-red-500/20 focus:border-red-500 shadow-sm font-medium" required />
+                                                            <input type="text" value={event.action} placeholder="Action Required..." onChange={(e) => updateAlarmEvent(index, 'action', e.target.value)} className="w-full rounded-xl border-slate-200 text-sm p-3 border focus:ring-4 focus:ring-red-500/20 focus:border-red-500 shadow-sm font-medium" required />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    <div className="w-full h-px bg-slate-200 my-6"></div>
+
+                                    <div className="space-y-4">
+                                        <label className="flex items-start gap-4 cursor-pointer p-5 border border-slate-200 bg-slate-50/50 rounded-2xl hover:bg-slate-50 hover:border-emerald-200 transition-all shadow-sm">
+                                            <div className="flex items-center h-5 mt-1">
+                                                <input type="checkbox" name="alarmTested" checked={formData.alarmTested} onChange={handleInputChange} className="w-6 h-6 text-[#006858] border-gray-300 rounded-md focus:ring-[#00bfa5]" />
+                                            </div>
+                                            <div>
+                                                <span className="font-black text-slate-800 tracking-tight">Weekly Fire detection Alarm System Testing Activated</span>
+                                                <p className="text-sm text-slate-500 font-medium mt-1">Tick if the system was tested in your department.</p>
+                                            </div>
+                                        </label>
+
+                                        <label className="flex items-start gap-4 cursor-pointer p-5 border border-slate-200 bg-slate-50/50 rounded-2xl hover:bg-slate-50 hover:border-red-200 transition-all shadow-sm">
+                                            <div className="flex items-center h-5 mt-1">
+                                                <input type="checkbox" name="sounderIssue" checked={formData.sounderIssue} onChange={handleInputChange} className="w-6 h-6 text-red-600 border-gray-300 rounded-md focus:ring-red-500" />
+                                            </div>
+                                            <div>
+                                                <span className="font-black text-slate-800 tracking-tight">Sounder Issue Reported</span>
+                                                <p className="text-sm text-slate-500 font-medium mt-1">Tick if sounders did not activate, were too low, or too loud. (Must report on Tririga system).</p>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {}
+                            <div className="bg-gradient-to-br from-[#ffffff] to-[#f8fafc] rounded-[2rem] shadow-2xl border border-slate-200 p-8 sm:p-10 relative overflow-hidden">
+                                <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#004d42] via-[#00bfa5] to-[#00917a]"></div>
+                                
+                                <h3 className="text-2xl font-black mb-8 flex items-center gap-3 text-slate-800 tracking-tight">
+                                    <div className="bg-emerald-100 p-2 rounded-xl text-[#006858]">
+                                        <Icon name="save" size={24} />
+                                    </div>
+                                    Sign Off & Submission
+                                </h3>
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+                                    <div>
+                                        <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Inspector Name</label>
+                                        <input type="text" name="inspectorName" value={formData.inspectorName} onChange={handleInputChange} className="w-full rounded-xl bg-white border-slate-300 text-slate-800 p-4 border focus:ring-4 focus:ring-[#00bfa5]/20 focus:border-[#006858] shadow-sm font-medium" required />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Ward / Department Manager</label>
+                                        <input type="text" name="wardManager" value={formData.wardManager} onChange={handleInputChange} className="w-full rounded-xl bg-white border-slate-300 text-slate-800 p-4 border focus:ring-4 focus:ring-[#00bfa5]/20 focus:border-[#006858] shadow-sm font-medium" required />
+                                    </div>
+                                </div>
+
+                                <div className="mb-10 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex justify-between items-end">
+                                        <span>Inspector Signature</span>
+                                        <button type="button" onClick={clearSignature} className="text-[#006858] hover:text-[#004d42] flex items-center gap-1.5 transition-colors bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100">
+                                            <Icon name="eraser" size={14} /> Clear Signature
+                                        </button>
+                                    </label>
+                                    <div className="bg-white rounded-xl p-2 touch-none shadow-sm border border-slate-300">
+                                        <canvas
+                                            ref={canvasRef}
+                                            onMouseDown={startDrawing}
+                                            onMouseMove={draw}
+                                            onMouseUp={stopDrawing}
+                                            onMouseOut={stopDrawing}
+                                            onTouchStart={startDrawing}
+                                            onTouchMove={draw}
+                                            onTouchEnd={stopDrawing}
+                                            className="w-full h-48 rounded bg-transparent cursor-crosshair"
+                                        />
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-3 font-medium flex items-center justify-center gap-2">
+                                        <Icon name="info" size={14} /> Please sign inside the box using your mouse or finger.
+                                    </p>
+                                </div>
+
+                                {submitError && (
+                                    <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-red-700 animate-fade-in">
+                                        <Icon name="x-circle" size={20} className="shrink-0 mt-0.5" />
+                                        <p className="font-medium text-sm">{submitError}</p>
+                                    </div>
+                                )}
+
+                                <button 
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    className={`w-full flex items-center justify-center gap-3 bg-gradient-to-r from-[#006858] to-[#00917a] hover:from-[#004d42] hover:to-[#006858] text-white font-black uppercase tracking-widest text-sm py-5 px-8 rounded-xl transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 ${isSubmitting ? 'opacity-70 cursor-not-allowed scale-95' : ''}`}
+                                >
+                                    <Icon name="send" size={20} />
+                                    {isSubmitting ? 'Transmitting Securely...' : 'Submit Daily Register'}
+                                </button>
+                            </div>
+                        </form>
+                        
+                        {}
+                        <footer className="mt-16 text-center border-t border-slate-300/50 pt-8">
+                            <div className="inline-flex items-center gap-2 mb-3">
+                                <div className="w-6 h-6 bg-gradient-to-br from-[#006858] to-[#004d42] rounded flex items-center justify-center shadow-md">
+                                    <img src="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico" className="w-3.5 h-3.5 brightness-0 invert" alt=""/>
+                                </div>
+                                <span className="font-black text-slate-700 text-sm tracking-tight">HSE Capital & Estates</span>
+                            </div>
+                            <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">
+                                Digital Solutions Developed by Dave Maher
+                            </p>
+                            <p className="text-[9px] text-emerald-600/80 uppercase tracking-[0.2em] font-bold mt-1.5">
+                                HSE Estates Infrastructure Intelligence
+                            </p>
+                        </footer>
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
