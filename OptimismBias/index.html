@@ -5,25 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HSE Optimism Bias Calculator</title>
   
-  <!-- Favicons -->
   <link rel="icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico">
   <link rel="mask-icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.svg" color="#006858">
 
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    if (!window.tailwind) {
+      var link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = '/css/vendor/tailwind.min.css'; /* Path to your local fallback stylesheet */
+      document.head.appendChild(link);
+    }
+  </script>
   
-  <!-- Chart.js for S-Curve -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>window.Chart || document.write('<script src="/js/vendor/chart.umd.min.js"><\/script>')</script>
   
-  <!-- React & ReactDOM -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script>window.React || document.write('<script src="/js/vendor/react.production.min.js"><\/script>')</script>
+
+  <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script>window.ReactDOM || document.write('<script src="/js/vendor/react-dom.production.min.js"><\/script>')</script>
   
-  <!-- Babel for JSX -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.24.0/babel.min.js"></script>
+  <script>window.Babel || document.write('<script src="/js/vendor/babel.min.js"><\/script>')</script>
 
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      -webkit-print-color-adjust: exact !important; 
+      print-color-adjust: exact !important; 
+    }
     
     /* Premium Slider Styling */
     input[type=range]::-webkit-slider-thumb {
@@ -41,6 +53,7 @@
       background: #e2e8f0; border-radius: 3px;
     }
 
+    /* Print Optimization Rules */
     @media print {
       @page { size: A4 portrait; margin: 1cm; }
       body { background-color: #f8fafc !important; }
