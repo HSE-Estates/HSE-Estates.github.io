@@ -7,16 +7,27 @@
     
     <link rel="icon" href="https://assets.hse.ie/static/hse-frontend/assets/favicons/favicon.ico">
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        if (!window.tailwind) {
+            var link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = '/css/vendor/tailwind.min.css'; /* Your local fallback file path */
+            document.head.appendChild(link);
+        }
+    </script>
     
-    <!-- React & Babel -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+    <script>window.React || document.write('<script src="/js/vendor/react.production.min.js"><\/script>')</script>
+
+    <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+    <script>window.ReactDOM || document.write('<script src="/js/vendor/react-dom.production.min.js"><\/script>')</script>
     
-    <!-- Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.24.0/babel.min.js"></script>
+    <script>window.Babel || document.write('<script src="/js/vendor/babel.min.js"><\/script>')</script>
+    
+    <script src="https://unpkg.com/lucide@0.450.0/dist/umd/lucide.min.js"></script>
+    <script>window.lucide || document.write('<script src="/js/vendor/lucide.min.js"><\/script>')</script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
@@ -43,10 +54,7 @@
         .hse-gradient::before {
             content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            top: 0; left: 0; right: 0; bottom: 0;
             background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
             opacity: 0.4;
         }
@@ -66,10 +74,7 @@
         .app-card::before {
             content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
+            top: 0; left: 0; right: 0; height: 3px;
             background: linear-gradient(90deg, var(--hse-primary), var(--hse-secondary));
             opacity: 0;
             transition: opacity 0.3s ease;
