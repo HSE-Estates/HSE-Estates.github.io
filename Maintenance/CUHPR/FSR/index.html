@@ -10,13 +10,13 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- React & Babel -->
+    <!-- React & Babel (Pinned to stable versions to prevent errors) -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
     
     <!-- Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@0.292.0"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
@@ -80,31 +80,30 @@
 
         const Icon = ({ name, size = 18, className = "" }) => {
             const iconRef = useRef(null);
+            
             useEffect(() => {
                 if (window.lucide && iconRef.current) {
+                    // Create a placeholder <i> tag for Lucide to target inside our span
+                    iconRef.current.innerHTML = `<i data-lucide="${name}"></i>`;
+                    
+                    // Tell Lucide to replace the <i> tag with the SVG inside this specific span
                     window.lucide.createIcons({
-                        icons: { [name]: window.lucide.icons[name] },
-                        nameAttr: 'data-lucide',
+                        root: iconRef.current,
                         attrs: {
                             class: className,
                             width: size,
                             height: size,
                             stroke: "currentColor",
-                            "stroke-width": 2,
+                            "stroke-width": "2",
                             "stroke-linecap": "round",
                             "stroke-linejoin": "round"
                         }
                     });
-                    
-                    const iconNode = window.lucide.icons[name];
-                    if (iconNode) {
-                        const svgString = window.lucide.renderIcon(iconNode, { width: size, height: size, class: className });
-                        iconRef.current.innerHTML = svgString;
-                    }
                 }
             }, [name, size, className]);
 
-            return <span ref={iconRef} className={className} />;
+            // React renders the wrapper span, Lucide manages the SVG inside it
+            return <span ref={iconRef} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} />;
         };
 
         const CHECKLIST_SECTIONS = [
@@ -116,16 +115,14 @@
                 iconBg: "bg-red-50",
                 items: [
                     "1. ANY fire doors held open by automatic release mechanisms must be released daily.",
-                    "2. Check previous day log to ensure any damage/ faults rectified.",
-                    "3. Any new damage observed to be reported on Tririga.",
-                    "4. Ensure no doors are held open with wedges / props.",
-                    "5. Note door numbers via inventory."
+                    "2. Any new damage observed to be reported on Tririga.",
+                    "3. Ensure no doors are held open with wedges / props."
                 ]
             },
             {
                 id: 'storage',
                 title: 'Storage & Housekeeping',
-                icon: "file-text",
+                icon: "package",
                 iconColor: "text-[#006858]",
                 iconBg: "bg-emerald-50",
                 items: [
@@ -135,48 +132,40 @@
                     "4. Plant access routes unobstructed?",
                     "5. Contractor materials removed after works?",
                     "6. Flammable liquids stored properly?",
-                    "7. General condition satisfactory?"
+                    "7. General condition satisfactory?",
+                    "8. Any evidence of water, fuel, oil or hydraulic leaks?",
+                    "9. Any temporary electrical wiring, extension leads or chargers in use?"
                 ]
             },
             {
                 id: 'extinguishers',
                 title: 'Portable Fire Extinguishers',
-                icon: "alert-triangle",
+                icon: "flame",
                 iconColor: "text-orange-500",
                 iconBg: "bg-orange-50",
                 items: [
-                    "1. Are Extinguishers in the correct location and in date?",
-                    "2. Are any Extinguishers missing?",
-                    "3. Is the seal intact?",
-                    "4. Extinguishers free from dust and dirt?",
-                    "5. Are all fire extinguishers unobstructed and ready for use?",
-                    "6. Is the pressure needle in green section?",
-                    "7. Is there any sign of wear and tear or physical damage?"
+                    "1. Are fire extinguishers present?",
+                    "2. Are fire extinguishers unobstructed and available for use?",
+                    "3. Are there any obvious defects or concerns to report?"
                 ]
             },
             {
                 id: 'escapeRoutes',
                 title: 'Escape Routes',
-                icon: "activity",
+                icon: "door-open",
                 iconColor: "text-emerald-500",
                 iconBg: "bg-emerald-50",
                 items: [
                     "1. Check escape routes are not obstructed and are immediately available for use.",
-                    "2. Batteries or battery powered machines should not be charged in common corridors, stairways or landings.",
-                    "3. Are Escape routes clearly illuminated, sign posted and adequately indicated?",
-                    "4. Are the final exit doors / gates across routes easily and immediately openable?",
-                    "5. Are Curtains, drapes or hangings not placed across or along an escape route in a manner which would obstruct or impede escape?",
-                    "6. Check Mirrors are not placed across an escape route or adjacent to an exit as to not confuse the direction of escape?",
-                    "7. Check that floor coverings, rugs and mats are fixed or laid so that they do not present a trip or slip hazard during an evacuation.",
-                    "8. Check floor coverings rugs and mats are not used to prop open doors.",
-                    "9. Check Fire resisting doors are kept closed at all times unless they are fitted with hold open devices.",
-                    "10. All external areas and external walkways are kept free of obstructions as to allow unimpeded escape to a place of safety."
+                    "2. Are Escape routes clearly illuminated, sign posted and adequately indicated?",
+                    "3. Are the final exit doors / gates across routes easily and immediately openable?",
+                    "4. Check Fire resisting doors are kept closed at all times unless they are fitted with hold open devices."
                 ]
             },
             {
                 id: 'emergencyLighting',
                 title: 'Emergency Lighting (Visual Check)',
-                icon: "info",
+                icon: "lightbulb",
                 iconColor: "text-yellow-500",
                 iconBg: "bg-yellow-50",
                 items: [
@@ -197,15 +186,16 @@
             {
                 id: 'security',
                 title: 'Plantroom Security & Access',
-                icon: "check-circle",
+                icon: "lock",
                 iconColor: "text-slate-500",
                 iconBg: "bg-slate-100",
                 items: [
                     "1. Is the plant room door secure and functioning?",
                     "2. Is 'Authorised personnel only' sign visible?",
-                    "3. Evidence of unauthorised entry?",
-                    "4. Are emergency isolation points accessible?",
-                    "5. Are Elec panels and plant unobstructed?"
+                    "3. Are emergency isolation points accessible?",
+                    "4. Are Elec panels and plant unobstructed?",
+                    "5. Any signs of overheating from plant or electrical equipment?",
+                    "6. Any unusual smells detected?"
                 ]
             }
         ];
@@ -219,10 +209,7 @@
                 sections: CHECKLIST_SECTIONS.reduce((acc, section) => {
                     acc[section.id] = { status: 'Normal', tririgaLogged: false, comments: '' };
                     return acc;
-                }, {}),
-                alarmEvents: [],
-                alarmTested: false,
-                sounderIssue: false
+                }, {})
             });
 
             const [submitted, setSubmitted] = useState(false);
@@ -233,23 +220,60 @@
             const [isDrawing, setIsDrawing] = useState(false);
 
             useEffect(() => {
+                // Debounce timer for resize events
+                let resizeTimeout;
+
                 const initCanvas = () => {
                     const canvas = canvasRef.current;
                     if (!canvas) return;
                     
-                    // FIXED internal high-res buffer to prevent clearing on rotation
-                    canvas.width = 1200;
-                    canvas.height = 600;
+                    const rect = canvas.getBoundingClientRect();
+                    // Prevent initialization if the element has collapsed or is hidden
+                    if (rect.width === 0 || rect.height === 0) return;
+
+                    // 1. Take a snapshot of the current signature before resizing
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = canvas.width;
+                    tempCanvas.height = canvas.height;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    if (canvas.width > 0 && canvas.height > 0) {
+                        tempCtx.drawImage(canvas, 0, 0);
+                    }
+                    
+                    const dpr = window.devicePixelRatio || 1;
+                    
+                    // 2. Resize canvas (this forcefully clears the buffer)
+                    canvas.width = rect.width * dpr;
+                    canvas.height = rect.height * dpr;
                     
                     const ctx = canvas.getContext('2d');
+                    ctx.scale(dpr, dpr);
+                    
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
                     ctx.strokeStyle = '#004d42'; // HSE Dark Green
-                    ctx.lineWidth = 5; // Slightly thicker for high-res buffer
+                    ctx.lineWidth = 3;
+
+                    // 3. Draw the snapshot back onto the canvas
+                    if (tempCanvas.width > 0 && tempCanvas.height > 0) {
+                        ctx.save();
+                        // Reset the scale transformation strictly for drawing the old image data back
+                        ctx.setTransform(1, 0, 0, 1, 0, 0); 
+                        ctx.drawImage(tempCanvas, 0, 0);
+                        ctx.restore();
+                    }
                 };
 
                 initCanvas();
-                // Removed the resize listener so the canvas buffer is never wiped when device is rotated
+
+                // Listen to window resize/rotation with a debounce to prevent glitches
+                const handleResize = () => {
+                    clearTimeout(resizeTimeout);
+                    resizeTimeout = setTimeout(initCanvas, 100);
+                };
+
+                window.addEventListener('resize', handleResize);
+                return () => window.removeEventListener('resize', handleResize);
             }, [submitted]);
 
             const getCoordinates = (e) => {
@@ -265,18 +289,14 @@
                     clientY = e.clientY;
                 }
                 
-                // Map visual CSS size to the internal fixed buffer size (1200x600)
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-                
                 return { 
-                    x: (clientX - rect.left) * scaleX, 
-                    y: (clientY - rect.top) * scaleY 
+                    x: clientX - rect.left, 
+                    y: clientY - rect.top 
                 };
             };
 
             const startDrawing = (e) => {
-                if (e.cancelable) e.preventDefault(); // Prevent scrolling while touching
+                if (e.cancelable) e.preventDefault();
                 setIsDrawing(true);
                 const { x, y } = getCoordinates(e);
                 const ctx = canvasRef.current.getContext('2d');
@@ -286,7 +306,7 @@
 
             const draw = (e) => {
                 if (!isDrawing) return;
-                if (e.cancelable) e.preventDefault(); // Prevent scrolling while touching
+                if (e.cancelable) e.preventDefault();
                 
                 const { x, y } = getCoordinates(e);
                 const ctx = canvasRef.current.getContext('2d');
@@ -302,6 +322,7 @@
             const clearSignature = () => {
                 const canvas = canvasRef.current;
                 const ctx = canvas.getContext('2d');
+                // Use the full internal buffer width to clear
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
             };
 
@@ -322,14 +343,6 @@
                     }
                 }));
             };
-
-            const addAlarmEvent = () => setFormData(prev => ({ ...prev, alarmEvents: [...prev.alarmEvents, { date: '', area: '', description: '', action: '' }] }));
-            const updateAlarmEvent = (index, field, value) => {
-                const newEvents = [...formData.alarmEvents];
-                newEvents[index][field] = value;
-                setFormData(prev => ({ ...prev, alarmEvents: newEvents }));
-            };
-            const removeAlarmEvent = (index) => setFormData(prev => ({ ...prev, alarmEvents: formData.alarmEvents.filter((_, i) => i !== index) }));
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
@@ -358,22 +371,6 @@
                     summaryText += `\nALL CLEAR: No faults reported in any plantroom section.\n`;
                 }
 
-                let alarmText = `WEEKLY ALARM SYSTEM REPORT\n`;
-                alarmText += `-------------------------------------------------\n`;
-                alarmText += `System Testing Activated in Dept: ${formData.alarmTested ? 'YES' : 'NO'}\n`;
-                alarmText += `Sounder Issues Reported (Tririga): ${formData.sounderIssue ? 'YES' : 'NO'}\n\n`;
-                
-                if (formData.alarmEvents.length > 0) {
-                    alarmText += `LOGGED EVENTS:\n`;
-                    formData.alarmEvents.forEach((event, i) => {
-                        alarmText += `${i + 1}. Date: ${event.date} | Area: ${event.area}\n`;
-                        alarmText += `   Event: ${event.description}\n`;
-                        alarmText += `   Action: ${event.action}\n\n`;
-                    });
-                } else {
-                    alarmText += `No specific alarm events logged for this period.\n`;
-                }
-
                 const payload = new URLSearchParams();
                 payload.append('formID', '261652530107045');
                 
@@ -386,7 +383,7 @@
                 payload.append('q4_q4_textbox2', formData.inspectorName);
                 payload.append('q5_q5_textbox3', formData.wardManager);
                 payload.append('q6_q6_textarea4', summaryText);
-                payload.append('q7_q7_textarea5', alarmText);
+                payload.append('q7_q7_textarea5', 'N/A - Section Removed');
                 payload.append('q8_q8_signature6', signatureImage);
 
                 try {
@@ -544,87 +541,6 @@
                                 </div>
                             ))}
 
-                            {/* Fire Alarm System Log */}
-                            <div className="bg-white rounded-3xl shadow-lg border border-slate-200/60 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-                                <div className="bg-gradient-to-r from-red-50 to-white border-b border-red-100 p-5 sm:p-6 flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-3 bg-red-100 rounded-xl shadow-sm">
-                                            <Icon name="activity" size={24} className="text-red-600" />
-                                        </div>
-                                        <h3 className="text-xl font-black text-slate-800 tracking-tight">Fire Alarm System Log</h3>
-                                    </div>
-                                    <button 
-                                        type="button" 
-                                        onClick={addAlarmEvent}
-                                        className="text-xs bg-white border border-red-200 text-red-700 font-black uppercase tracking-widest py-2 px-4 rounded-xl shadow-sm hover:bg-red-50 hover:border-red-300 flex items-center gap-2 transition-all"
-                                    >
-                                        <Icon name="plus" size={16} /> Add Event
-                                    </button>
-                                </div>
-                                
-                                <div className="p-5 sm:p-8 space-y-6">
-                                    {formData.alarmEvents.length === 0 ? (
-                                        <div className="text-center py-10 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl">
-                                            <p className="text-slate-500 font-medium text-sm">No fire alarm events or tests to log for this week.</p>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            {formData.alarmEvents.map((event, index) => (
-                                                <div key={index} className="flex flex-col sm:flex-row gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative group">
-                                                    <button 
-                                                        type="button" 
-                                                        onClick={() => removeAlarmEvent(index)}
-                                                        className="absolute -top-3 -right-3 bg-white text-red-500 p-2 rounded-full shadow-md border border-slate-100 hover:bg-red-50 hover:text-red-600 transition-all z-10"
-                                                    >
-                                                        <Icon name="trash-2" size={16} />
-                                                    </button>
-                                                    
-                                                    <div className="w-full sm:w-1/4">
-                                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Date</label>
-                                                        <input type="date" value={event.date} onChange={(e) => updateAlarmEvent(index, 'date', e.target.value)} className="w-full rounded-xl border-slate-200 text-sm p-3 border focus:ring-4 focus:ring-red-500/20 focus:border-red-500 shadow-sm font-medium" required />
-                                                    </div>
-                                                    <div className="w-full sm:w-1/4">
-                                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Area</label>
-                                                        <input type="text" value={event.area} placeholder="e.g. Ward 2B" onChange={(e) => updateAlarmEvent(index, 'area', e.target.value)} className="w-full rounded-xl border-slate-200 text-sm p-3 border focus:ring-4 focus:ring-red-500/20 focus:border-red-500 shadow-sm font-medium" required />
-                                                    </div>
-                                                    <div className="w-full sm:w-2/4">
-                                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Event & Action</label>
-                                                        <div className="space-y-3">
-                                                            <input type="text" value={event.description} placeholder="Event Description..." onChange={(e) => updateAlarmEvent(index, 'description', e.target.value)} className="w-full rounded-xl border-slate-200 text-sm p-3 border focus:ring-4 focus:ring-red-500/20 focus:border-red-500 shadow-sm font-medium" required />
-                                                            <input type="text" value={event.action} placeholder="Action Required..." onChange={(e) => updateAlarmEvent(index, 'action', e.target.value)} className="w-full rounded-xl border-slate-200 text-sm p-3 border focus:ring-4 focus:ring-red-500/20 focus:border-red-500 shadow-sm font-medium" required />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    <div className="w-full h-px bg-slate-200 my-6"></div>
-
-                                    <div className="space-y-4">
-                                        <label className="flex items-start gap-4 cursor-pointer p-5 border border-slate-200 bg-slate-50/50 rounded-2xl hover:bg-slate-50 hover:border-emerald-200 transition-all shadow-sm">
-                                            <div className="flex items-center h-5 mt-1">
-                                                <input type="checkbox" name="alarmTested" checked={formData.alarmTested} onChange={handleInputChange} className="w-6 h-6 text-[#006858] border-gray-300 rounded-md focus:ring-[#00bfa5]" />
-                                            </div>
-                                            <div>
-                                                <span className="font-black text-slate-800 tracking-tight">Weekly Fire detection Alarm System Testing Activated</span>
-                                                <p className="text-sm text-slate-500 font-medium mt-1">Tick if the system was tested in your department.</p>
-                                            </div>
-                                        </label>
-
-                                        <label className="flex items-start gap-4 cursor-pointer p-5 border border-slate-200 bg-slate-50/50 rounded-2xl hover:bg-slate-50 hover:border-red-200 transition-all shadow-sm">
-                                            <div className="flex items-center h-5 mt-1">
-                                                <input type="checkbox" name="sounderIssue" checked={formData.sounderIssue} onChange={handleInputChange} className="w-6 h-6 text-red-600 border-gray-300 rounded-md focus:ring-red-500" />
-                                            </div>
-                                            <div>
-                                                <span className="font-black text-slate-800 tracking-tight">Sounder Issue Reported</span>
-                                                <p className="text-sm text-slate-500 font-medium mt-1">Tick if sounders did not activate, were too low, or too loud. (Must report on Tririga system).</p>
-                                            </div>
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-
                             {/* Sign Off & Submission */}
                             <div className="bg-gradient-to-br from-[#ffffff] to-[#f8fafc] rounded-[2rem] shadow-2xl border border-slate-200 p-5 sm:p-10 relative overflow-hidden">
                                 <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#004d42] via-[#00bfa5] to-[#00917a]"></div>
@@ -647,14 +563,14 @@
                                     </div>
                                 </div>
 
-                                <div className="-mx-5 sm:mx-0 mb-10 bg-slate-50 py-4 sm:p-6 sm:rounded-2xl border-y sm:border border-slate-200">
-                                    <label className="px-5 sm:px-0 block text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex justify-between items-end">
+                                <div className="-mx-2 sm:mx-0 mb-10 bg-slate-50 p-2 sm:p-6 rounded-2xl border border-slate-200">
+                                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-4 px-2 flex justify-between items-end">
                                         <span>Inspector Signature</span>
-                                        <button type="button" onClick={clearSignature} className="text-[#006858] hover:text-[#004d42] flex items-center gap-1.5 transition-colors bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 shadow-sm">
-                                            <Icon name="eraser" size={14} /> Clear Signature
+                                        <button type="button" onClick={clearSignature} className="text-[#006858] hover:text-[#004d42] flex items-center gap-1.5 transition-colors bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100">
+                                            <Icon name="eraser" size={14} /> Clear
                                         </button>
                                     </label>
-                                    <div className="bg-white sm:rounded-xl p-0 sm:p-2 touch-none shadow-inner border-y sm:border border-slate-300">
+                                    <div className="bg-white rounded-xl p-0 sm:p-2 touch-none shadow-sm border border-slate-300 overflow-hidden">
                                         <canvas
                                             ref={canvasRef}
                                             onMouseDown={startDrawing}
@@ -664,11 +580,11 @@
                                             onTouchStart={startDrawing}
                                             onTouchMove={draw}
                                             onTouchEnd={stopDrawing}
-                                            className="w-full h-64 bg-transparent cursor-crosshair touch-none"
+                                            className="w-full h-64 min-h-[256px] rounded bg-transparent cursor-crosshair touch-none"
                                             style={{ touchAction: 'none' }}
                                         />
                                     </div>
-                                    <p className="px-5 sm:px-0 text-xs text-slate-400 mt-3 font-medium flex items-center justify-center gap-2">
+                                    <p className="text-xs text-slate-400 mt-3 font-medium flex items-center justify-center gap-2">
                                         <Icon name="info" size={14} /> Please sign inside the box using your mouse or finger.
                                     </p>
                                 </div>
