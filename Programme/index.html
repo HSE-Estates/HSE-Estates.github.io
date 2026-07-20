@@ -54,17 +54,28 @@
 
     .kpi-card { border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; }
 
+    /* Print pages are built by the app so wide programmes tile correctly */
+    #print-root { display: none; }
+    .join-mark {
+        position: absolute; top: -13px; left: 0; font-size: 8px; font-weight: 700;
+        color: #94a3b8; font-family: Inter, sans-serif;
+    }
+
     @media print {
         .no-print { display: none !important; }
-        body { background: white; padding: 0; font-size: 10px; width: fit-content; overflow-x: visible; }
-        .max-w-7xl { max-width: none !important; width: fit-content !important; box-shadow: none !important; border: none; margin: 0; padding: 0; height: auto !important; }
-        .gantt-chart-container { overflow: visible !important; display: block !important; height: auto !important; width: max-content !important; min-width: 100%; }
-        #gantt-chart { width: max-content !important; }
-        header { background: #006858 !important; -webkit-print-color-adjust: exact; padding: 10px !important; width: 100%; }
-        .gantt-bar-wrapper { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-shadow: none !important; }
-        .task-row { page-break-inside: avoid; break-inside: avoid; }
-        .group-header-row { page-break-after: avoid; break-after: avoid; }
-        .sticky { position: static !important; }
+        html, body { background: #fff !important; padding: 0 !important; margin: 0 !important; height: auto !important; }
+        body > div.max-w-7xl, #toast-wrap, #task-modal, #print-panel { display: none !important; }
+        #print-root { display: block !important; }
+        .print-page {
+            page-break-after: always; break-after: page;
+            page-break-inside: avoid; break-inside: avoid;
+            overflow: hidden; position: relative;
+        }
+        .print-page:last-child { page-break-after: auto; break-after: auto; }
+        #print-root * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
         ::-webkit-scrollbar { display: none; }
     }
 </style>
@@ -144,7 +155,7 @@
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
             </button>
 
-            <button id="print-btn" title="Print" class="toolbar-btn p-2 bg-white/10 hover:bg-white/20 rounded-xl border border-white/10" onclick="window.print()">
+            <button id="print-btn" title="Print setup — tile across sheets or fit to one" class="toolbar-btn p-2 bg-white/10 hover:bg-white/20 rounded-xl border border-white/10">
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
             </button>
 
@@ -707,6 +718,29 @@ document.addEventListener('DOMContentLoaded', () => {
         return { left, width, eff: e };
     };
 
+    // Bounds from ALL tasks so every view and every printout shows the same schedule
+    const computeBounds = () => {
+        let minT = null, maxT = null;
+        state.tasks.forEach(t => {
+            const e = effMap[t.id];
+            const s = parseDate(e.start), en = parseDate(e.end);
+            if (!minT || s < minT) minT = s;
+            if (!maxT || en > maxT) maxT = en;
+        });
+        if (!minT) { minT = todayUTC(); maxT = addDays(minT, 30); }
+        const v = VIEWS[state.viewMode];
+        minT = addDays(minT, -v.padBefore);
+        maxT = addDays(maxT, v.padAfter);
+        // Align grid origin to the view's natural unit start
+        if (state.viewMode === 'week') { const dow = minT.getUTCDay() || 7; minT = addDays(minT, -(dow - 1)); }
+        else if (state.viewMode === 'month') minT = new Date(Date.UTC(minT.getUTCFullYear(), minT.getUTCMonth(), 1));
+        else if (state.viewMode === 'quarter') minT = new Date(Date.UTC(minT.getUTCFullYear(), Math.floor(minT.getUTCMonth() / 3) * 3, 1));
+        else if (state.viewMode === 'year') minT = new Date(Date.UTC(minT.getUTCFullYear(), 0, 1));
+        state.minDate = minT;
+        gridWidth = (daysBetween(minT, maxT) + 1) * ppd();
+        return { minT, maxT, cols: buildColumns(minT, maxT) };
+    };
+
     const render = () => {
         computeCPM();
         const rows = buildRows();
@@ -732,27 +766,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Bounds from ALL tasks so every view shows the same schedule
-        let minT = null, maxT = null;
-        state.tasks.forEach(t => {
-            const e = effMap[t.id];
-            const s = parseDate(e.start), en = parseDate(e.end);
-            if (!minT || s < minT) minT = s;
-            if (!maxT || en > maxT) maxT = en;
-        });
-        const v = VIEWS[state.viewMode];
-        minT = addDays(minT, -v.padBefore);
-        maxT = addDays(maxT, v.padAfter);
-        // Align grid origin to the view's natural unit start
-        if (state.viewMode === 'week') { const dow = minT.getUTCDay() || 7; minT = addDays(minT, -(dow - 1)); }
-        else if (state.viewMode === 'month') minT = new Date(Date.UTC(minT.getUTCFullYear(), minT.getUTCMonth(), 1));
-        else if (state.viewMode === 'quarter') minT = new Date(Date.UTC(minT.getUTCFullYear(), Math.floor(minT.getUTCMonth() / 3) * 3, 1));
-        else if (state.viewMode === 'year') minT = new Date(Date.UTC(minT.getUTCFullYear(), 0, 1));
-        state.minDate = minT;
-
-        const totalDays = daysBetween(minT, maxT) + 1;
-        gridWidth = totalDays * ppd();
-        const cols = buildColumns(minT, maxT);
+        const { minT, maxT, cols } = computeBounds();
         const hasTop = cols.top.length > 0;
 
         const sortIcon = (m) => state.sortBy === m ? ' ▼' : '';
@@ -808,7 +822,7 @@ document.addEventListener('DOMContentLoaded', () => {
         rows.forEach(r => {
             if (r.type === 'group') {
                 html += `<div class="group-header-row flex" style="height:${GROUP_H}px;width:${LW + gridWidth}px">
-                    <div class="sticky left-0 flex items-center px-3 text-[10px] font-bold uppercase text-slate-500 tracking-wider" style="width:${LW}px;z-index:25">&#128193; ${esc(r.label)}</div>
+                    <div class="sticky left-0 flex items-center px-3 text-[10px] font-bold uppercase text-slate-600 tracking-wider" style="width:${LW}px;z-index:35;background:#e8edf2;border-right:1px solid #cbd5e1;box-shadow:2px 0 4px -2px rgba(15,23,42,.18)">&#128193; ${esc(r.label)}</div>
                 </div>`;
                 y += GROUP_H;
                 return;
@@ -827,7 +841,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 : (kids ? '' : `<span class="mr-1 w-3 shrink-0"></span>`);
 
             html += `<div class="task-row flex border-b border-slate-100 hover:bg-emerald-50/30 transition-colors relative" style="height:${ROW_H}px;width:${LW + gridWidth}px">
-                <div class="flex-none flex items-center border-r border-slate-200 bg-white sticky left-0 group cursor-pointer" style="width:${LW}px;z-index:30" onclick="app.editTask(${t.id})">
+                <div class="flex-none flex items-center border-r border-slate-200 bg-white sticky left-0 group cursor-pointer" style="width:${LW}px;z-index:30;box-shadow:2px 0 4px -2px rgba(15,23,42,.18)" onclick="app.editTask(${t.id})">
                     <div class="flex-1 flex items-center text-xs ${kids ? 'font-bold text-slate-800' : 'font-semibold text-slate-700'} truncate group-hover:text-emerald-700" style="padding-left:${indent}px" title="${esc(t.name)}">
                         ${chev}<span class="truncate">${t.milestone ? '&#9670; ' : ''}${esc(t.name)}</span>
                     </div>
@@ -888,31 +902,34 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Map a hidden task (collapsed subtask) to its nearest visible ancestor row
-    const visibleAnchor = (id) => {
+    const visibleAnchor = (id, yMap) => {
+        const map = yMap || rowY;
         let cur = id, guard = 0;
         while (cur !== null && guard++ < 500) {
-            if (rowY[cur] !== undefined) return cur;
+            if (map[cur] !== undefined) return cur;
             const t = byId(cur);
             cur = t ? t.parentId : null;
         }
         return null;
     };
 
-    const buildArrowSVG = (rows, totalH, LW) => {
+    const buildArrowSVG = (rows, totalH, LW, yMap, svgW) => {
+        const map = yMap || rowY;
+        const width = svgW === undefined ? LW + gridWidth : svgW;
         let paths = '';
         state.tasks.forEach(task => {
             if (!task.dependencies.length) return;
-            const toId = visibleAnchor(task.id);
+            const toId = visibleAnchor(task.id, map);
             if (toId === null) return;
             task.dependencies.forEach(pid => {
-                const fromId = visibleAnchor(pid);
+                const fromId = visibleAnchor(pid, map);
                 if (fromId === null || fromId === toId) return;
                 const from = byId(fromId), to = byId(toId);
                 const gF = barGeom(from), gT = barGeom(to);
                 const x1 = LW + gF.left + (from.milestone ? Math.min(ppd(), 42) / 2 + 8 : gF.width);
-                const y1 = rowY[fromId] + ROW_H / 2;
+                const y1 = map[fromId] + ROW_H / 2;
                 const x2 = LW + gT.left + (to.milestone ? Math.min(ppd(), 42) / 2 - 9 : 0);
-                const y2 = rowY[toId] + ROW_H / 2;
+                const y2 = map[toId] + ROW_H / 2;
                 const crit = state.showCriticalPath && from.isCritical && to.isCritical;
                 let d;
                 if (x2 >= x1 + 16) {
@@ -926,7 +943,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 paths += `<path d="${d}" class="dependency-arrow ${crit ? 'critical' : ''}" marker-end="url(#arw-${crit ? 'c' : 'n'})"></path>`;
             });
         });
-        return `<svg width="${LW + gridWidth}" height="${totalH}" style="position:absolute;top:0;left:0;pointer-events:none;z-index:10" xmlns="http://www.w3.org/2000/svg">
+        return `<svg width="${width}" height="${totalH}" style="position:absolute;top:0;left:0;pointer-events:none;z-index:10" xmlns="http://www.w3.org/2000/svg">
             <defs>
                 <marker id="arw-n" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"></path></marker>
                 <marker id="arw-c" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444"></path></marker>
@@ -1505,6 +1522,307 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /* =========================================================
+       11b. PRINT ENGINE — tiles a wide programme across pages
+            that line up when taped, or squeezes it onto one.
+       ========================================================= */
+    const PAPER = { A4: [210, 297], A3: [297, 420], A2: [420, 594], A1: [594, 841] };
+    const MMPX = 96 / 25.4;
+    const printOpts = { paper: 'A3', orient: 'landscape', mode: 'tile', margin: 8, overlap: 24, listW: 230 };
+
+    const printRowLayout = (rows) => {
+        const y = {}; const bands = []; let h = 0;
+        rows.forEach(r => {
+            if (r.type === 'group') { bands.push({ y: h, label: r.label }); h += GROUP_H; }
+            else { y[r.task.id] = h; h += ROW_H; }
+        });
+        return { y, bands, totalH: h };
+    };
+
+    // Timeline canvas at full width — each page shows a window onto this.
+    const buildPrintTimeline = (rows, cols, lay, minT, maxT) => {
+        let h = `<div style="position:absolute;inset:0;display:flex">`;
+        cols.bottom.forEach(c => {
+            h += `<div style="flex:none;width:${c.w}px;height:100%;border-right:1px solid #dbe2ea;${c.weekend ? 'background:#f1f5f9;' : ''}"></div>`;
+        });
+        h += `</div>`;
+
+        lay.bands.forEach(b => {
+            h += `<div style="position:absolute;left:0;top:${b.y}px;width:${gridWidth}px;height:${GROUP_H}px;background:#e8edf2;border-bottom:1px solid #b9c4d0;border-top:1px solid #b9c4d0"></div>`;
+        });
+        rows.forEach(r => {
+            if (r.type !== 'task') return;
+            const y = lay.y[r.task.id];
+            h += `<div style="position:absolute;left:0;top:${y + ROW_H}px;width:${gridWidth}px;height:0;border-bottom:1px solid #eef2f6"></div>`;
+        });
+
+        const tNow = todayUTC();
+        if (tNow >= minT && tNow <= maxT) {
+            const tx = (daysBetween(minT, tNow) + 0.5) * ppd();
+            h += `<div style="position:absolute;top:0;height:${lay.totalH}px;left:${tx}px;width:1px;background:#ef4444"></div>`;
+        }
+
+        rows.forEach(r => {
+            if (r.type !== 'task') return;
+            const t = r.task, y = lay.y[t.id], g = barGeom(t);
+            const crit = state.showCriticalPath && t.isCritical ? 'outline:2px solid #ef4444;outline-offset:1px;' : '';
+            if (t.milestone) {
+                const cx = g.left + Math.min(ppd(), 42) / 2;
+                h += `<div style="position:absolute;left:${cx - 6}px;top:${y + ROW_H / 2 - 6}px;width:12px;height:12px;transform:rotate(45deg);background:${t.color};border:1px solid #fff;${crit}"></div>`;
+            } else if (!isLeaf(t)) {
+                h += `<div style="position:absolute;left:${g.left}px;top:${y + ROW_H / 2 - 4}px;width:${g.width}px;height:8px;background:#334155;${crit}">
+                    <div style="height:100%;width:${g.eff.progress}%;background:#6ee7b7"></div></div>`;
+            } else {
+                h += `<div style="position:absolute;left:${g.left}px;top:${y + ROW_H / 2 - 9}px;width:${g.width}px;height:18px;background:${t.color};border-radius:3px;overflow:hidden;${crit}">
+                    <div style="height:100%;width:${t.progress}%;background:rgba(0,0,0,.18)"></div>
+                    ${g.width > 70 ? `<span style="position:absolute;inset:0;display:flex;align-items:center;padding:0 5px;font-size:9px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden">${esc(t.name)} · ${t.progress}%</span>` : ''}
+                </div>`;
+            }
+        });
+
+        h += buildArrowSVG(rows, lay.totalH, 0, lay.y, gridWidth);
+        return h;
+    };
+
+    const buildPrintList = (rows, lay, PLW) => {
+        let h = '';
+        rows.forEach(r => {
+            if (r.type === 'group') {
+                h += `<div style="height:${GROUP_H}px;display:flex;align-items:center;padding:0 8px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#475569;background:#e8edf2;border-bottom:1px solid #b9c4d0;border-top:1px solid #b9c4d0">${esc(r.label)}</div>`;
+                return;
+            }
+            const t = r.task, g = barGeom(t);
+            const indent = 6 + r.depth * 12;
+            const bold = hasChildren(t.id) ? '700' : '500';
+            h += `<div style="height:${ROW_H}px;display:flex;align-items:center;border-bottom:1px solid #eef2f6;font-size:9px">
+                <div style="flex:1;min-width:0;padding-left:${indent}px;padding-right:4px;font-weight:${bold};color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.milestone ? '&#9670; ' : ''}${esc(t.name)}</div>
+                <div style="width:56px;flex:none;padding:0 3px;color:#64748b;border-left:1px solid #eef2f6;white-space:nowrap">${displayDate(g.eff.start).replace(/ \d{4}$/, '')}</div>
+                <div style="width:56px;flex:none;padding:0 3px;color:#64748b;border-left:1px solid #eef2f6;white-space:nowrap">${displayDate(g.eff.end).replace(/ \d{4}$/, '')}</div>
+                <div style="width:30px;flex:none;text-align:center;color:#94a3b8;border-left:1px solid #eef2f6">${t.milestone ? '—' : g.eff.dur + 'd'}</div>
+            </div>`;
+        });
+        return h;
+    };
+
+    const buildPrintHeaderStrip = (cols) => {
+        const hasTop = cols.top.length > 0;
+        let h = '';
+        if (hasTop) {
+            h += `<div style="display:flex;height:16px;border-bottom:1px solid #e2e8f0;width:${gridWidth}px">`;
+            cols.top.forEach(c => {
+                h += `<div style="flex:none;width:${c.w}px;overflow:hidden;padding-left:4px;font-size:9px;font-weight:700;color:#475569;border-right:1px solid #cbd5e1;white-space:nowrap">${esc(c.label)}</div>`;
+            });
+            h += `</div>`;
+        }
+        h += `<div style="display:flex;height:${hasTop ? 20 : 30}px;width:${gridWidth}px">`;
+        cols.bottom.forEach(c => {
+            h += `<div style="flex:none;width:${c.w}px;display:flex;flex-direction:column;justify-content:center;align-items:center;overflow:hidden;border-right:1px solid ${c.weekend ? '#cbd5e1' : '#e2e8f0'};${c.weekend ? 'background:#f1f5f9;' : ''}">
+                ${c.sub ? `<span style="font-size:6px;color:#94a3b8;line-height:1">${c.sub}</span>` : ''}
+                <span style="font-size:8px;font-weight:700;color:#475569;line-height:1.2;white-space:nowrap">${esc(c.label)}</span>
+            </div>`;
+        });
+        h += `</div>`;
+        return h;
+    };
+
+    const dateAtX = (x, minT) => fmtDate(addDays(minT, Math.max(0, Math.round(x / ppd()))));
+
+    const buildPrintDoc = () => {
+        computeCPM();
+        const rows = buildRows();
+        const { minT, maxT, cols } = computeBounds();
+        if (!rows.some(r => r.type === 'task')) { toast('There is nothing to print.', true); return false; }
+
+        const lay = printRowLayout(rows);
+        const [pw, ph] = PAPER[printOpts.paper];
+        const landscape = printOpts.orient === 'landscape';
+        const pageWmm = (landscape ? ph : pw) - printOpts.margin * 2;
+        const pageHmm = (landscape ? pw : ph) - printOpts.margin * 2;
+        const usableW = Math.floor(pageWmm * MMPX);
+        const PLW = Math.min(printOpts.listW, Math.floor(usableW * 0.45));
+        const headerH = cols.top.length ? 36 : 30;
+
+        const timelineHTML = buildPrintTimeline(rows, cols, lay, minT, maxT);
+        const listHTML = buildPrintList(rows, lay, PLW);
+        const stripHTML = buildPrintHeaderStrip(cols);
+        const title = esc(document.getElementById('project-title').value || 'Project Timeline');
+        const viewLabel = { day: 'Days', week: 'Weeks', month: 'Months', quarter: 'Quarters', year: 'Years' }[state.viewMode];
+
+        const pageBlock = (inner) => `<div class="print-page" style="width:${usableW}px">${inner}</div>`;
+        const meta = (pageTxt, rangeTxt) => `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;font-family:Inter,sans-serif">
+            <div><span style="font-size:13px;font-weight:800;color:#006858">${title}</span>
+            <span style="font-size:9px;color:#64748b;margin-left:8px">${viewLabel} view · printed ${new Date().toLocaleDateString('en-IE')}</span></div>
+            <div style="font-size:9px;font-weight:700;color:#475569">${pageTxt}${rangeTxt ? ' · ' + rangeTxt : ''}</div>
+        </div>`;
+
+        let doc = '';
+
+        if (printOpts.mode === 'fit') {
+            const fullW = PLW + gridWidth;
+            const scale = Math.min(1, usableW / fullW);
+            const scaledH = (headerH + lay.totalH) * scale;
+            doc = pageBlock(
+                meta('Single sheet · scaled to ' + Math.round(scale * 100) + '%', displayDate(fmtDate(minT)) + ' → ' + displayDate(fmtDate(maxT))) +
+                `<div style="width:${usableW}px;height:${scaledH}px;overflow:hidden">
+                    <div style="width:${fullW}px;transform:scale(${scale});transform-origin:top left">
+                        <div style="display:flex;border:1px solid #94a3b8">
+                            <div style="width:${PLW}px;flex:none;border-right:1px solid #94a3b8">
+                                <div style="height:${headerH}px;background:#f8fafc;border-bottom:1px solid #94a3b8"></div>
+                                ${listHTML}
+                            </div>
+                            <div style="width:${gridWidth}px;flex:none">
+                                <div style="border-bottom:1px solid #94a3b8;background:#f8fafc">${stripHTML}</div>
+                                <div style="position:relative;height:${lay.totalH}px;width:${gridWidth}px">${timelineHTML}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`
+            );
+        } else {
+            const sliceW = usableW - PLW;
+            const step = Math.max(60, sliceW - printOpts.overlap);
+            const pages = Math.max(1, Math.ceil((gridWidth - printOpts.overlap) / step));
+            for (let p = 0; p < pages; p++) {
+                const offset = Math.min(p * step, Math.max(0, gridWidth - sliceW));
+                const from = displayDate(dateAtX(offset, minT));
+                const to = displayDate(dateAtX(Math.min(offset + sliceW, gridWidth) - 1, minT));
+                const joinNote = p > 0 ? `<div class="join-mark">◀ overlaps sheet ${p}</div>` : '';
+                doc += pageBlock(
+                    meta(`Sheet ${p + 1} of ${pages}`, from + ' → ' + to) +
+                    `<div style="display:flex;border:1px solid #94a3b8;position:relative">
+                        ${joinNote}
+                        <div style="width:${PLW}px;flex:none;border-right:2px solid #475569">
+                            <div style="height:${headerH}px;background:#f8fafc;border-bottom:1px solid #94a3b8;display:flex;align-items:flex-end;padding:0 8px 3px">
+                                <span style="flex:1;font-size:8px;font-weight:700;text-transform:uppercase;color:#64748b">Task</span>
+                                <span style="width:56px;font-size:8px;font-weight:700;text-transform:uppercase;color:#64748b">Start</span>
+                                <span style="width:56px;font-size:8px;font-weight:700;text-transform:uppercase;color:#64748b">Finish</span>
+                                <span style="width:30px;font-size:8px;font-weight:700;text-transform:uppercase;color:#64748b;text-align:center">Dur</span>
+                            </div>
+                            ${listHTML}
+                        </div>
+                        <div style="width:${sliceW}px;flex:none;overflow:hidden">
+                            <div style="width:${gridWidth}px;margin-left:-${offset}px;border-bottom:1px solid #94a3b8;background:#f8fafc">${stripHTML}</div>
+                            <div style="width:${gridWidth}px;margin-left:-${offset}px;position:relative;height:${lay.totalH}px">${timelineHTML}</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:4px;font-size:8px;color:#94a3b8;font-family:Inter,sans-serif">Sheet ${p + 1} of ${pages} · ${printOpts.paper} ${printOpts.orient} · trim at the outer line and overlap ${printOpts.overlap}px with the next sheet</div>`
+                );
+            }
+        }
+
+        let root = document.getElementById('print-root');
+        if (!root) { root = document.createElement('div'); root.id = 'print-root'; document.body.appendChild(root); }
+        root.innerHTML = doc;
+
+        let rule = document.getElementById('page-rule');
+        if (!rule) { rule = document.createElement('style'); rule.id = 'page-rule'; document.head.appendChild(rule); }
+        rule.innerHTML = `@page { size: ${printOpts.paper} ${printOpts.orient}; margin: ${printOpts.margin}mm; }`;
+        return true;
+    };
+
+    const openPrintPanel = () => {
+        let panel = document.getElementById('print-panel');
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.id = 'print-panel';
+            panel.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-[70] p-4 no-print';
+            panel.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100">
+                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-slate-800">Print Setup</h2>
+                        <button id="pp-close" class="text-slate-400 hover:text-red-500">
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Layout</label>
+                            <select id="pp-mode" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+                                <option value="tile">Tile across sheets (full size, tape together)</option>
+                                <option value="fit">Squeeze onto one sheet</option>
+                            </select>
+                            <p id="pp-hint" class="text-[11px] text-slate-400 mt-1.5"></p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Paper</label>
+                                <select id="pp-paper" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+                                    <option>A4</option><option>A3</option><option>A2</option><option>A1</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Orientation</label>
+                                <select id="pp-orient" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+                                    <option value="landscape">Landscape</option><option value="portrait">Portrait</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="pp-estimate" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-slate-600"></div>
+                        <p class="text-[11px] text-slate-400 leading-relaxed">In the browser's print dialog, set the same paper size and turn on background graphics. Choose "Scale: Default" — the sheets are already sized here.</p>
+                        <div class="flex justify-end gap-3 pt-1">
+                            <button id="pp-cancel" class="px-4 py-2 bg-slate-100 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-200">Cancel</button>
+                            <button id="pp-go" class="px-5 py-2 bg-[#006858] text-white text-sm font-bold rounded-lg hover:bg-emerald-700 shadow-md shadow-emerald-200">Print</button>
+                        </div>
+                    </div>
+                </div>`;
+            document.body.appendChild(panel);
+            panel.addEventListener('mousedown', (e) => { if (e.target === panel) closePrintPanel(); });
+            document.getElementById('pp-close').onclick = closePrintPanel;
+            document.getElementById('pp-cancel').onclick = closePrintPanel;
+            document.getElementById('pp-go').onclick = () => {
+                closePrintPanel();
+                if (buildPrintDoc()) setTimeout(() => window.print(), 60);
+            };
+            ['pp-mode', 'pp-paper', 'pp-orient'].forEach(id => {
+                document.getElementById(id).onchange = () => { readPrintPanel(); updatePrintEstimate(); };
+            });
+        }
+        document.getElementById('pp-mode').value = printOpts.mode;
+        document.getElementById('pp-paper').value = printOpts.paper;
+        document.getElementById('pp-orient').value = printOpts.orient;
+        updatePrintEstimate();
+        panel.classList.remove('hidden'); panel.classList.add('flex');
+    };
+    const closePrintPanel = () => {
+        const p = document.getElementById('print-panel');
+        if (p) { p.classList.add('hidden'); p.classList.remove('flex'); }
+    };
+    const readPrintPanel = () => {
+        printOpts.mode = document.getElementById('pp-mode').value;
+        printOpts.paper = document.getElementById('pp-paper').value;
+        printOpts.orient = document.getElementById('pp-orient').value;
+    };
+    const updatePrintEstimate = () => {
+        computeCPM();
+        const rows = buildRows();
+        computeBounds();
+        const [pw, ph] = PAPER[printOpts.paper];
+        const landscape = printOpts.orient === 'landscape';
+        const usableW = Math.floor(((landscape ? ph : pw) - printOpts.margin * 2) * MMPX);
+        const PLW = Math.min(printOpts.listW, Math.floor(usableW * 0.45));
+        const est = document.getElementById('pp-estimate');
+        const hint = document.getElementById('pp-hint');
+        const taskCount = rows.filter(r => r.type === 'task').length;
+        if (printOpts.mode === 'fit') {
+            const scale = Math.min(1, usableW / (PLW + gridWidth));
+            const pct = Math.round(scale * 100);
+            const bigger = ['A4', 'A3', 'A2'].indexOf(printOpts.paper);
+            const suggestion = pct < 40
+                ? (bigger !== -1
+                    ? ` <span class="text-amber-600 font-semibold">Text will be very small — try ${['A3', 'A2', 'A1'][bigger]}, a coarser timescale, or tiling instead.</span>`
+                    : ` <span class="text-amber-600 font-semibold">Text will be very small even on A1 — switch to a coarser timescale or tile across sheets.</span>`)
+                : '';
+            est.innerHTML = `<b>1 sheet</b> at <b>${pct}%</b> scale · ${taskCount} tasks.` + suggestion;
+            hint.innerText = 'The whole programme is scaled down to fit a single sheet.';
+        } else {
+            const sliceW = usableW - PLW;
+            const step = Math.max(60, sliceW - printOpts.overlap);
+            const pages = Math.max(1, Math.ceil((gridWidth - printOpts.overlap) / step));
+            est.innerHTML = `<b>${pages} sheet${pages > 1 ? 's' : ''}</b> at full size · ${taskCount} tasks · task names repeat on every sheet.`;
+            hint.innerText = 'Each sheet carries the task list, so sheets read on their own and tape together.';
+        }
+    };
+
+    /* =========================================================
        12. MODAL
        ========================================================= */
     const openModal = () => { refs.modal.classList.remove('hidden'); refs.modal.classList.add('flex'); };
@@ -1736,6 +2054,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (file) openFile(file);
         e.target.value = ''; // allow re-opening the same file
     };
+    document.getElementById('print-btn').onclick = openPrintPanel;
     document.getElementById('save-json-btn').onclick = saveProjectJSON;
     document.getElementById('download-btn').onclick = exportExcel;
     document.getElementById('download-html-btn').onclick = saveHTMLCopy;
@@ -1744,7 +2063,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !refs.modal.classList.contains('flex')) { e.preventDefault(); undo(); }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') { e.preventDefault(); openPrintPanel(); }
         if (e.key === 'Escape' && refs.modal.classList.contains('flex')) closeModal();
+        if (e.key === 'Escape') closePrintPanel();
     });
 
     let resizeTimer = null;
