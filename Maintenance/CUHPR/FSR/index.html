@@ -11,8 +11,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- React & Babel (Pinned to stable versions to prevent errors) -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
     
     <!-- Icons -->
@@ -114,9 +114,8 @@
                 iconColor: "text-red-500",
                 iconBg: "bg-red-50",
                 items: [
-                    "1. ANY fire doors held open by automatic release mechanisms must be released daily.",
-                    "2. Any new damage observed to be reported on Tririga.",
-                    "3. Ensure no doors are held open with wedges / props."
+                    "1. Any new damage observed to be reported on Tririga.",
+                    "2. Ensure no doors are held open with wedges / props."
                 ]
             },
             {
@@ -134,7 +133,7 @@
                     "6. Flammable liquids stored properly?",
                     "7. General condition satisfactory?",
                     "8. Any evidence of water, fuel, oil or hydraulic leaks?",
-                    "9. Any temporary electrical wiring, extension leads or chargers in use?"
+                    "9. Any unnecessary extension leads or equipment?"
                 ]
             },
             {
@@ -158,8 +157,7 @@
                 items: [
                     "1. Check escape routes are not obstructed and are immediately available for use.",
                     "2. Are Escape routes clearly illuminated, sign posted and adequately indicated?",
-                    "3. Are the final exit doors / gates across routes easily and immediately openable?",
-                    "4. Check Fire resisting doors are kept closed at all times unless they are fitted with hold open devices."
+                    "3. Are the final exit doors / gates across routes easily and immediately openable?"
                 ]
             },
             {
@@ -192,10 +190,8 @@
                 items: [
                     "1. Is the plant room door secure and functioning?",
                     "2. Is 'Authorised personnel only' sign visible?",
-                    "3. Are emergency isolation points accessible?",
-                    "4. Are Elec panels and plant unobstructed?",
-                    "5. Any signs of overheating from plant or electrical equipment?",
-                    "6. Any unusual smells detected?"
+                    "3. Is any necessary equipment obstructed?",
+                    "4. Any unusual smells or burning concerns?"
                 ]
             }
         ];
@@ -488,6 +484,7 @@
                     <main className="max-w-4xl mx-auto px-4 sm:px-6 -mt-10 flex-1 w-full relative z-10 pb-20">
                         <form onSubmit={handleSubmit} className="space-y-8">
                             
+                            {}
                             {CHECKLIST_SECTIONS.map((section) => (
                                 <div key={section.id} className="bg-white rounded-3xl shadow-lg border border-slate-200/60 overflow-hidden hover:shadow-xl transition-shadow duration-300">
                                     <div className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 p-5 sm:p-6 flex items-center gap-4">
@@ -541,7 +538,7 @@
                                 </div>
                             ))}
 
-                            {/* Sign Off & Submission */}
+                            {}
                             <div className="bg-gradient-to-br from-[#ffffff] to-[#f8fafc] rounded-[2rem] shadow-2xl border border-slate-200 p-5 sm:p-10 relative overflow-hidden">
                                 <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#004d42] via-[#00bfa5] to-[#00917a]"></div>
                                 
@@ -607,7 +604,7 @@
                             </div>
                         </form>
                         
-                        {/* Footer */}
+                        {}
                         <footer className="mt-16 text-center border-t border-slate-300/50 pt-8">
                             <div className="inline-flex items-center gap-2 mb-3">
                                 <div className="w-6 h-6 bg-gradient-to-br from-[#006858] to-[#004d42] rounded flex items-center justify-center shadow-md">
