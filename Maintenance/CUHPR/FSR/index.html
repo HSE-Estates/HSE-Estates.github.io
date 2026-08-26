@@ -374,6 +374,14 @@
                 // This is required for the form to accept the request
                 payload.append('simple_spc', '261652530107045-261652530107045');
                 // =============================
+
+                // === JOTFORM EMAIL TRIGGER METADATA ===
+                // Jotform suppresses emails for "bot" submissions. These hidden fields 
+                // trick Jotform into treating this as a standard browser submission.
+                payload.append('jsExecutionTracker', 'build-date-1787750619055');
+                payload.append('submitSource', 'unknown');
+                payload.append('buildDate', '1787750619055');
+                // ======================================
                 
                 const [year, month, day] = formData.date.split('-');
                 payload.append('q2_q2_datetime0[month]', month);
