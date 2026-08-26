@@ -370,6 +370,11 @@
                 const payload = new URLSearchParams();
                 payload.append('formID', '261652530107045');
                 
+                // === JOTFORM ANTI-SPAM FIX ===
+                // This is required for the form to accept the request
+                payload.append('simple_spc', '261652530107045-261652530107045');
+                // =============================
+                
                 const [year, month, day] = formData.date.split('-');
                 payload.append('q2_q2_datetime0[month]', month);
                 payload.append('q2_q2_datetime0[day]', day);
@@ -484,7 +489,7 @@
                     <main className="max-w-4xl mx-auto px-4 sm:px-6 -mt-10 flex-1 w-full relative z-10 pb-20">
                         <form onSubmit={handleSubmit} className="space-y-8">
                             
-                            {}
+                            {/* Checklist Sections */}
                             {CHECKLIST_SECTIONS.map((section) => (
                                 <div key={section.id} className="bg-white rounded-3xl shadow-lg border border-slate-200/60 overflow-hidden hover:shadow-xl transition-shadow duration-300">
                                     <div className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 p-5 sm:p-6 flex items-center gap-4">
@@ -538,7 +543,7 @@
                                 </div>
                             ))}
 
-                            {}
+                            {/* Sign Off Section */}
                             <div className="bg-gradient-to-br from-[#ffffff] to-[#f8fafc] rounded-[2rem] shadow-2xl border border-slate-200 p-5 sm:p-10 relative overflow-hidden">
                                 <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#004d42] via-[#00bfa5] to-[#00917a]"></div>
                                 
@@ -604,7 +609,7 @@
                             </div>
                         </form>
                         
-                        {}
+                        {/* Footer */}
                         <footer className="mt-16 text-center border-t border-slate-300/50 pt-8">
                             <div className="inline-flex items-center gap-2 mb-3">
                                 <div className="w-6 h-6 bg-gradient-to-br from-[#006858] to-[#004d42] rounded flex items-center justify-center shadow-md">
