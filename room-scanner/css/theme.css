@@ -1,0 +1,240 @@
+/* ---------------------------------------------------------------------------
+   HSE theme tokens
+   Single source of truth for colour, type and spacing. Nothing else in the
+   app hard-codes a colour.
+   --------------------------------------------------------------------------- */
+
+:root {
+  /* Brand -------------------------------------------------------------- */
+  --hse-green-900: #00352c;
+  --hse-green-800: #004b3f;
+  --hse-green-700: #006354; /* primary */
+  --hse-green-600: #007e6a;
+  --hse-teal-500:  #00a499; /* accent */
+  --hse-teal-100:  #d8efec;
+  --hse-teal-050:  #eef7f6;
+
+  /* Status ------------------------------------------------------------- */
+  --hse-amber:     #e9a73c;
+  --hse-amber-bg:  #fdf3e2;
+  --hse-red:       #c8102e;
+  --hse-red-bg:    #fdecef;
+  --hse-blue:      #1c5c9e;
+  --hse-blue-bg:   #e9f1f9;
+
+  /* Neutrals ----------------------------------------------------------- */
+  --ink-900: #16211f;
+  --ink-700: #3d4b48;
+  /* 4.6:1 on white. The lighter grey this replaced was 4.0:1 and failed
+     WCAG 2.1 AA for body text, which public sector sites must meet. */
+  --ink-500: #5c6b67;
+  --ink-300: #8b9894;
+  --line:    #d5ddda;
+  --line-soft: #e7ecea;
+  --surface: #ffffff;
+  --surface-2: #f4f7f6;
+  --surface-3: #eaefed;
+  --paper:   #ffffff;   /* floor-plan sheet colour */
+
+  /* Type --------------------------------------------------------------- */
+  --font: "Lato", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto,
+          Helvetica, Arial, sans-serif;
+  --font-mono: "Cascadia Mono", "SF Mono", Consolas, "Roboto Mono", monospace;
+  --fs-xs: 11px;
+  --fs-sm: 12.5px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 26px;
+
+  /* Space and shape ---------------------------------------------------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --r-sm: 3px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --shadow-1: 0 1px 2px rgba(0, 53, 44, .10);
+  --shadow-2: 0 4px 14px rgba(0, 53, 44, .14);
+  --shadow-3: 0 10px 34px rgba(0, 53, 44, .20);
+
+  /* Plan drawing colours (consumed by the SVG renderer) ------------------ */
+  --plan-wall: #16211f;
+  --plan-wall-fill: #16211f;
+  --plan-line: #3d4b48;
+  --plan-dim: #006354;
+  --plan-object: #4a5a56;
+  --plan-object-fill: #f0f3f2;
+  --plan-selected: #00a499;
+  --plan-warning: #c8102e;
+}
+
+/* Dark mode: chrome only. The plan sheet stays white — a floor plan is a
+   printed document and inverting it makes the export wrong. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink-900: #eef2f1;
+    --ink-700: #c3cecb;
+    --ink-500: #93a19d;
+    --ink-300: #61706c;
+    --line:    #2c3937;
+    --line-soft: #222d2b;
+    --surface: #131c1a;
+    --surface-2: #0d1615;
+    --surface-3: #1b2624;
+    --hse-teal-050: #10201d;
+    --hse-teal-100: #16302c;
+  }
+}
+
+* { box-sizing: border-box; }
+
+/* Accessibility ---------------------------------------------------------
+   Public sector sites in Ireland must meet WCAG 2.1 AA under the EU Web
+   Accessibility Directive, so these are requirements rather than polish. */
+
+/* Every interactive control gets the same visible focus ring, including the
+   icon-only ones, so the app is fully operable from a keyboard. */
+:where(button, [href], input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--hse-teal-500);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* Respect a stated preference for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Windows high-contrast mode strips background colours, which would make the
+   icon-only toolbar buttons indistinguishable. */
+@media (forced-colors: active) {
+  .tool[aria-pressed="true"] { outline: 2px solid ButtonText; }
+  .btn { border: 1px solid ButtonText; }
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: var(--font);
+  font-size: var(--fs-md);
+  color: var(--ink-900);
+  background: var(--surface-2);
+  -webkit-text-size-adjust: 100%;
+}
+
+h1, h2, h3 { margin: 0; font-weight: 700; letter-spacing: -0.01em; }
+h1 { font-size: var(--fs-2xl); }
+h2 { font-size: var(--fs-xl); }
+h3 { font-size: var(--fs-lg); }
+p  { margin: 0 0 var(--sp-3); color: var(--ink-700); line-height: 1.5; }
+
+/* Buttons -------------------------------------------------------------- */
+.btn {
+  font: inherit;
+  font-weight: 600;
+  font-size: var(--fs-md);
+  padding: 9px 16px;
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  background: var(--surface);
+  color: var(--ink-900);
+  border-color: var(--line);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.btn:hover:not(:disabled) { background: var(--surface-3); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn:focus-visible { outline: 3px solid var(--hse-teal-500); outline-offset: 2px; }
+
+.btn-primary {
+  background: var(--hse-green-700);
+  border-color: var(--hse-green-700);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) { background: var(--hse-green-800); }
+
+.btn-accent {
+  background: var(--hse-teal-500);
+  border-color: var(--hse-teal-500);
+  color: #06231f;
+}
+.btn-accent:hover:not(:disabled) { background: #00918a; }
+
+.btn-danger { color: var(--hse-red); border-color: var(--line); }
+.btn-danger:hover:not(:disabled) { background: var(--hse-red-bg); }
+
+.btn-ghost { background: transparent; border-color: transparent; color: var(--ink-700); }
+.btn-ghost:hover:not(:disabled) { background: var(--surface-3); }
+
+.btn-sm { padding: 5px 10px; font-size: var(--fs-sm); }
+.btn-lg { padding: 13px 22px; font-size: var(--fs-lg); }
+.btn-block { width: 100%; justify-content: center; }
+
+/* Form controls -------------------------------------------------------- */
+label.field { display: block; margin-bottom: var(--sp-3); }
+label.field > span {
+  display: block;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-700);
+  margin-bottom: var(--sp-1);
+}
+input[type="text"], input[type="number"], select, textarea, input[type="password"] {
+  font: inherit;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink-900);
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--hse-teal-500);
+  box-shadow: 0 0 0 3px var(--hse-teal-100);
+}
+input[type="range"] { width: 100%; accent-color: var(--hse-green-700); }
+input[type="checkbox"] { accent-color: var(--hse-green-700); width: 16px; height: 16px; }
+
+.hint { font-size: var(--fs-sm); color: var(--ink-500); line-height: 1.45; }
+
+/* Notices -------------------------------------------------------------- */
+.notice {
+  border-left: 4px solid var(--hse-blue);
+  background: var(--hse-blue-bg);
+  color: var(--ink-900);
+  padding: var(--sp-3);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.notice.warn  { border-color: var(--hse-amber); background: var(--hse-amber-bg); }
+.notice.error { border-color: var(--hse-red);   background: var(--hse-red-bg); }
+
+.tag {
+  display: inline-block;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--hse-teal-100);
+  color: var(--hse-green-800);
+}
+.tag.warn  { background: var(--hse-amber-bg); color: #8a5b00; }
+.tag.error { background: var(--hse-red-bg);   color: var(--hse-red); }
