@@ -1,0 +1,4 @@
+{
+  "orgName": "",
+  "note": "Set orgName to the organisation shown in the PDF header. Put the logo in logo.txt as a base64 data URL."
+}
