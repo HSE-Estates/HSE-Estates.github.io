@@ -307,6 +307,7 @@ RS.UI = (function () {
         RS.Scan.setStep(s2.step === 'objects' ? 'openings' : 'corners');
         syncScanSteps();
       } else if (act === 'detect') RS.Scan.runDetection();
+      else if (act === 'checkup') checkupModal();
       else if (act === 'sweep-start') RS.Scan.sweepStart();
       else if (act === 'sweep-stop') RS.Scan.sweepStop();
       else if (act === 'sweep-again') RS.Scan.sweepAgain();
@@ -319,6 +320,75 @@ RS.UI = (function () {
     document.querySelectorAll('#scan-steps [data-step]').forEach(function (b) {
       b.setAttribute('aria-pressed', b.getAttribute('data-step') === cur);
     });
+  }
+
+  /* Everything that has to be true for a scan to work, and which of them is
+     not. A permission dialog that never appeared is invisible; this makes it
+     visible. */
+  function checkupModal() {
+    var d = RS.Scan.diagnose();
+
+    function row(ok, label, detail, fatal) {
+      var mark = ok ? '&#10003;' : (fatal ? '&#10007;' : '!');
+      var colour = ok ? 'var(--ok, #2f6b4f)' : (fatal ? 'var(--hse-red)' : 'var(--hse-amber)');
+      return '<div class="kv" style="align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--line-soft)">' +
+        '<span style="display:flex;gap:8px"><b style="color:' + colour + ';width:14px">' + mark + '</b>' +
+        '<span>' + label + (detail ? '<br><span class="hint">' + escapeHtml(detail) + '</span>' : '') + '</span></span></div>';
+    }
+
+    var body = '';
+    body += row(d.secureContext, 'Secure connection',
+      d.secureContext ? d.protocol + '//' + d.host
+        : 'Page is on ' + d.protocol + '//' + d.host + '. Browsers block the camera and motion sensors unless the address starts with https, or is localhost. This is the usual reason no permission dialog ever appears.',
+      !d.secureContext);
+    body += row(d.cameraApi, 'Camera supported by this browser', d.cameraApi ? null : 'No getUserMedia in this browser.', true);
+    body += row(d.cameraLive, 'Camera running',
+      d.cameraLive ? (d.cameraLabel + ' at ' + d.videoSize[0] + '×' + d.videoSize[1])
+        : (d.lastCameraError || 'The camera has not started.'), true);
+    body += row(d.motionSupported, 'Motion sensor supported',
+      d.motionSupported ? null : 'This device reports no orientation sensor — a desktop, usually.', true);
+    body += row(d.motionLive, 'Motion sensor reporting',
+      d.motionLive ? (d.motionSamples + ' readings received') :
+        (d.motionSamples ? 'Readings stopped arriving.' :
+          'No readings at all' + (d.motionNeedsPermission ? ' — access has not been granted.' : '.')), true);
+
+    var canAsk = d.motionNeedsPermission && !d.motionLive;
+    var buttons = [{ label: 'Close', ghost: true }];
+    if (canAsk) {
+      buttons.push({
+        label: 'Allow motion access', primary: true, action: function () {
+          RS.Scan.requestMotion().then(function (r) {
+            toast(r === 'granted'
+              ? 'Motion access granted. Press Record.'
+              : 'Motion access was refused. On iPhone: Settings → Apps → Safari → Motion & Orientation Access, then reload.',
+              r === 'granted' ? undefined : 'warn');
+          });
+          return false;
+        }
+      });
+    }
+
+    var advice = '';
+    if (!d.secureContext) {
+      advice = '<div class="notice error" style="margin-top:12px"><b>This is the problem.</b> ' +
+        'Open the app from its <code>https://…github.io/…</code> address, not from a file or an ' +
+        'http address. No permission dialog can appear on an insecure page — the browser refuses ' +
+        'silently, which is exactly what you saw.</div>';
+    } else if (!d.cameraLive && /NotAllowed|Security|Permission/i.test(d.cameraErrorName || '')) {
+      advice = '<div class="notice warn" style="margin-top:12px">Camera access was refused earlier and the ' +
+        'browser is remembering that, so it will not ask again. Tap the padlock or camera icon in the ' +
+        'address bar and set the camera to Allow, then reload.</div>';
+    } else if (!d.cameraLive && /NotReadable|TrackStart|NotFound/i.test(d.cameraErrorName || '')) {
+      advice = '<div class="notice warn" style="margin-top:12px">Another app is holding the camera. Close it ' +
+        'and reload this page.</div>';
+    } else if (canAsk) {
+      advice = '<div class="notice warn" style="margin-top:12px">Motion access has not been granted. iPhones only ' +
+        'ask when you tap a button, so tap <b>Allow motion access</b> below.</div>';
+    }
+
+    openModal('Check setup', body + advice +
+      '<p class="hint" style="margin-top:12px">All five need a tick before a sweep can record.</p>',
+      buttons);
   }
 
   function heightModal() {
