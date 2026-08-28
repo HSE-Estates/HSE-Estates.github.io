@@ -54,12 +54,18 @@ RS.UI = (function () {
 
     RS.Scan.init({
       video: document.getElementById('scan-video'),
+      frame: document.getElementById('scan-frame'),
       overlay: document.getElementById('scan-overlay'),
       stepTitle: document.getElementById('scan-step-title'),
       instruct: document.getElementById('scan-instruct'),
       stats: document.getElementById('scan-stats'),
       actions: document.getElementById('scan-actions'),
       subtypes: document.getElementById('scan-subtypes'),
+      modePills: document.getElementById('scan-mode'),
+      stepPills: document.getElementById('scan-steps'),
+      scrub: document.getElementById('scan-scrub'),
+      scrubber: document.getElementById('scan-scrubber'),
+      scrubLabel: document.getElementById('scrub-label'),
       cameraError: document.getElementById('scan-camera-error')
     });
 
@@ -268,6 +274,16 @@ RS.UI = (function () {
       RS.Scan.setStep(b.getAttribute('data-step'));
       syncScanSteps();
     };
+    document.getElementById('scan-mode').onclick = function (e) {
+      var b = e.target.closest('[data-mode]');
+      if (!b) return;
+      RS.Scan.setMode(b.getAttribute('data-mode'));
+    };
+    document.getElementById('scan-scrubber').oninput = function (e) {
+      RS.Scan.sweepSeek(Number(e.target.value));
+    };
+    document.getElementById('scrub-prev').onclick = function () { RS.Scan.sweepStep(-1); };
+    document.getElementById('scrub-next').onclick = function () { RS.Scan.sweepStep(1); };
     document.getElementById('scan-subtypes').onclick = function (e) {
       var b = e.target.closest('[data-subtype],[data-objtype]');
       if (!b) return;
@@ -291,6 +307,9 @@ RS.UI = (function () {
         RS.Scan.setStep(s2.step === 'objects' ? 'openings' : 'corners');
         syncScanSteps();
       } else if (act === 'detect') RS.Scan.runDetection();
+      else if (act === 'sweep-start') RS.Scan.sweepStart();
+      else if (act === 'sweep-stop') RS.Scan.sweepStop();
+      else if (act === 'sweep-again') RS.Scan.sweepAgain();
       else if (act === 'finish') finishScan();
     };
   }

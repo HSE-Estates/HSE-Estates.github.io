@@ -24,6 +24,7 @@ RS.Scan = (function () {
   var step = 'corners';           // corners | openings | objects
   var subType = 'door';
   var objType = 'bed_double';
+  var mode = 'sweep';             // sweep | live
 
   var corners = [];               // { x, y, confidence, tap, orient }
   var openings = [];              // { wallIndex, offset, width, type }
@@ -44,6 +45,7 @@ RS.Scan = (function () {
     active = true;
     step = 'corners';
     corners = []; openings = []; objects = []; pendingJamb = null; draftRoom = null;
+    RS.Sweep.reset();
     var st = Store.getSettings();
     opts.cameraHeight = st.cameraHeight || 1.45;
     opts.fovDeg = st.fovDeg || 66;
@@ -70,6 +72,10 @@ RS.Scan = (function () {
     rafId = null;
     stopCamera();
     O.stop();
+    /* Captured frames are object URLs; leaving them would leak the whole sweep
+       until the tab is closed. */
+    RS.Sweep.reset();
+    if (el.frame) { el.frame.removeAttribute('src'); el.frame.style.display = 'none'; }
   }
 
   function startCamera() {
@@ -118,24 +124,51 @@ RS.Scan = (function () {
     rafId = requestAnimationFrame(loop);
   }
 
-  function elemSize() {
+  /* Reviewing a captured frame is not the same optical situation as the live
+     preview. The live video is drawn with object-fit: cover and is cropped; the
+     review frame is drawn with object-fit: contain and is whole, letterboxed
+     inside the element. Measuring against the element box in review mode would
+     silently stretch every angle, so the content rect is computed instead — the
+     actual rectangle the picture occupies. */
+  function contentRect() {
     var r = el.overlay.getBoundingClientRect();
+    var f = reviewing() ? RS.Sweep.current() : null;
+
+    if (!f) {
+      return {
+        left: 0, top: 0,
+        elemWidth: r.width, elemHeight: r.height,
+        videoWidth: el.video.videoWidth || 0,
+        videoHeight: el.video.videoHeight || 0
+      };
+    }
+    var scale = Math.min(r.width / f.w, r.height / f.h);   // object-fit: contain
+    var w = f.w * scale, h = f.h * scale;
     return {
-      elemWidth: r.width,
-      elemHeight: r.height,
-      videoWidth: el.video.videoWidth || 0,
-      videoHeight: el.video.videoHeight || 0
+      left: (r.width - w) / 2,
+      top: (r.height - h) / 2,
+      elemWidth: w, elemHeight: h,
+      videoWidth: f.w, videoHeight: f.h
     };
   }
 
   function projOpts() {
-    return Object.assign({}, opts, elemSize());
+    return Object.assign({}, opts, contentRect());
+  }
+
+  function reviewing() { return mode === 'sweep' && RS.Sweep.state === 'review'; }
+
+  /* The pose to measure against: the live sensor, or the pose recorded with the
+     frame currently on screen. Everything downstream is identical. */
+  function currentOrient() {
+    return reviewing() ? RS.Sweep.currentOrient() : O.snapshot();
   }
 
   /* World plan point → screen pixel, the inverse of the capture ray. Returns
      null when the point is behind the camera. */
   function planToScreen(p, o) {
-    var orient = O.snapshot();
+    var orient = currentOrient();
+    if (!orient) return null;
     var m = orient.matrix;
     /* Vector from camera to the floor point, world frame. */
     var v = { x: p.x, y: -p.y, z: -o.cameraHeight };
@@ -153,8 +186,10 @@ RS.Scan = (function () {
     var ny = -(s.y / -s.z) / t.ty;
     if (o.mirrored) nx = -nx;
     return {
-      x: (nx + 1) / 2 * o.elemWidth,
-      y: (ny + 1) / 2 * o.elemHeight,
+      /* Offset by the content rect so markers land on the picture, not on the
+         letterbox bars beside it. */
+      x: (o.left || 0) + (nx + 1) / 2 * o.elemWidth,
+      y: (o.top || 0) + (ny + 1) / 2 * o.elemHeight,
       onScreen: Math.abs(nx) <= 1.25 && Math.abs(ny) <= 1.25
     };
   }
@@ -163,16 +198,19 @@ RS.Scan = (function () {
     var o = projOpts();
     var W = o.elemWidth, H = o.elemHeight;
     if (!W || !H) return;
+    var full = el.overlay.getBoundingClientRect();
+    var ox = o.left || 0, oy = o.top || 0;
 
     var parts = [];
     var state = O.getState();
 
-    /* Horizon: everything above it cannot hit the floor. */
+    /* Horizon: everything above it cannot hit the floor. Positioned inside the
+       picture, which in review mode is not the whole element. */
     var horizonY = horizonScreenY(o);
     if (horizonY != null && horizonY > -H && horizonY < H * 2) {
-      parts.push('<line x1="0" y1="' + horizonY + '" x2="' + W + '" y2="' + horizonY +
+      parts.push('<line x1="' + ox + '" y1="' + (oy + horizonY) + '" x2="' + (ox + W) + '" y2="' + (oy + horizonY) +
         '" stroke="rgba(255,255,255,.35)" stroke-width="1" stroke-dasharray="6 6"/>');
-      parts.push('<text x="10" y="' + (horizonY - 8) + '" fill="rgba(255,255,255,.6)" font-size="11" ' +
+      parts.push('<text x="' + (ox + 10) + '" y="' + (oy + horizonY - 8) + '" fill="rgba(255,255,255,.6)" font-size="11" ' +
         'font-family="Lato, Segoe UI, Arial, sans-serif">horizon — aim below this line</text>');
     }
 
@@ -214,31 +252,55 @@ RS.Scan = (function () {
         'fill="rgba(0,164,153,.25)" stroke="#00a499" stroke-width="2"/>');
     });
 
-    /* Reticle. */
-    var cx = W / 2, cy = H / 2;
-    var aimOk = horizonY == null || cy > horizonY + 10;
-    var ret = aimOk ? '#ffffff' : '#e9a73c';
-    parts.push('<circle cx="' + cx + '" cy="' + cy + '" r="17" fill="none" stroke="' + ret + '" stroke-width="1.5" opacity=".85"/>');
-    parts.push('<line x1="' + (cx - 26) + '" y1="' + cy + '" x2="' + (cx - 8) + '" y2="' + cy + '" stroke="' + ret + '" stroke-width="1.5"/>');
-    parts.push('<line x1="' + (cx + 8) + '" y1="' + cy + '" x2="' + (cx + 26) + '" y2="' + cy + '" stroke="' + ret + '" stroke-width="1.5"/>');
-    parts.push('<line x1="' + cx + '" y1="' + (cy - 26) + '" x2="' + cx + '" y2="' + (cy - 8) + '" stroke="' + ret + '" stroke-width="1.5"/>');
-    parts.push('<line x1="' + cx + '" y1="' + (cy + 8) + '" x2="' + cx + '" y2="' + (cy + 26) + '" stroke="' + ret + '" stroke-width="1.5"/>');
+    /* Reticle. Live only — on a still frame you aim with your finger, and a
+       crosshair in the middle of the picture is just clutter. */
+    if (!reviewing()) {
+      var cx = ox + W / 2, cy = oy + H / 2;
+      var aimOk = horizonY == null || (H / 2) > horizonY + 10;
+      var ret = aimOk ? '#ffffff' : '#e9a73c';
+      parts.push('<circle cx="' + cx + '" cy="' + cy + '" r="17" fill="none" stroke="' + ret + '" stroke-width="1.5" opacity=".85"/>');
+      parts.push('<line x1="' + (cx - 26) + '" y1="' + cy + '" x2="' + (cx - 8) + '" y2="' + cy + '" stroke="' + ret + '" stroke-width="1.5"/>');
+      parts.push('<line x1="' + (cx + 8) + '" y1="' + cy + '" x2="' + (cx + 26) + '" y2="' + cy + '" stroke="' + ret + '" stroke-width="1.5"/>');
+      parts.push('<line x1="' + cx + '" y1="' + (cy - 26) + '" x2="' + cx + '" y2="' + (cy - 8) + '" stroke="' + ret + '" stroke-width="1.5"/>');
+      parts.push('<line x1="' + cx + '" y1="' + (cy + 8) + '" x2="' + cx + '" y2="' + (cy + 26) + '" stroke="' + ret + '" stroke-width="1.5"/>');
+    }
 
-    /* Live plan mini-map. */
-    parts.push(miniMap(W, H));
+    /* Live plan mini-map, pinned to the element rather than the picture. */
+    parts.push(miniMap(full.width, full.height));
 
-    el.overlay.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    el.overlay.setAttribute('viewBox', '0 0 ' + full.width + ' ' + full.height);
     el.overlay.innerHTML = parts.join('');
 
     /* Stats line. */
     if (el.stats) {
+      var sw = RS.Sweep.status();
       var q = Math.round(state.quality * 100);
-      el.stats.innerHTML =
+      var line =
         '<span>corners <b>' + corners.length + '</b></span>' +
         '<span>openings <b>' + openings.length + '</b></span>' +
-        '<span>items <b>' + objects.length + '</b></span>' +
-        '<span>signal <b>' + (state.live ? q + '%' : 'none') + '</b></span>' +
-        '<span>h <b>' + opts.cameraHeight.toFixed(2) + ' m</b></span>';
+        '<span>items <b>' + objects.length + '</b></span>';
+      if (mode === 'sweep' && sw.state === 'recording') {
+        line = '<span>recording <b>' + sw.seconds.toFixed(0) + 's</b></span>' +
+               '<span>frames <b>' + sw.count + '</b></span>' +
+               '<span>turned <b>' + sw.swept + '°</b></span>';
+      } else if (reviewing()) {
+        line += '<span>frame <b>' + (sw.index + 1) + '/' + sw.count + '</b></span>';
+      } else {
+        line += '<span>signal <b>' + (state.live ? q + '%' : 'none') + '</b></span>';
+      }
+      line += '<span>h <b>' + opts.cameraHeight.toFixed(2) + ' m</b></span>';
+      el.stats.innerHTML = line;
+    }
+
+    /* Show the captured frame under the overlay while reviewing. */
+    if (el.frame) {
+      var f = reviewing() ? RS.Sweep.current() : null;
+      if (f) {
+        if (el.frame.getAttribute('src') !== f.url) el.frame.setAttribute('src', f.url);
+        el.frame.style.display = 'block';
+      } else {
+        el.frame.style.display = 'none';
+      }
     }
   }
 
@@ -249,7 +311,8 @@ RS.Scan = (function () {
 
   /* Screen y where the ray pitch is exactly horizontal. */
   function horizonScreenY(o) {
-    var orient = O.snapshot();
+    var orient = currentOrient();
+    if (!orient) return null;
     var t = RC.visibleTangents(o);
     /* Search vertically for the sign change in the world z of the ray. */
     var prev = null;
@@ -311,14 +374,30 @@ RS.Scan = (function () {
 
   function onTap(ev) {
     if (!active) return;
-    var rect = el.overlay.getBoundingClientRect();
-    var tap = { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
-    var orient = O.snapshot();
-    var o = projOpts();
+    if (mode === 'sweep' && RS.Sweep.state !== 'review') {
+      RS.UI.toast(RS.Sweep.state === 'recording'
+        ? 'Keep turning — press Stop when you have been all the way round.'
+        : 'Press Record and turn slowly on the spot first.', 'warn');
+      return;
+    }
 
-    if (!O.getState().live) {
+    var rect = el.overlay.getBoundingClientRect();
+    var o = projOpts();
+    /* Taps are measured from the corner of the picture, not the corner of the
+       screen, so the letterbox bars either side of a review frame do not shift
+       every angle. */
+    var tap = {
+      x: ev.clientX - rect.left - (o.left || 0),
+      y: ev.clientY - rect.top - (o.top || 0)
+    };
+    var orient = currentOrient();
+
+    if (!orient || (!reviewing() && !O.getState().live)) {
       RS.UI.toast('No orientation data yet — hold the phone still for a moment, or use manual entry.', 'warn');
       return;
+    }
+    if (tap.x < 0 || tap.y < 0 || tap.x > o.elemWidth || tap.y > o.elemHeight) {
+      return;   /* tapped the letterbox, not the picture */
     }
 
     if (step === 'corners') {
@@ -379,6 +458,21 @@ RS.Scan = (function () {
 
   /* -- Step chrome ---------------------------------------------------------- */
 
+  var SWEEP_TEXT = {
+    idle: {
+      title: 'Record a sweep',
+      body: 'Stand in the middle of the room. Press Record and turn slowly all the way round, keeping the wall-floor line in shot. Press Stop, then tap the corners on the still pictures — no rush, and you can zoom in.'
+    },
+    recording: {
+      title: 'Turn slowly on the spot',
+      body: 'Do not walk — turn where you stand. Keep the bottom of the walls in frame. Around five seconds per wall is plenty.'
+    },
+    review: {
+      title: 'Now tap the corners',
+      body: 'Slide through the frames to find each corner, then tap where the wall meets the floor. Markers stay put as you scrub, so you can check each one from a different frame.'
+    }
+  };
+
   var STEP_TEXT = {
     corners: {
       title: 'Tap each corner',
@@ -395,9 +489,38 @@ RS.Scan = (function () {
   };
 
   function renderChrome() {
-    var t = STEP_TEXT[step];
+    var sw = RS.Sweep.status();
+    var inSweepSetup = mode === 'sweep' && sw.state !== 'review';
+
+    /* Before there are frames to tap, the sweep instructions replace the step
+       instructions entirely — there is nothing else to do yet. */
+    var t = inSweepSetup ? SWEEP_TEXT[sw.state]
+          : (mode === 'sweep' && step === 'corners' ? SWEEP_TEXT.review : STEP_TEXT[step]);
     if (el.stepTitle) el.stepTitle.textContent = t.title;
     if (el.instruct) el.instruct.textContent = t.body;
+
+    /* Mode pills. */
+    if (el.modePills) {
+      el.modePills.querySelectorAll('[data-mode]').forEach(function (b) {
+        b.setAttribute('aria-pressed', b.getAttribute('data-mode') === mode);
+      });
+      el.modePills.style.display = sw.state === 'recording' ? 'none' : 'flex';
+    }
+
+    /* Scrubber, only once there are frames. */
+    if (el.scrub) {
+      el.scrub.style.display = reviewing() ? 'flex' : 'none';
+      if (reviewing() && el.scrubber) {
+        el.scrubber.max = String(Math.max(0, sw.count - 1));
+        if (Number(el.scrubber.value) !== sw.index) el.scrubber.value = String(sw.index);
+        if (el.scrubLabel) {
+          el.scrubLabel.textContent = 'Frame ' + (sw.index + 1) + ' of ' + sw.count;
+        }
+      }
+    }
+
+    /* The step pills are meaningless until there are frames to tap on. */
+    if (el.stepPills) el.stepPills.style.display = inSweepSetup ? 'none' : 'flex';
 
     /* Sub-type pills. */
     if (el.subtypes) {
@@ -422,6 +545,26 @@ RS.Scan = (function () {
     /* Actions. */
     if (el.actions) {
       var a = '';
+
+      /* Sweep mode owns the action bar until there are frames to work with. */
+      if (inSweepSetup) {
+        if (sw.state === 'recording') {
+          a += '<button type="button" class="btn btn-lg btn-recording" data-act="sweep-stop">Stop (' +
+               sw.seconds.toFixed(0) + 's)</button>';
+          a += '<button type="button" class="btn btn-sm" data-act="height">Height ' +
+               opts.cameraHeight.toFixed(2) + ' m</button>';
+        } else {
+          a += '<button type="button" class="btn btn-lg btn-record" data-act="sweep-start">Record</button>';
+          a += '<button type="button" class="btn btn-sm" data-act="height">Height ' +
+               opts.cameraHeight.toFixed(2) + ' m</button>';
+        }
+        el.actions.innerHTML = a;
+        return;
+      }
+
+      if (reviewing()) {
+        a += '<button type="button" class="btn btn-sm" data-act="sweep-again">Re-record</button>';
+      }
       a += '<button type="button" class="btn btn-sm" data-act="undo"' + (canUndo() ? '' : ' disabled') + '>Undo tap</button>';
       if (step === 'corners') {
         a += '<button type="button" class="btn btn-sm" data-act="height">Height ' + opts.cameraHeight.toFixed(2) + ' m</button>';
@@ -470,6 +613,54 @@ RS.Scan = (function () {
 
   function setSubType(t) { subType = t; renderChrome(); }
   function setObjType(t) { objType = t; renderChrome(); }
+
+  /* -- Sweep controls ------------------------------------------------------- */
+
+  function setMode(m) {
+    if (m === mode) return;
+    mode = m;
+    if (m === 'live') RS.Sweep.reset();
+    renderChrome();
+  }
+
+  function sweepStart() {
+    if (!O.getState().live) {
+      RS.UI.toast('Waiting for the motion sensor — hold the phone still for a second, then press Record again.', 'warn');
+      return;
+    }
+    if (!el.video.videoWidth) {
+      RS.UI.toast('The camera has not started yet.', 'warn');
+      return;
+    }
+    RS.Sweep.start(el.video);
+    renderChrome();
+  }
+
+  function sweepStop() {
+    RS.Sweep.stop();
+    var sw = RS.Sweep.status();
+    if (!sw.count) {
+      RS.UI.toast('Nothing was captured — check the camera and motion permissions.', 'error');
+    } else {
+      step = 'corners';
+      RS.UI.toast(sw.count + ' frames over ' + sw.swept + '°. Now slide through them and tap each corner.');
+      if (sw.swept < 200) {
+        RS.UI.toast('You only turned about ' + sw.swept + '°. If a corner is missing, re-record and go the whole way round.', 'warn');
+      }
+    }
+    renderChrome();
+  }
+
+  function sweepAgain() {
+    if (corners.length || openings.length || objects.length) {
+      RS.UI.toast('Re-recording keeps the corners you have already placed.');
+    }
+    RS.Sweep.reset();
+    renderChrome();
+  }
+
+  function sweepSeek(i) { RS.Sweep.seek(i); renderChrome(); }
+  function sweepStep(d) { RS.Sweep.step(d); renderChrome(); }
 
   function setHeight(m) {
     opts.cameraHeight = G.clamp(Number(m) || 1.45, 0.6, 2.4);
@@ -534,11 +725,20 @@ RS.Scan = (function () {
       RS.UI.toast('No detection service is configured — add one in Settings.', 'warn');
       return Promise.resolve(0);
     }
-    var orient = O.snapshot();
+    var orient = currentOrient();
     var o = projOpts();
+    if (!orient) {
+      RS.UI.toast('No pose for this frame yet.', 'warn');
+      return Promise.resolve(0);
+    }
     var frame;
     try {
-      frame = RS.AI.frameFromVideo(el.video, 768);
+      /* In review the frame on screen is the one to send, together with the
+         pose recorded alongside it — not whatever the camera happens to be
+         pointing at now. */
+      frame = reviewing()
+        ? RS.AI.frameFromImage(el.frame, 768)
+        : RS.AI.frameFromVideo(el.video, 768);
     } catch (e) {
       RS.UI.toast(e.message, 'error');
       return Promise.resolve(0);
@@ -596,6 +796,10 @@ RS.Scan = (function () {
     undoTap: undoTap, setStep: setStep, setSubType: setSubType, setObjType: setObjType,
     setHeight: setHeight, finish: finish, autoCalibrate: autoCalibrate,
     runDetection: runDetection,
+    setMode: setMode, sweepStart: sweepStart, sweepStop: sweepStop,
+    sweepAgain: sweepAgain, sweepSeek: sweepSeek, sweepStep: sweepStep,
+    reviewing: reviewing,
+    get mode() { return mode; },
     currentState: currentState,
     get corners() { return corners; },
     get options() { return opts; }

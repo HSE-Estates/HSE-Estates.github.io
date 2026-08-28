@@ -73,6 +73,7 @@
   <!-- ------------------------------------------------------------------ -->
   <section id="screen-scan" class="screen">
     <video id="scan-video" playsinline muted autoplay></video>
+    <img id="scan-frame" alt="" style="display:none">
     <svg id="scan-overlay" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none"></svg>
 
     <div class="scan-ui">
@@ -87,6 +88,21 @@
       <div id="scan-camera-error" class="notice error" style="display:none;margin:0 16px"></div>
 
       <div class="scan-bottom">
+        <div class="mode-pills" id="scan-mode" style="align-self:flex-start">
+          <button type="button" data-mode="sweep" aria-pressed="true">Record a sweep</button>
+          <button type="button" data-mode="live" aria-pressed="false">Tap live</button>
+        </div>
+
+        <div id="scan-scrub" style="display:none">
+          <input type="range" id="scan-scrubber" min="0" max="0" value="0" step="1"
+                 aria-label="Scrub through the recorded frames">
+          <div class="scrub-row">
+            <button type="button" class="btn btn-sm" id="scrub-prev" aria-label="Previous frame">&#8249;</button>
+            <span class="hint" id="scrub-label" style="color:rgba(255,255,255,.8)"></span>
+            <button type="button" class="btn btn-sm" id="scrub-next" aria-label="Next frame">&#8250;</button>
+          </div>
+        </div>
+
         <div class="mode-pills" id="scan-steps" style="align-self:flex-start">
           <button type="button" data-step="corners" aria-pressed="true">Corners</button>
           <button type="button" data-step="openings" aria-pressed="false">Doors &amp; windows</button>
@@ -128,6 +144,7 @@
 <!-- Capture ---------------------------------------------------------------- -->
 <script src="js/capture/orientation.js"></script>
 <script src="js/capture/raycast.js"></script>
+<script src="js/capture/sweep.js"></script>
 <!-- Layer B: presentation -------------------------------------------------- -->
 <script src="js/render/symbols.js"></script>
 <script src="js/render/plan.js"></script>

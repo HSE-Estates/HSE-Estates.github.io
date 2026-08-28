@@ -292,14 +292,24 @@ RS.AI = (function () {
      privacy floor: 768 px is plenty for detection and useless for recognising
      the people who live there. */
   function frameFromVideo(video, maxDim) {
+    return downscale(video, video.videoWidth, video.videoHeight, maxDim,
+      'No camera frame is available.');
+  }
+
+  /* Same, for a still frame captured during a sweep. */
+  function frameFromImage(img, maxDim) {
+    return downscale(img, img.naturalWidth, img.naturalHeight, maxDim,
+      'That frame has not finished loading.');
+  }
+
+  function downscale(source, vw, vh, maxDim, missingMessage) {
     maxDim = maxDim || 768;
-    var vw = video.videoWidth, vh = video.videoHeight;
-    if (!vw || !vh) throw new Error('No camera frame is available.');
+    if (!vw || !vh) throw new Error(missingMessage);
     var scale = Math.min(1, maxDim / Math.max(vw, vh));
     var canvas = document.createElement('canvas');
     canvas.width = Math.round(vw * scale);
     canvas.height = Math.round(vh * scale);
-    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
     return canvas.toDataURL('image/jpeg', 0.82);
   }
 
@@ -407,7 +417,7 @@ RS.AI = (function () {
     enabled: enabled, spaceEnabled: spaceEnabled,
     summarise: summarise, run: run,
     applyClassification: applyClassification, applyStyle: applyStyle,
-    frameFromVideo: frameFromVideo, callSpace: callSpace,
+    frameFromVideo: frameFromVideo, frameFromImage: frameFromImage, callSpace: callSpace,
     detectObjects: detectObjects, detectionsToPlacements: detectionsToPlacements,
     applyDetections: applyDetections,
     testConnection: testConnection
