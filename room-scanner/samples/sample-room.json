@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "name": "Sample survey — first floor bedroom",
+  "units": "m",
+  "presentation": {
+    "style": "presentation",
+    "showDimensions": true,
+    "showAreas": true,
+    "showLabels": true,
+    "showFurniture": true,
+    "showNorth": true,
+    "showGrid": false,
+    "dimensionUnits": "m"
+  },
+  "rooms": [
+    {
+      "name": "Bedroom 1",
+      "type": "bedroom",
+      "ceilingHeight": 2.4,
+      "notes": "Worked example. Dimensions are made up but plausible.",
+      "capture": {
+        "method": "station",
+        "cameraHeight": 1.45,
+        "fovDeg": 66,
+        "scaleCorrected": true
+      },
+      "points": [
+        { "x": 0.00, "y": 0.00, "confidence": 0.92 },
+        { "x": 4.20, "y": 0.00, "confidence": 0.88 },
+        { "x": 4.20, "y": 3.40, "confidence": 0.90 },
+        { "x": 0.00, "y": 3.40, "confidence": 0.86 }
+      ],
+      "walls": [
+        { "thickness": 0.30, "exterior": true },
+        { "thickness": 0.10, "exterior": false },
+        { "thickness": 0.10, "exterior": false },
+        { "thickness": 0.30, "exterior": true }
+      ],
+      "openings": [
+        { "type": "window", "wallIndex": 0, "offset": 2.10, "width": 1.35, "sill": 0.9, "height": 1.3 },
+        { "type": "door", "wallIndex": 2, "offset": 3.10, "width": 0.81, "hinge": "start", "swing": "in" }
+      ],
+      "objects": [
+        { "type": "bed_double", "x": 2.10, "y": 1.05, "rot": 0, "confidence": 1 },
+        { "type": "bedside", "x": 1.20, "y": 0.30, "rot": 0, "confidence": 1 },
+        { "type": "bedside", "x": 3.00, "y": 0.30, "rot": 0, "confidence": 1 },
+        { "type": "wardrobe", "x": 0.35, "y": 2.50, "rot": 90, "confidence": 1 },
+        { "type": "dresser", "x": 3.65, "y": 2.60, "rot": 90, "confidence": 0.48 },
+        { "type": "radiator", "x": 0.06, "y": 0.90, "rot": 90, "confidence": 1 }
+      ]
+    }
+  ]
+}

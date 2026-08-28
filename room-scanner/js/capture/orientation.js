@@ -20,6 +20,7 @@ RS.Orientation = (function () {
   var supported = ('DeviceOrientationEvent' in window);
   var haveSample = false;
   var lastEventAt = 0;
+  var sampleCount = 0;
 
   var euler = { alpha: 0, beta: 90, gamma: 0 };   // smoothed
   var rawEuler = { alpha: 0, beta: 90, gamma: 0 };
@@ -64,6 +65,7 @@ RS.Orientation = (function () {
   function onEvent(ev) {
     if (ev.alpha == null && ev.beta == null && ev.gamma == null) return;
     lastEventAt = Date.now();
+    sampleCount += 1;
 
     var a = ev.alpha == null ? rawEuler.alpha : ev.alpha;
     /* iOS exposes a true compass heading; it runs the opposite way to alpha. */
@@ -154,9 +156,20 @@ RS.Orientation = (function () {
     return wrap360(Math.atan2(f.x, f.y) * 180 / Math.PI);
   }
 
-  /* 0..1 quality estimate. Indoors the magnetometer is the weak link, so
+  /* Is there a usable orientation reading at all?
+
+     Kept strictly separate from quality() below. quality() falls as the phone
+     MOVES, because jitter and genuine rotation are indistinguishable from a
+     single sample — so it goes to zero exactly while you are turning. Anything
+     that needs to know "do we have a pose" must ask this, not quality(), or it
+     will reject every reading taken during a sweep. */
+  function hasPose() {
+    return haveSample && (Date.now() - lastEventAt) < 1500;
+  }
+
+  /* 0..1 steadiness estimate. Indoors the magnetometer is the weak link, so
      alpha jitter dominates. Shown to the user, and stored on each captured
-     point as its confidence. */
+     point as its confidence. Low means "moving or noisy", not "unusable". */
   function quality() {
     if (!haveSample) return 0;
     var age = Date.now() - lastEventAt;
@@ -168,7 +181,10 @@ RS.Orientation = (function () {
   function getState() {
     return {
       supported: supported,
-      live: haveSample && (Date.now() - lastEventAt) < 1500,
+      listening: listening,
+      needsPermission: needsPermission(),
+      sampleCount: sampleCount,
+      live: hasPose(),
       absolute: absolute,
       euler: { alpha: euler.alpha, beta: euler.beta, gamma: euler.gamma },
       quality: quality(),
@@ -195,6 +211,6 @@ RS.Orientation = (function () {
     start: start, stop: stop, onChange: onChange,
     matrix: matrix, applyMatrix: applyMatrix, rotateForScreen: rotateForScreen,
     screenAngle: screenAngle, cameraPitch: cameraPitch, cameraYaw: cameraYaw,
-    quality: quality, getState: getState, snapshot: snapshot
+    quality: quality, hasPose: hasPose, getState: getState, snapshot: snapshot
   };
 })();

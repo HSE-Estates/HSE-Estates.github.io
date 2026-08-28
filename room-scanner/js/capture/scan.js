@@ -31,6 +31,8 @@ RS.Scan = (function () {
   var objects = [];               // { type, x, y, rot, confidence }
   var pendingJamb = null;         // first jamb tap while placing an opening
   var draftRoom = null;           // rebuilt after every corner so bearings work
+  var cameraErrorMessage = null;  // friendly text shown to the user
+  var cameraErrorName = null;     // raw DOMException name, used to give advice
 
   var opts = { cameraHeight: 1.45, fovDeg: 66, mirrored: false };
 
@@ -94,6 +96,7 @@ RS.Scan = (function () {
       var settings = track ? track.getSettings() : {};
       opts.mirrored = settings.facingMode === 'user';
     }).catch(function (err) {
+      cameraErrorName = err ? err.name : null;
       cameraFailed(err && err.name === 'NotAllowedError'
         ? 'Camera access was declined.'
         : 'No camera available. On a laptop this usually means the page is not on https or localhost.');
@@ -101,6 +104,7 @@ RS.Scan = (function () {
   }
 
   function cameraFailed(msg) {
+    cameraErrorMessage = msg;
     RS.UI.toast(msg + ' You can still draw the room by hand.', 'error');
     if (el.cameraError) {
       el.cameraError.textContent = msg;
@@ -557,6 +561,7 @@ RS.Scan = (function () {
           a += '<button type="button" class="btn btn-lg btn-record" data-act="sweep-start">Record</button>';
           a += '<button type="button" class="btn btn-sm" data-act="height">Height ' +
                opts.cameraHeight.toFixed(2) + ' m</button>';
+          a += '<button type="button" class="btn btn-sm" data-act="checkup">Check setup</button>';
         }
         el.actions.innerHTML = a;
         return;
@@ -637,18 +642,72 @@ RS.Scan = (function () {
   }
 
   function sweepStop() {
-    RS.Sweep.stop();
-    var sw = RS.Sweep.status();
-    if (!sw.count) {
-      RS.UI.toast('Nothing was captured — check the camera and motion permissions.', 'error');
-    } else {
-      step = 'corners';
-      RS.UI.toast(sw.count + ' frames over ' + sw.swept + '°. Now slide through them and tap each corner.');
-      if (sw.swept < 200) {
-        RS.UI.toast('You only turned about ' + sw.swept + '°. If a corner is missing, re-record and go the whole way round.', 'warn');
+    RS.Sweep.stop(function (sw) {
+      if (!sw.count) {
+        /* Say which thing failed. "Check your permissions" is what you write
+           when you did not bother to find out. */
+        var why;
+        if (sw.skipped.noVideo && !sw.skipped.noPose) {
+          why = 'the camera produced no picture. Check that no other app is using it, then reopen this page.';
+        } else if (sw.skipped.noPose && !sw.skipped.noVideo) {
+          why = 'the phone stopped reporting its orientation. Tap "Check setup" to see whether motion access was allowed.';
+        } else if (sw.skipped.encodeFailed) {
+          why = 'the frames could not be saved — the phone may be low on memory. Close some tabs and try a shorter sweep.';
+        } else if (sw.skipped.noVideo && sw.skipped.noPose) {
+          why = 'neither the camera nor the motion sensor produced anything. Tap "Check setup".';
+        } else {
+          why = 'no frames were grabbed at all. Tap "Check setup" to see what is missing.';
+        }
+        RS.UI.toast('Nothing was captured — ' + why, 'error');
+      } else {
+        step = 'corners';
+        RS.UI.toast(sw.count + ' frames over ' + sw.swept + '°. Now slide through them and tap each corner.');
+        if (sw.swept < 200) {
+          RS.UI.toast('You only turned about ' + sw.swept + '°. If a corner is missing, re-record and go the whole way round.', 'warn');
+        }
       }
-    }
+      renderChrome();
+    });
     renderChrome();
+  }
+
+  /* -- Setup diagnosis ------------------------------------------------------
+     Everything that has to be true for a scan to work, and which of them is
+     not. Replaces guessing at permission dialogs that never appeared. */
+  function diagnose() {
+    var os = O.getState();
+    var secure = window.isSecureContext;
+    var proto = location.protocol;
+    var hasMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    var track = stream && stream.getVideoTracks ? stream.getVideoTracks()[0] : null;
+
+    return {
+      secureContext: secure,
+      protocol: proto,
+      host: location.hostname,
+      cameraApi: hasMedia,
+      cameraStream: !!stream,
+      cameraLive: !!(track && track.readyState === 'live'),
+      cameraLabel: track ? (track.label || 'camera') : null,
+      videoSize: el.video ? [el.video.videoWidth, el.video.videoHeight] : [0, 0],
+      lastCameraError: cameraErrorMessage,
+      cameraErrorName: cameraErrorName,
+      motionSupported: os.supported,
+      motionListening: os.listening,
+      motionNeedsPermission: os.needsPermission,
+      motionSamples: os.sampleCount,
+      motionLive: os.live,
+      steadiness: os.quality
+    };
+  }
+
+  /* Ask for motion access again. iOS only ever shows this dialog from inside a
+     real user gesture, so it has to be reachable from a button. */
+  function requestMotion() {
+    return O.requestPermission().then(function (r) {
+      if (r === 'granted') { O.start(); }
+      return r;
+    });
   }
 
   function sweepAgain() {
@@ -797,6 +856,7 @@ RS.Scan = (function () {
     setHeight: setHeight, finish: finish, autoCalibrate: autoCalibrate,
     runDetection: runDetection,
     setMode: setMode, sweepStart: sweepStart, sweepStop: sweepStop,
+    diagnose: diagnose, requestMotion: requestMotion,
     sweepAgain: sweepAgain, sweepSeek: sweepSeek, sweepStep: sweepStep,
     reviewing: reviewing,
     get mode() { return mode; },

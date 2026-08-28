@@ -44,6 +44,9 @@ RS.Sweep = (function () {
   var startedAt = 0;
   var lastYaw = null;
   var sweptDeg = 0;
+  /* Why frames were dropped, so a failed sweep can say what actually went
+     wrong instead of guessing at permissions. */
+  var skipped = { noVideo: 0, noPose: 0, encodeFailed: 0 };
 
   function on(fn) { listeners.push(fn); return function () { listeners = listeners.filter(function (f) { return f !== fn; }); }; }
   function emit() { listeners.forEach(function (f) { try { f(status()); } catch (e) { console.error(e); } }); }
@@ -55,7 +58,8 @@ RS.Sweep = (function () {
       index: index,
       seconds: state === 'recording' ? (Date.now() - startedAt) / 1000 : 0,
       swept: Math.round(sweptDeg),
-      full: frames.length >= MAX_FRAMES
+      full: frames.length >= MAX_FRAMES,
+      skipped: { noVideo: skipped.noVideo, noPose: skipped.noPose, encodeFailed: skipped.encodeFailed }
     };
   }
 
@@ -85,10 +89,15 @@ RS.Sweep = (function () {
 
   function grab(videoEl, canvas, ctx) {
     var vw = videoEl.videoWidth, vh = videoEl.videoHeight;
-    if (!vw || !vh) return;
+    if (!vw || !vh) { skipped.noVideo += 1; return; }
 
+    /* hasPose(), NOT quality(). quality falls as the phone moves and hits zero
+       exactly while you are turning — gating on it threw away every frame of
+       the sweep and reported it as a permissions problem. A moving frame is
+       still perfectly measurable; its steadiness is recorded and carried into
+       the corner's confidence instead. */
+    if (!O.hasPose()) { skipped.noPose += 1; return; }
     var orient = O.snapshot();
-    if (!orient || orient.quality <= 0) return;   // no pose, no use
 
     var k = Math.min(1, MAX_DIM / Math.max(vw, vh));
     var w = Math.round(vw * k), h = Math.round(vh * k);
@@ -105,7 +114,8 @@ RS.Sweep = (function () {
     lastYaw = yaw;
 
     canvas.toBlob(function (blob) {
-      if (!blob || state === 'idle') return;
+      if (!blob) { skipped.encodeFailed += 1; emit(); return; }
+      if (state === 'idle') return;
       frames.push({
         url: URL.createObjectURL(blob),
         w: w,
@@ -118,17 +128,18 @@ RS.Sweep = (function () {
     }, 'image/jpeg', 0.82);
   }
 
-  function stop() {
-    if (state !== 'recording') return;
+  /* toBlob is asynchronous, so the last frames grabbed are still encoding when
+     Stop is pressed. Settling briefly before judging the sweep avoids
+     announcing "nothing was captured" while frames are still arriving. */
+  function stop(done) {
+    if (state !== 'recording') { if (done) done(status()); return; }
     if (timer) { clearInterval(timer); timer = null; }
-    if (!frames.length) {
-      state = 'idle';
+    setTimeout(function () {
+      state = frames.length ? 'review' : 'idle';
+      index = 0;
       emit();
-      return;
-    }
-    state = 'review';
-    index = 0;
-    emit();
+      if (done) done(status());
+    }, 350);
   }
 
   /* -- Review -------------------------------------------------------------- */
@@ -171,6 +182,7 @@ RS.Sweep = (function () {
     index = 0;
     sweptDeg = 0;
     lastYaw = null;
+    skipped = { noVideo: 0, noPose: 0, encodeFailed: 0 };
     state = 'idle';
     emit();
   }
