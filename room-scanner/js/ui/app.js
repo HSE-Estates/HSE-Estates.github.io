@@ -307,6 +307,7 @@ RS.UI = (function () {
         RS.Scan.setStep(s2.step === 'objects' ? 'openings' : 'corners');
         syncScanSteps();
       } else if (act === 'detect') RS.Scan.runDetection();
+      else if (act === 'auto') autoBuildFlow();
       else if (act === 'checkup') checkupModal();
       else if (act === 'sweep-start') RS.Scan.sweepStart();
       else if (act === 'sweep-stop') RS.Scan.sweepStop();
@@ -409,6 +410,103 @@ RS.UI = (function () {
       }]);
     el.modal.querySelectorAll('[data-h]').forEach(function (b) {
       b.onclick = function () { document.getElementById('m-height').value = b.getAttribute('data-h'); };
+    });
+  }
+
+  /* The automatic path: hand the sweep to the Space, get a room back, name it,
+     put it on the plan. No tapping anywhere in here. */
+  function autoBuildFlow() {
+    var progress = 'Starting…';
+    openModal('Building the plan', '' +
+      '<p id="ab-status">' + escapeHtml(progress) + '</p>' +
+      '<div class="level-bar" style="background:var(--surface-3)">' +
+        '<i style="width:100%;background:var(--hse-teal-500);animation:none"></i></div>' +
+      '<p class="hint" style="margin-top:12px">The segmentation model is finding the floor in each ' +
+      'frame and measuring where it meets the walls. A cold Space can take a minute to wake before ' +
+      'it starts.</p>', []);
+
+    function say(msg) {
+      var node = document.getElementById('ab-status');
+      if (node) node.textContent = msg;
+    }
+
+    RS.Scan.autoBuild(say).then(function (out) {
+      var res = out.result;
+      var room;
+      try {
+        room = RS.Reconstruct.toRoom(res, 'Scanned room', 'other', out.options);
+        RS.Scan.mergeTapped(room);
+      } catch (e) {
+        closeModal();
+        toast(e.message, 'error');
+        return;
+      }
+
+      var area = S.roomArea(room);
+      var coverage = Math.round((Number(res.coverage) || 0) * 100);
+      var types = S.ROOM_TYPES.map(function (t) {
+        return '<option value="' + t.id + '">' + t.label + '</option>';
+      }).join('');
+
+      closeModal();
+      openModal('The plan it built', '' +
+        '<div class="row" style="margin-bottom:12px">' +
+          '<div><div class="hint">Floor area</div><b style="font-size:1.3rem">' +
+            G.formatArea(area, Store.state.project.presentation.dimensionUnits) + '</b></div>' +
+          '<div><div class="hint">Corners</div><b style="font-size:1.3rem">' + room.points.length + '</b></div>' +
+          '<div><div class="hint">Openings</div><b style="font-size:1.3rem">' + room.openings.length + '</b></div>' +
+          '<div><div class="hint">Items</div><b style="font-size:1.3rem">' + room.objects.length + '</b></div>' +
+        '</div>' +
+        (coverage < 85
+          ? '<div class="notice warn">The sweep covered about ' + coverage + '% of a full turn, so ' +
+            'part of the room was never in shot. Check the outline before trusting it.</div>'
+          : '') +
+        '<label class="field" style="margin-top:12px"><span>Room name</span>' +
+          '<input type="text" id="ab-name" value="Room ' +
+          ((Store.state.project.rooms.filter(function (r) { return r.points.length; }).length) + 1) + '"></label>' +
+        '<label class="field"><span>Room type</span><select id="ab-type">' + types + '</select></label>' +
+        '<p class="hint">Everything here was measured from the pictures, not drawn by hand — treat it ' +
+        'as a first draft and drag anything that looks wrong. You will be asked for one tape ' +
+        'measurement next, which is what makes the dimensions real.</p>',
+        [{ label: 'Discard', ghost: true }, {
+          label: 'Use this plan', primary: true, action: function () {
+            room.name = document.getElementById('ab-name').value.slice(0, 40) || 'Scanned room';
+            room.type = document.getElementById('ab-type').value;
+            RS.Scan.stop();
+            Store.do('Add reconstructed room', function (p) {
+              p.rooms = p.rooms.filter(function (r) { return r.points.length >= 3; });
+              var right = -Infinity;
+              S.roomsOnStorey(p, room.storey).forEach(function (r) {
+                right = Math.max(right, S.bounds(r).maxX);
+              });
+              if (isFinite(right)) {
+                var b = S.bounds(room);
+                G.translateRoom(room, right + 2.0 - b.minX, -b.minY);
+              } else {
+                room.placed = true;
+              }
+              p.rooms.push(room);
+            });
+            Store.setActiveRoom(room.id);
+            show('plan');
+            setTimeout(function () { scaleModal(function () { offerJoin(room); }); }, 350);
+          }
+        }], true);
+    }).catch(function (e) {
+      closeModal();
+      var extra = '';
+      if (e.diagnostics) {
+        var d = e.diagnostics;
+        extra = '<p class="hint">Frames sent: ' + (d.frames || 0) +
+          ' · used: ' + (d.used || 0) +
+          ' · with no floor found: ' + (d.no_floor || 0) + '</p>';
+      }
+      openModal('It could not build the plan', '' +
+        '<div class="notice error">' + escapeHtml(e.message) + '</div>' + extra +
+        '<p class="hint" style="margin-top:12px">Most often this is the camera being held too high, ' +
+        'so the bottom of the walls never appears. Point it down a little and sweep again. You can ' +
+        'always fall back to tapping the corners.</p>',
+        [{ label: 'Close', primary: true }]);
     });
   }
 

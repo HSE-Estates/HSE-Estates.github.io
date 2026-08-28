@@ -568,6 +568,11 @@ RS.Scan = (function () {
       }
 
       if (reviewing()) {
+        /* The automatic path leads, because it is the one that means no
+           tapping. Tapping stays available underneath it. */
+        if (RS.AI.spaceEnabled()) {
+          a += '<button type="button" class="btn btn-accent btn-sm" data-act="auto">Build plan automatically</button>';
+        }
         a += '<button type="button" class="btn btn-sm" data-act="sweep-again">Re-record</button>';
       }
       a += '<button type="button" class="btn btn-sm" data-act="undo"' + (canUndo() ? '' : ' disabled') + '>Undo tap</button>';
@@ -721,6 +726,34 @@ RS.Scan = (function () {
   function sweepSeek(i) { RS.Sweep.seek(i); renderChrome(); }
   function sweepStep(d) { RS.Sweep.step(d); renderChrome(); }
 
+  /* Hand the whole sweep to the Space and let it build the room. */
+  function autoBuild(onProgress) {
+    var sw = RS.Sweep.status();
+    if (sw.state !== 'review' || !sw.count) {
+      return Promise.reject(new Error('Record a sweep first.'));
+    }
+    if (sw.swept < 150) {
+      RS.UI.toast('You only turned about ' + sw.swept + '°, so the far side of the room ' +
+        'was never in shot. Expect gaps.', 'warn');
+    }
+    return RS.Reconstruct.run(RS.Sweep.frames, opts, onProgress)
+      .then(function (res) {
+        return { result: res, options: { cameraHeight: opts.cameraHeight, fovDeg: opts.fovDeg } };
+      });
+  }
+
+  /* Carry anything already tapped into an automatically built room, so
+     switching to automatic never silently discards work. */
+  function mergeTapped(room) {
+    objects.forEach(function (o) {
+      if (!S.OBJECTS[o.type]) return;
+      var ob = S.newObject(o.type, o.x, o.y, o.rot || 0);
+      ob.confidence = 1;                       // a person put this one here
+      room.objects.push(ob);
+    });
+    return room;
+  }
+
   function setHeight(m) {
     opts.cameraHeight = G.clamp(Number(m) || 1.45, 0.6, 2.4);
     Store.saveSettings({ cameraHeight: opts.cameraHeight });
@@ -857,6 +890,7 @@ RS.Scan = (function () {
     runDetection: runDetection,
     setMode: setMode, sweepStart: sweepStart, sweepStop: sweepStop,
     diagnose: diagnose, requestMotion: requestMotion,
+    autoBuild: autoBuild, mergeTapped: mergeTapped,
     sweepAgain: sweepAgain, sweepSeek: sweepSeek, sweepStep: sweepStep,
     reviewing: reviewing,
     get mode() { return mode; },
