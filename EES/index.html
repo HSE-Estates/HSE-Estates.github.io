@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>East End Surgery | Drimoleague</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e', // Slate-navy matching logo
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom styles for smooth image loading and slight adjustments */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+        .hero-pattern {
+            background-color: #f8fafc;
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2394a3b8' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans antialiased flex flex-col min-h-screen">
+
+    <!-- Top Info Bar -->
+    <div class="bg-brand-900 text-white text-xs py-2 px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center z-50 relative">
+        <div class="flex items-center space-x-4 mb-2 sm:mb-0">
+            <span><i class="fa-solid fa-location-dot mr-2 text-brand-500"></i> Baurnahulla, Drimoleague</span>
+        </div>
+        <div class="flex items-center space-x-6">
+            <a href="tel:02831222" class="hover:text-brand-100 transition-colors"><i class="fa-solid fa-phone mr-2 text-brand-500"></i>(028) 31222</a>
+            <span class="text-brand-100">|</span>
+            <span class="font-semibold text-red-300"><i class="fa-solid fa-truck-medical mr-2"></i>Southdoc: 0818 355 999</span>
+        </div>
+    </div>
+
+    <!-- Main Navigation -->
+    <nav class="bg-white shadow-sm sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-20">
+                <!-- Logo area -->
+                <div class="flex items-center">
+                    <a href="#" class="flex items-center gap-3">
+                        <!-- Using the provided user logo -->
+                        <img class="h-16 w-auto object-contain" src="file_000000004d248210839f782415c89630.png" alt="East End Surgery Logo">
+                        <div class="flex flex-col">
+                            <span class="font-bold text-xl text-brand-900 tracking-tight leading-none">East End</span>
+                            <span class="text-sm font-medium text-gray-500 uppercase tracking-widest leading-none mt-1">Surgery</span>
+                        </div>
+                    </a>
+                </div>
+                
+                <!-- Desktop Menu -->
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#" class="text-brand-900 font-medium hover:text-brand-600 transition-colors border-b-2 border-transparent hover:border-brand-600 pb-1">Home</a>
+                    <a href="#about" class="text-gray-600 font-medium hover:text-brand-600 transition-colors">Our Team</a>
+                    <a href="#services" class="text-gray-600 font-medium hover:text-brand-600 transition-colors">Services</a>
+                    <a href="#contact" class="text-gray-600 font-medium hover:text-brand-600 transition-colors">Contact</a>
+                    <a href="#prescriptions" class="bg-brand-600 text-white px-5 py-2.5 rounded-full font-medium hover:bg-brand-700 shadow-md transition-all transform hover:-translate-y-0.5">Order Prescription</a>
+                </div>
+
+                <!-- Mobile menu button -->
+                <div class="flex items-center md:hidden">
+                    <button type="button" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-500" aria-expanded="false">
+                        <span class="sr-only">Open main menu</span>
+                        <i class="fa-solid fa-bars text-2xl text-brand-900"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Menu (Hidden by default) -->
+        <div class="md:hidden hidden bg-white border-t border-gray-100 shadow-lg absolute w-full" id="mobile-menu">
+            <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                <a href="#" class="block px-3 py-2 rounded-md text-base font-medium text-brand-900 bg-brand-50">Home</a>
+                <a href="#about" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-brand-900 hover:bg-gray-50">Our Team</a>
+                <a href="#services" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-brand-900 hover:bg-gray-50">Services</a>
+                <a href="#contact" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-brand-900 hover:bg-gray-50">Contact</a>
+                <a href="#prescriptions" class="block mt-4 px-3 py-3 rounded-md text-base font-medium text-white bg-brand-600 text-center mx-2 shadow-sm">Order Prescription</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow">
+        <!-- Hero Section with background image and overlay -->
+        <div class="relative bg-brand-900 overflow-hidden">
+            <!-- Background Image -->
+            <div class="absolute inset-0">
+                <img class="w-full h-full object-cover opacity-30 mix-blend-multiply" src="https://images.unsplash.com/photo-1579684385127-1ef15d508118?q=80&w=2080&auto=format&fit=crop" alt="Medical Background">
+                <div class="absolute inset-0 bg-gradient-to-t from-brand-900/90 via-brand-900/60 to-transparent"></div>
+            </div>
+            
+            <div class="relative max-w-7xl mx-auto py-24 px-4 sm:py-32 sm:px-6 lg:px-8 text-center lg:text-left flex flex-col lg:flex-row items-center">
+                <div class="lg:w-2/3">
+                    <h1 class="text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl drop-shadow-md">
+                        Comprehensive care for the <span class="text-brand-100">Drimoleague</span> community.
+                    </h1>
+                    <p class="mt-6 text-xl text-gray-200 max-w-3xl drop-shadow">
+                        Providing friendly, empathetic, and evidence-based healthcare to individuals and families in West Cork.
+                    </p>
+                    <div class="mt-10 flex justify-center lg:justify-start gap-4 flex-col sm:flex-row">
+                        <a href="tel:02831222" class="inline-flex items-center justify-center px-8 py-3.5 border border-transparent text-base font-medium rounded-full shadow-lg text-brand-900 bg-white hover:bg-gray-50 transition-all transform hover:-translate-y-1">
+                            <i class="fa-solid fa-phone mr-2"></i> Call to Book
+                        </a>
+                        <a href="#services" class="inline-flex items-center justify-center px-8 py-3.5 border-2 border-white text-base font-medium rounded-full text-white hover:bg-white hover:text-brand-900 transition-all">
+                            View Services
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Essential Info Cards - Overlapping the Hero -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 sm:-mt-24 relative z-10 mb-16">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                <!-- Location Card -->
+                <div class="bg-white rounded-2xl shadow-xl p-8 border-t-4 border-brand-600 flex flex-col h-full transform transition duration-300 hover:shadow-2xl hover:-translate-y-1">
+                    <div class="w-12 h-12 bg-brand-100 text-brand-600 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fa-solid fa-house-medical text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Practice Location</h3>
+                    <address class="not-italic text-gray-600 flex-grow leading-relaxed">
+                        East End Surgery<br>
+                        East End, Baurnahulla<br>
+                        Drimoleague, Co. Cork<br>
+                        P47 HP90
+                    </address>
+                    <div class="mt-6 pt-6 border-t border-gray-100">
+                        <a href="https://maps.google.com/?q=East+End+Surgery+Drimoleague" target="_blank" class="text-brand-600 font-semibold hover:text-brand-800 inline-flex items-center">
+                            Get Directions <i class="fa-solid fa-arrow-right ml-2 text-sm"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Hours Card -->
+                <div class="bg-white rounded-2xl shadow-xl p-8 border-t-4 border-brand-500 flex flex-col h-full transform transition duration-300 hover:shadow-2xl hover:-translate-y-1">
+                    <div class="w-12 h-12 bg-brand-50 text-brand-500 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fa-solid fa-clock text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">Working Hours</h3>
+                    <div class="flex-grow space-y-3">
+                        <div class="flex justify-between items-center text-gray-700">
+                            <span class="font-medium">Mon - Fri</span>
+                            <div class="text-right text-sm">
+                                <div>9:00am - 1:00pm</div>
+                                <div>2:00pm - 5:00pm</div>
+                            </div>
+                        </div>
+                        <div class="w-full h-px bg-gray-100 my-2"></div>
+                        <div class="flex justify-between items-center text-gray-500">
+                            <span>Weekends & Bank Holidays</span>
+                            <span class="font-medium text-red-500 bg-red-50 px-2 py-1 rounded">Closed</span>
+                        </div>
+                    </div>
+                    <div class="mt-6 pt-6 border-t border-gray-100 text-sm text-gray-500 flex items-start">
+                        <i class="fa-solid fa-circle-info text-brand-500 mt-1 mr-2"></i>
+                        <p>For urgent out-of-hours care, please contact Southdoc at <strong class="text-gray-800">0818 355 999</strong>.</p>
+                    </div>
+                </div>
+
+                <!-- Appointments Card -->
+                <div class="bg-white rounded-2xl shadow-xl p-8 border-t-4 border-brand-700 flex flex-col h-full transform transition duration-300 hover:shadow-2xl hover:-translate-y-1">
+                    <div class="w-12 h-12 bg-brand-100 text-brand-700 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fa-regular fa-calendar-check text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Appointments</h3>
+                    <p class="text-gray-600 mb-6 flex-grow">Book a consultation or make a general enquiry by calling our reception team.</p>
+                    
+                    <a href="tel:02831222" class="w-full flex items-center justify-center px-4 py-3 border border-transparent text-base font-semibold rounded-lg text-white bg-brand-900 hover:bg-brand-800 transition-colors shadow-sm mb-4">
+                        <i class="fa-solid fa-phone mr-2"></i> (028) 31222
+                    </a>
+                    
+                    <div class="text-center text-sm text-gray-500 mt-auto">
+                        Existing patient? <br>
+                        <a href="#prescriptions" class="text-brand-600 font-semibold hover:underline mt-1 inline-block">Order prescriptions online here</a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Our Team Section -->
+        <section id="about" class="py-16 bg-gray-50 hero-pattern">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl font-bold text-brand-900 sm:text-4xl">The Family Doctors of Drimoleague</h2>
+                    <div class="w-24 h-1 bg-brand-500 mx-auto mt-4 rounded-full"></div>
+                    <p class="mt-4 text-xl text-gray-600 max-w-2xl mx-auto">Committed to providing exceptional, patient-centered care for every stage of life.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-4xl mx-auto">
+                    <!-- Doctor 1 -->
+                    <div class="bg-white rounded-2xl p-8 shadow-md hover:shadow-lg transition-shadow border border-gray-100 flex flex-col sm:flex-row gap-6 items-center sm:items-start text-center sm:text-left">
+                        <img src="https://ui-avatars.com/api/?name=Michael+McNamara&background=075985&color=fff&size=128&font-size=0.33" alt="Dr. Michael McNamara" class="w-24 h-24 rounded-full shadow-inner ring-4 ring-brand-50">
+                        <div>
+                            <h3 class="text-2xl font-bold text-gray-900">Dr. Michael McNamara</h3>
+                            <p class="text-brand-600 font-medium mb-3">General Practitioner</p>
+                            <p class="text-gray-600 leading-relaxed text-sm">
+                                Dr. McNamara has been a cornerstone of healthcare in the Drimoleague community, offering extensive experience in all aspects of general practice and family medicine.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Doctor 2 (Dr. Chidi Ejim) -->
+                    <div class="bg-white rounded-2xl p-8 shadow-md hover:shadow-lg transition-shadow border border-gray-100 flex flex-col sm:flex-row gap-6 items-center sm:items-start text-center sm:text-left">
+                        <img src="https://ui-avatars.com/api/?name=Chidi+Ejim&background=0284c7&color=fff&size=128&font-size=0.33" alt="Dr. Chidi Ejim" class="w-24 h-24 rounded-full shadow-inner ring-4 ring-brand-50">
+                        <div>
+                            <h3 class="text-2xl font-bold text-gray-900">Dr. Chidi Ejim</h3>
+                            <p class="text-brand-600 font-medium mb-3">General Practitioner</p>
+                            <p class="text-gray-600 leading-relaxed text-sm">
+                                Dr. Ejim is a dedicated GP committed to creating a comfortable environment. He focuses on empowering patients through clear explanations and personalized treatment plans.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Services Section -->
+        <section id="services" class="py-20 bg-white">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl font-bold text-brand-900 sm:text-4xl">Community Medical Care</h2>
+                    <p class="mt-4 text-xl text-gray-600 max-w-2xl mx-auto">We offer a comprehensive suite of professional healthcare services.</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Service Item -->
+                    <div class="p-6 rounded-2xl bg-gray-50 border border-gray-100 hover:bg-brand-50 hover:border-brand-200 transition-colors group text-center flex flex-col items-center">
+                        <div class="w-14 h-14 bg-white rounded-full shadow-sm flex items-center justify-center text-brand-600 group-hover:bg-brand-600 group-hover:text-white transition-colors mb-4">
+                            <i class="fa-solid fa-stethoscope text-xl"></i>
+                        </div>
+                        <h4 class="text-lg font-bold text-gray-900 mb-2">General Practice</h4>
+                        <p class="text-sm text-gray-600">Routine check-ups, acute illness management, and preventative care.</p>
+                    </div>
+
+                    <div class="p-6 rounded-2xl bg-gray-50 border border-gray-100 hover:bg-brand-50 hover:border-brand-200 transition-colors group text-center flex flex-col items-center">
+                        <div class="w-14 h-14 bg-white rounded-full shadow-sm flex items-center justify-center text-brand-600 group-hover:bg-brand-600 group-hover:text-white transition-colors mb-4">
+                            <i class="fa-solid fa-vial-circle-check text-xl"></i>
+                        </div>
+                        <h4 class="text-lg font-bold text-gray-900 mb-2">Blood Tests</h4>
+                        <p class="text-sm text-gray-600">Comprehensive phlebotomy services and laboratory investigations.</p>
+                    </div>
+
+                    <div class="p-6 rounded-2xl bg-gray-50 border border-gray-100 hover:bg-brand-50 hover:border-brand-200 transition-colors group text-center flex flex-col items-center">
+                        <div class="w-14 h-14 bg-white rounded-full shadow-sm flex items-center justify-center text-brand-600 group-hover:bg-brand-600 group-hover:text-white transition-colors mb-4">
+                            <i class="fa-solid fa-baby text-xl"></i>
+                        </div>
+                        <h4 class="text-lg font-bold text-gray-900 mb-2">Maternity & Infant</h4>
+                        <p class="text-sm text-gray-600">Antenatal care, childhood immunizations, and developmental checks.</p>
+                    </div>
+
+                    <div class="p-6 rounded-2xl bg-gray-50 border border-gray-100 hover:bg-brand-50 hover:border-brand-200 transition-colors group text-center flex flex-col items-center">
+                        <div class="w-14 h-14 bg-white rounded-full shadow-sm flex items-center justify-center text-brand-600 group-hover:bg-brand-600 group-hover:text-white transition-colors mb-4">
+                            <i class="fa-solid fa-heart-pulse text-xl"></i>
+                        </div>
+                        <h4 class="text-lg font-bold text-gray-900 mb-2">Chronic Care</h4>
+                        <p class="text-sm text-gray-600">Ongoing management for asthma, diabetes, heart disease, and more.</p>
+                    </div>
+                </div>
+
+                <div class="mt-12 text-center">
+                    <a href="tel:02831222" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-full shadow-sm text-white bg-brand-700 hover:bg-brand-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 transition-colors">
+                        Enquire About Services
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Registration Banner -->
+        <section class="bg-gradient-to-r from-brand-900 to-brand-700 py-16 relative overflow-hidden">
+            <!-- Decorative circle -->
+            <div class="absolute -right-24 -top-24 w-96 h-96 rounded-full bg-white opacity-5"></div>
+            <div class="absolute -left-24 -bottom-24 w-72 h-72 rounded-full bg-white opacity-5"></div>
+            
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+                <h2 class="text-3xl font-extrabold text-white mb-4">New to the Area?</h2>
+                <p class="text-lg text-brand-100 mb-8 max-w-2xl mx-auto">
+                    We are currently accepting new patients from Drimoleague and surrounding areas. Enrol as a patient of East End Surgery today.
+                </p>
+                <a href="tel:02831222" class="inline-block bg-white text-brand-900 font-bold py-3.5 px-8 rounded-full shadow-lg hover:bg-gray-50 hover:scale-105 transition-transform duration-200">
+                    Register With Us
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-gray-300 pt-16 pb-8 border-t-4 border-brand-500">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
+                
+                <!-- Col 1: Brand -->
+                <div class="space-y-6">
+                    <div class="flex items-center gap-3 bg-white/5 p-3 rounded-xl inline-flex">
+                        <img class="h-12 w-auto filter brightness-0 invert opacity-90" src="file_000000004d248210839f782415c89630.png" alt="Logo outline">
+                        <div class="flex flex-col">
+                            <span class="font-bold text-lg text-white leading-none">East End</span>
+                            <span class="text-xs text-brand-300 uppercase tracking-widest leading-none mt-1">Surgery</span>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-400">
+                        Dedicated family medical practice serving the Drimoleague community with expert, compassionate care.
+                    </p>
+                    <div class="flex space-x-4">
+                        <!-- Social placeholders -->
+                        <a href="#" class="text-gray-400 hover:text-white transition-colors"><i class="fa-brands fa-facebook fa-lg"></i></a>
+                    </div>
+                </div>
+
+                <!-- Col 2: Surgery Details -->
+                <div>
+                    <h3 class="text-white text-lg font-semibold mb-6 border-b border-slate-700 pb-2 inline-block">Surgery Details</h3>
+                    <ul class="space-y-4 text-sm">
+                        <li class="flex items-start">
+                            <i class="fa-solid fa-location-dot mt-1 w-6 text-brand-400"></i>
+                            <span>East End, Baurnahulla,<br>Drimoleague, Co. Cork<br>P47 HP90</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fa-solid fa-phone w-6 text-brand-400"></i>
+                            <a href="tel:02831222" class="hover:text-white transition-colors">(028) 31222</a>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Col 3: Hours -->
+                <div>
+                    <h3 class="text-white text-lg font-semibold mb-6 border-b border-slate-700 pb-2 inline-block">Opening Hours</h3>
+                    <ul class="space-y-3 text-sm">
+                        <li class="flex justify-between">
+                            <span>Monday - Friday</span>
+                            <span class="text-white">9am-1pm & 2pm-5pm</span>
+                        </li>
+                        <li class="flex justify-between text-gray-500">
+                            <span>Weekends & Bank Holidays</span>
+                            <span>Closed</span>
+                        </li>
+                    </ul>
+                    <div class="mt-6 p-4 bg-slate-800 rounded-lg border border-slate-700">
+                        <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Out of Hours</p>
+                        <p class="text-sm font-semibold text-brand-300 flex items-center">
+                            <i class="fa-solid fa-phone mr-2"></i> Southdoc 0818 355 999
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Col 4: Useful Numbers -->
+                <div>
+                    <h3 class="text-white text-lg font-semibold mb-6 border-b border-slate-700 pb-2 inline-block">Useful Numbers</h3>
+                    <ul class="space-y-3 text-sm">
+                        <li class="flex justify-between items-center group">
+                            <span class="group-hover:text-white transition-colors">Bantry General Hospital</span>
+                            <span class="font-mono text-gray-400">027 - 50133</span>
+                        </li>
+                        <li class="flex justify-between items-center group">
+                            <span class="group-hover:text-white transition-colors">Drimoleague Pharmacy</span>
+                            <span class="font-mono text-gray-400">028 - 31116</span>
+                        </li>
+                        <li class="flex justify-between items-center group">
+                            <span class="group-hover:text-white transition-colors">Cork University Hosp.</span>
+                            <span class="font-mono text-gray-400">021 - 4922000</span>
+                        </li>
+                        <li class="flex justify-between items-center group mt-2 pt-2 border-t border-slate-800">
+                            <span class="font-bold text-red-400">Emergency Ambulance</span>
+                            <span class="font-bold text-red-400 text-lg">112</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Bottom Bar -->
+            <div class="border-t border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-gray-500">
+                <p>&copy; <span id="year"></span> East End Surgery. All Rights Reserved.</p>
+                <div class="flex gap-4">
+                    <a href="#" class="hover:text-white transition-colors">Practice Policies</a>
+                    <a href="#" class="hover:text-white transition-colors">Privacy</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Set current year in footer
+        document.getElementById('year').textContent = new Date().getFullYear();
+    </script>
+</body>
+</html>
