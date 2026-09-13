@@ -1,0 +1,14 @@
+{
+  "name": "RegVault",
+  "short_name": "RegVault",
+  "description": "Building regulations, technical guidance and policy — searchable offline.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d1117",
+  "theme_color": "#0b6b5e",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
