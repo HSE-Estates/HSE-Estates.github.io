@@ -1,2433 +1,1362 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="auto">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b6b5e">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="RegVault">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon.svg">
-<title>RegVault</title>
-<style>
-:root{
-  --bg:#f6f7f9; --panel:#ffffff; --panel-2:#f1f3f6; --line:#e2e6ec;
-  --ink:#101828; --ink-2:#475467; --ink-3:#8a94a6;
-  --accent:#0b6b5e; --accent-ink:#ffffff; --accent-soft:#e3f2ee;
-  --warn:#b54708; --warn-soft:#fef0c7; --danger:#b42318; --danger-soft:#fee4e2;
-  --mark:#fde68a; --shadow:0 1px 2px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.08);
-  --r:12px; --r-sm:8px;
-  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+/**
+ * RegVault — backend (Google Apps Script)
+ * -----------------------------------------------------------------------------
+ * Stores regulation / guidance documents in Google Drive, keeps a chunk + vector
+ * index as JSON files in Drive, and serves both to the RegVault web client.
+ *
+ * ONE-TIME SETUP
+ *   1. Run  setupRegVault()  from the editor and accept the permission prompts.
+ *   2. Read the execution log — it prints your first admin access code. Save it.
+ *   3. Project Settings -> Script Properties, add:
+ *        GEMINI_KEY      (free key from aistudio.google.com — enables meaning
+ *                         search and Ask; leave blank for keyword-only)
+ *        FIRECRAWL_KEY   (optional, for discovering documents on the web)
+ *   4. Deploy -> New deployment -> Web app
+ *        Execute as: Me      Who has access: Anyone
+ *      Copy the /exec URL into the RegVault app's Settings screen.
+ *
+ * Nothing in this file is specific to any organisation. Access codes are stored
+ * hashed; document bytes never leave your own Drive.
+ */
+
+var VERSION = '1.0.0';
+
+var SP = PropertiesService.getScriptProperties();
+
+function cfg(k, d) {
+  var v = SP.getProperty(k);
+  return (v === null || v === undefined || v === '') ? d : v;
 }
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    --bg:#0d1117; --panel:#161b22; --panel-2:#1c232c; --line:#2a323d;
-    --ink:#e6edf3; --ink-2:#9aa7b6; --ink-3:#6b7787;
-    --accent:#2ec4a6; --accent-ink:#04211c; --accent-soft:#123029;
-    --warn:#f0b429; --warn-soft:#3a2c0a; --danger:#f97066; --danger-soft:#3d1512;
-    --mark:#7a5b00; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+function setCfg(k, v) { SP.setProperty(k, String(v)); }
+
+var SHEET_DOCS = 'Documents';
+var SHEET_USERS = 'Users';
+var SHEET_AUDIT = 'Audit';
+
+var DOC_HEADERS = ['docId', 'title', 'collection', 'publisher', 'docRef', 'edition',
+  'effectiveDate', 'jurisdiction', 'tags', 'sourceUrl', 'driveFileId', 'pages',
+  'chunkCount', 'parts', 'internal', 'status', 'supersedes', 'notes',
+  'addedBy', 'addedAt', 'updatedAt'];
+var USER_HEADERS = ['name', 'codeHash', 'role', 'internal', 'active', 'createdAt', 'lastSeen'];
+var AUDIT_HEADERS = ['ts', 'user', 'action', 'detail'];
+
+/* ============================================================ setup ======= */
+
+function setupRegVault() {
+  var root;
+  var rootId = cfg('ROOT_FOLDER_ID', '');
+  if (rootId) {
+    root = DriveApp.getFolderById(rootId);
+  } else {
+    root = DriveApp.createFolder('RegVault');
+    setCfg('ROOT_FOLDER_ID', root.getId());
+  }
+  setCfg('LIBRARY_FOLDER_ID', childFolder_(root, 'Library').getId());
+  setCfg('INDEX_FOLDER_ID', childFolder_(root, 'Index').getId());
+  setCfg('STAGING_FOLDER_ID', childFolder_(root, 'Staging').getId());
+
+  var ss;
+  var sheetId = cfg('SHEET_ID', '');
+  if (sheetId) {
+    ss = SpreadsheetApp.openById(sheetId);
+  } else {
+    ss = SpreadsheetApp.create('RegVault DB');
+    setCfg('SHEET_ID', ss.getId());
+    var f = DriveApp.getFileById(ss.getId());
+    root.addFile(f);
+    DriveApp.getRootFolder().removeFile(f);
+  }
+  ensureSheet_(ss, SHEET_DOCS, DOC_HEADERS);
+  ensureSheet_(ss, SHEET_USERS, USER_HEADERS);
+  ensureSheet_(ss, SHEET_AUDIT, AUDIT_HEADERS);
+  var def = ss.getSheetByName('Sheet1');
+  if (def && ss.getSheets().length > 1) ss.deleteSheet(def);
+
+  if (!cfg('SALT', '')) setCfg('SALT', Utilities.getUuid());
+
+  var msg = '';
+  var users = readRows_(SHEET_USERS);
+  if (!users.length) {
+    var code = newCode_();
+    appendRow_(SHEET_USERS, {
+      name: 'Admin', codeHash: hash_(code), role: 'admin',
+      internal: true, active: true, createdAt: new Date(), lastSeen: ''
+    });
+    msg = '\n\n>>> YOUR ADMIN ACCESS CODE IS:  ' + code + '  <<<\n' +
+          '>>> Save it now — it is stored hashed and cannot be recovered. <<<\n';
+  }
+
+  if (!loadManifestFile_()) saveManifest_({ version: 1, updatedAt: nowIso_(), dim: embedDim_(), docs: [] });
+
+  Logger.log('RegVault ready.\nDrive folder: ' + root.getUrl() +
+    '\nDatabase sheet: ' + ss.getUrl() +
+    '\nEmbeddings: ' + (cfg('GEMINI_KEY', '') ? 'enabled' : 'NOT configured (keyword-only)') +
+    msg);
+}
+
+/** Creates an extra access code. Edit name/role/internal then run. */
+function createAccessCode() {
+  var name = 'New user';        // <- change me
+  var role = 'user';            // 'admin' or 'user'
+  var internal = false;         // true = may see documents marked internal
+
+  var code = newCode_();
+  appendRow_(SHEET_USERS, {
+    name: name, codeHash: hash_(code), role: role,
+    internal: internal, active: true, createdAt: new Date(), lastSeen: ''
+  });
+  Logger.log('Access code for ' + name + ':  ' + code);
+}
+
+function childFolder_(parent, name) {
+  var it = parent.getFoldersByName(name);
+  return it.hasNext() ? it.next() : parent.createFolder(name);
+}
+
+function ensureSheet_(ss, name, headers) {
+  var sh = ss.getSheetByName(name);
+  if (!sh) sh = ss.insertSheet(name);
+  var first = sh.getRange(1, 1, 1, Math.max(headers.length, sh.getLastColumn() || 1)).getValues()[0];
+  if (String(first[0] || '').trim() !== headers[0]) {
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  }
+  return sh;
+}
+
+/* ============================================================ web entry === */
+
+function doGet(e) {
+  var p = (e && e.parameter) || {};
+  if (p.app === '1') {
+    try {
+      return HtmlService.createHtmlOutputFromFile('index')
+        .setTitle('RegVault')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    } catch (err) {
+      return json_({ ok: false, error: 'index.html has not been added to this script project.' });
+    }
+  }
+  return json_({ ok: true, service: 'RegVault', version: VERSION, configured: !!cfg('SHEET_ID', '') });
+}
+
+function doPost(e) {
+  var req;
+  try {
+    req = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return json_({ ok: false, error: 'Bad request body' });
+  }
+  try {
+    return json_(route_(req));
+  } catch (err) {
+    return json_({ ok: false, error: String((err && err.message) || err) });
   }
 }
-:root[data-theme="dark"]{
-  --bg:#0d1117; --panel:#161b22; --panel-2:#1c232c; --line:#2a323d;
-  --ink:#e6edf3; --ink-2:#9aa7b6; --ink-3:#6b7787;
-  --accent:#2ec4a6; --accent-ink:#04211c; --accent-soft:#123029;
-  --warn:#f0b429; --warn-soft:#3a2c0a; --danger:#f97066; --danger-soft:#3d1512;
-  --mark:#7a5b00; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
-}
-*{box-sizing:border-box}
-html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--font);-webkit-text-size-adjust:100%;overscroll-behavior-y:none}
-button,input,select,textarea{font:inherit;color:inherit}
-button{cursor:pointer}
-a{color:var(--accent)}
-::selection{background:var(--accent-soft)}
-.hide{display:none!important}
 
-/* ---------- shell ---------- */
-#app{display:flex;flex-direction:column;height:100dvh;min-height:100dvh}
-header.topbar{
-  position:sticky;top:0;z-index:30;background:var(--panel);border-bottom:1px solid var(--line);
-  padding:calc(env(safe-area-inset-top) + 10px) 12px 10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap
-}
-.brand{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
-.brand .dot{width:22px;height:22px;border-radius:6px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink);font-size:12px;font-weight:800}
-.searchwrap{flex:1 1 260px;display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:6px 8px 6px 14px;min-width:0}
-.searchwrap:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-#q{flex:1;border:0;background:transparent;outline:0;min-width:0;padding:4px 0;font-size:16px}
-.modeswap{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:999px;overflow:hidden}
-.modeswap button{border:0;background:transparent;padding:6px 12px;font-size:13px;font-weight:600;color:var(--ink-2)}
-.modeswap button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
-.iconbtn{border:1px solid var(--line);background:var(--panel);border-radius:10px;width:38px;height:38px;display:grid;place-items:center;color:var(--ink-2)}
-.iconbtn:hover{color:var(--ink);border-color:var(--ink-3)}
-.filters{display:flex;gap:6px;overflow-x:auto;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);scrollbar-width:none}
-.filters::-webkit-scrollbar{display:none}
-.chip{border:1px solid var(--line);background:var(--panel-2);color:var(--ink-2);border-radius:999px;padding:5px 11px;font-size:13px;white-space:nowrap;font-weight:500}
-.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-main{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
-.wrap{max-width:1180px;margin:0 auto;padding:14px 12px 96px}
-
-nav.tabs{
-  position:sticky;bottom:0;z-index:30;display:flex;background:var(--panel);border-top:1px solid var(--line);
-  padding-bottom:env(safe-area-inset-bottom)
-}
-nav.tabs button{flex:1;border:0;background:transparent;padding:9px 4px 10px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--ink-3)}
-nav.tabs button[aria-pressed="true"]{color:var(--accent)}
-nav.tabs svg{width:20px;height:20px}
-@media (min-width:900px){
-  nav.tabs{position:fixed;left:0;top:0;bottom:0;width:88px;flex-direction:column;border-top:0;border-right:1px solid var(--line);padding-top:calc(env(safe-area-inset-top) + 72px);justify-content:flex-start;gap:2px}
-  nav.tabs button{flex:0 0 auto;padding:12px 4px}
-  #app{padding-left:88px}
+function json_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
-/* ---------- cards ---------- */
-.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:10px;box-shadow:var(--shadow)}
-.card.tight{padding:11px 13px}
-.hit{cursor:pointer;transition:border-color .12s,transform .12s}
-.hit:hover{border-color:var(--accent)}
-.hit:active{transform:scale(.995)}
-.hit h3{margin:0 0 4px;font-size:15px;font-weight:650;line-height:1.35}
-.meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--ink-3);margin-bottom:7px}
-.tag{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-size:11.5px;font-weight:600;color:var(--ink-2)}
-.tag.accent{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
-.tag.warn{background:var(--warn-soft);border-color:transparent;color:var(--warn)}
-.tag.danger{background:var(--danger-soft);border-color:transparent;color:var(--danger)}
-.snippet{font-size:14px;color:var(--ink-2);line-height:1.55}
-.snippet mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 1px}
-.scorebar{height:3px;background:var(--panel-2);border-radius:2px;overflow:hidden;margin-top:9px}
-.scorebar i{display:block;height:100%;background:var(--accent)}
+/* ============================================================ router ====== */
 
-h2.sec{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);margin:18px 2px 8px;font-weight:700}
-.muted{color:var(--ink-3)}
-.empty{text-align:center;padding:48px 20px;color:var(--ink-3)}
-.empty svg{width:44px;height:44px;opacity:.35;margin-bottom:10px}
-.empty h3{margin:0 0 6px;color:var(--ink-2);font-size:16px}
+var OPEN_ACTIONS = { ping: 1, auth: 1 };
+var ADMIN_ACTIONS = {
+  beginDoc: 1, uploadPart: 1, finishUpload: 1, addChunks: 1, commitDoc: 1,
+  deleteDoc: 1, updateDoc: 1, fetchUrl: 1, discover: 1, listUsers: 1, purgeStaging: 1,
+  embedBackfill: 1
+};
 
-/* ---------- forms ---------- */
-label.f{display:block;margin:0 0 10px}
-label.f span{display:block;font-size:12px;font-weight:650;color:var(--ink-2);margin-bottom:4px}
-input[type=text],input[type=url],input[type=date],input[type=password],select,textarea{
-  width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 11px;outline:0;font-size:15px
+function route_(req) {
+  var action = req.action;
+  var user = null;
+
+  if (!OPEN_ACTIONS[action]) {
+    user = findUser_(req.code);
+    if (!user) return { ok: false, error: 'auth', message: 'Access code not recognised.' };
+    touchUser_(user);
+    if (ADMIN_ACTIONS[action] && user.role !== 'admin') {
+      return { ok: false, error: 'forbidden', message: 'Admin access code required for that.' };
+    }
+  }
+
+  switch (action) {
+    case 'ping':        return { ok: true, version: VERSION, configured: !!cfg('SHEET_ID', ''),
+                                 embeddings: !!cfg('GEMINI_KEY', ''), firecrawl: !!cfg('FIRECRAWL_KEY', '') };
+    case 'auth':        return authAction_(req);
+    case 'manifest':    return manifestAction_(user);
+    case 'docIndex':    return docIndexAction_(req, user);
+    case 'pdf':         return pdfAction_(req, user);
+    case 'embedQuery':  return embedQueryAction_(req);
+    case 'ask':         return askAction_(req, user);
+    case 'beginDoc':    return beginDocAction_(req, user);
+    case 'uploadPart':  return uploadPartAction_(req);
+    case 'finishUpload':return finishUploadAction_(req);
+    case 'addChunks':   return addChunksAction_(req);
+    case 'commitDoc':   return commitDocAction_(req, user);
+    case 'updateDoc':   return updateDocAction_(req, user);
+    case 'deleteDoc':   return deleteDocAction_(req, user);
+    case 'fetchUrl':    return fetchUrlAction_(req, user);
+    case 'discover':    return discoverAction_(req, user);
+    case 'listUsers':   return { ok: true, users: readRows_(SHEET_USERS).map(function (u) {
+                                  return { name: u.name, role: u.role, internal: truthy_(u.internal),
+                                           active: truthy_(u.active), lastSeen: u.lastSeen }; }) };
+    case 'purgeStaging':return purgeStaging_();
+    case 'embedBackfill': return embedBackfillAction_(req, user);
+
+    case 'embedQueries': return embedQueriesAction_(req);
+    case 'brief':       return briefAction_(req, user);
+    case 'briefSave':   return briefSaveAction_(req, user);
+    case 'briefList':   return briefListAction_(user);
+    case 'briefGet':    return briefGetAction_(req, user);
+    case 'briefDelete': return briefDeleteAction_(req, user);
+    case 'genCards':    return genCardsAction_(req, user);
+    case 'cardsSync':   return cardsSyncAction_(user);
+    case 'cardsAdd':    return cardsAddAction_(req, user);
+    case 'cardsDelete': return cardsDeleteAction_(req, user);
+    case 'cardsReview': return cardsReviewAction_(req, user);
+
+    default:            return { ok: false, error: 'Unknown action: ' + action };
+  }
 }
-input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-textarea{min-height:70px;resize:vertical}
-.row{display:grid;gap:10px;grid-template-columns:1fr 1fr}
-@media (max-width:640px){.row{grid-template-columns:1fr}}
-.btn{border:1px solid var(--line);background:var(--panel-2);border-radius:var(--r-sm);padding:9px 14px;font-weight:650;font-size:14px}
-.btn:hover{border-color:var(--ink-3)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.btn.danger{background:var(--danger-soft);border-color:transparent;color:var(--danger)}
-.btn:disabled{opacity:.5;cursor:not-allowed}
-.btnrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.switch{display:flex;align-items:center;gap:9px;padding:9px 0;font-size:14px}
-.switch input{width:42px;height:24px;appearance:none;background:var(--line);border-radius:999px;position:relative;transition:background .15s;flex:none}
-.switch input:checked{background:var(--accent)}
-.switch input::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .15s}
-.switch input:checked::after{transform:translateX(18px)}
 
-/* ---------- reader ---------- */
-.sheet{position:fixed;inset:0;z-index:60;background:rgba(8,12,18,.5);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px)}
-.sheet .panel{background:var(--panel);width:100%;max-width:900px;max-height:92dvh;border-radius:16px 16px 0 0;display:flex;flex-direction:column;box-shadow:var(--shadow);animation:up .18s ease-out}
-@keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
-@media (min-width:900px){.sheet{align-items:center}.sheet .panel{border-radius:16px;max-height:88dvh}}
-.sheet header{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start}
-.sheet header h3{margin:0;font-size:16px;line-height:1.3;flex:1}
-.sheet .body{padding:16px;overflow:auto;flex:1}
-.sheet footer{padding:10px 14px calc(env(safe-area-inset-bottom) + 12px);border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap}
-.passage{font-size:15.5px;line-height:1.65;white-space:pre-wrap}
-.passage.ctx{color:var(--ink-3);font-size:14px}
-.divider{height:1px;background:var(--line);margin:14px 0}
+/* ============================================================ auth ======== */
 
-/* ---------- progress / toast ---------- */
-.bar{height:6px;background:var(--panel-2);border-radius:4px;overflow:hidden;margin:8px 0}
-.bar i{display:block;height:100%;background:var(--accent);transition:width .2s}
-#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 76px);z-index:90;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:min(560px,92vw)}
-.toast{background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:10px;font-size:14px;box-shadow:var(--shadow);animation:up .15s}
-.toast.err{background:var(--danger);color:#fff}
-.spin{width:15px;height:15px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;display:inline-block;animation:sp .7s linear infinite;vertical-align:-2px}
-@keyframes sp{to{transform:rotate(360deg)}}
-.answer{font-size:15px;line-height:1.65}
-.answer .cite{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:5px;padding:0 6px;font-size:12px;font-weight:700;cursor:pointer;margin:0 1px}
-.answer h4{margin:14px 0 6px;font-size:14px}
-.answer ul{margin:6px 0 6px 18px;padding:0}
-.answer p{margin:0 0 10px}
-table.lib{width:100%;border-collapse:collapse;font-size:14px}
-table.lib th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);padding:6px 8px;border-bottom:1px solid var(--line)}
-table.lib td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
-table.lib tr:hover td{background:var(--panel-2)}
-.dz{border:2px dashed var(--line);border-radius:var(--r);padding:28px 16px;text-align:center;color:var(--ink-3);background:var(--panel-2)}
-.dz.over{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
-.kbd{font:600 11px var(--mono);background:var(--panel-2);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 5px;color:var(--ink-2)}
-.pdfstage{background:#3a3f46;border-radius:var(--r-sm);padding:10px;overflow:auto;text-align:center}
-.pdfstage canvas{max-width:100%;height:auto;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.4)}
-.list-clean{list-style:none;margin:0;padding:0}
-.list-clean li{padding:8px 0;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start}
-.list-clean li:last-child{border-bottom:0}
+function hash_(code) {
+  var salt = cfg('SALT', 'regvault');
+  var raw = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
+    salt + '|' + String(code).trim().toUpperCase());
+  return raw.map(function (b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
+}
 
-/* ---------- brief ---------- */
-.sev{border-left:3px solid var(--line);padding:9px 0 9px 12px;margin:0 0 12px}
-.sev:last-child{margin-bottom:0}
-.sev.critical{border-left-color:var(--danger)}
-.sev.important{border-left-color:var(--warn)}
-.sev.check{border-left-color:var(--accent)}
-.sev b{display:block;font-size:14.5px;margin-bottom:3px}
-.sev p{margin:0;font-size:14px;color:var(--ink-2);line-height:1.55}
-.sevtag{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:1px 6px;border-radius:5px;vertical-align:2px;margin-right:6px}
-.sevtag.critical{background:var(--danger-soft);color:var(--danger)}
-.sevtag.important{background:var(--warn-soft);color:var(--warn)}
-.sevtag.check{background:var(--accent-soft);color:var(--accent)}
-.refchip{display:inline-block;background:var(--panel-2);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0 6px;font-size:11.5px;font-weight:700;cursor:pointer;margin:4px 4px 0 0}
-.refchip:hover{border-color:var(--accent);color:var(--accent)}
-.cov{display:flex;flex-wrap:wrap;gap:6px}
-.cov span{font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink-2)}
-.cov span.none{background:var(--warn-soft);border-color:transparent;color:var(--warn)}
-.cov span.good{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+function newCode_() {
+  var alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  var out = '';
+  for (var i = 0; i < 9; i++) {
+    if (i === 3 || i === 6) out += '-';
+    out += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+  }
+  return out;
+}
+
+function findUser_(code) {
+  if (!code) return null;
+  var h = hash_(code);
+  var rows = readRows_(SHEET_USERS);
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i].codeHash === h && truthy_(rows[i].active)) {
+      rows[i]._row = i + 2;
+      // normalise once so every caller can trust these two
+      rows[i].internal = truthy_(rows[i].internal);
+      rows[i].role = String(rows[i].role || 'user').trim().toLowerCase();
+      return rows[i];
+    }
+  }
+  return null;
+}
+
+function touchUser_(user) {
+  try {
+    var sh = sheet_(SHEET_USERS);
+    var col = USER_HEADERS.indexOf('lastSeen') + 1;
+    sh.getRange(user._row, col).setValue(new Date());
+  } catch (e) { /* non-fatal */ }
+}
+
+function authAction_(req) {
+  var u = findUser_(req.code);
+  if (!u) return { ok: false, error: 'auth', message: 'Access code not recognised.' };
+  touchUser_(u);
+  audit_(u.name, 'sign-in', '');
+  return {
+    ok: true,
+    user: { name: u.name, role: u.role, internal: truthy_(u.internal) },
+    embeddings: !!cfg('GEMINI_KEY', ''),
+    firecrawl: !!cfg('FIRECRAWL_KEY', ''),
+    version: VERSION
+  };
+}
+
+function audit_(who, action, detail) {
+  try {
+    appendRow_(SHEET_AUDIT, { ts: new Date(), user: who || '', action: action, detail: detail || '' });
+  } catch (e) { /* non-fatal */ }
+}
+
+/* ============================================================ sheets ====== */
+
+function sheet_(name) {
+  return SpreadsheetApp.openById(cfg('SHEET_ID', '')).getSheetByName(name);
+}
+
+function headersFor_(name) {
+  if (name === SHEET_DOCS) return DOC_HEADERS;
+  if (name === SHEET_USERS) return USER_HEADERS;
+  return AUDIT_HEADERS;
+}
+
+function readRows_(name) {
+  var sh = sheet_(name);
+  if (!sh) return [];
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+  var headers = headersFor_(name);
+  var values = sh.getRange(2, 1, last - 1, headers.length).getValues();
+  return values.filter(function (r) { return String(r[0]).trim() !== ''; })
+    .map(function (r) {
+      var o = {};
+      for (var i = 0; i < headers.length; i++) o[headers[i]] = r[i];
+      return o;
+    });
+}
+
+function appendRow_(name, obj) {
+  var sh = sheet_(name);
+  var headers = headersFor_(name);
+  sh.appendRow(headers.map(function (h) {
+    var v = obj[h];
+    return (v === undefined || v === null) ? '' : v;
+  }));
+}
+
+function findDocRow_(docId) {
+  var sh = sheet_(SHEET_DOCS);
+  var last = sh.getLastRow();
+  if (last < 2) return -1;
+  var ids = sh.getRange(2, 1, last - 1, 1).getValues();
+  for (var i = 0; i < ids.length; i++) if (String(ids[i][0]) === String(docId)) return i + 2;
+  return -1;
+}
+
+function writeDocFields_(docId, fields) {
+  var row = findDocRow_(docId);
+  if (row < 0) throw new Error('Document not found: ' + docId);
+  var sh = sheet_(SHEET_DOCS);
+  Object.keys(fields).forEach(function (k) {
+    var c = DOC_HEADERS.indexOf(k);
+    if (c >= 0) sh.getRange(row, c + 1).setValue(fields[k]);
+  });
+}
+
+function truthy_(v) {
+  if (v === true) return true;
+  var s = String(v).trim().toLowerCase();
+  return s === 'true' || s === 'yes' || s === '1' || s === 'y';
+}
+
+function nowIso_() { return new Date().toISOString(); }
+
+/* ============================================================ manifest ==== */
+
+function indexFolder_() { return DriveApp.getFolderById(cfg('INDEX_FOLDER_ID', '')); }
+function libraryFolder_() { return DriveApp.getFolderById(cfg('LIBRARY_FOLDER_ID', '')); }
+function stagingFolder_() { return DriveApp.getFolderById(cfg('STAGING_FOLDER_ID', '')); }
+
+function loadManifestFile_() {
+  var it = indexFolder_().getFilesByName('manifest.json');
+  return it.hasNext() ? it.next() : null;
+}
+
+function loadManifest_() {
+  var f = loadManifestFile_();
+  if (!f) return { version: 1, updatedAt: nowIso_(), dim: embedDim_(), docs: [] };
+  try { return JSON.parse(f.getBlob().getDataAsString()); }
+  catch (e) { return { version: 1, updatedAt: nowIso_(), dim: embedDim_(), docs: [] }; }
+}
+
+function saveManifest_(m) {
+  m.updatedAt = nowIso_();
+  m.dim = embedDim_();
+  var body = JSON.stringify(m);
+  var f = loadManifestFile_();
+  if (f) f.setContent(body);
+  else indexFolder_().createFile('manifest.json', body, MimeType.PLAIN_TEXT);
+}
+
+function manifestAction_(user) {
+  var m = loadManifest_();
+  var docs = readRows_(SHEET_DOCS).filter(function (d) {
+    var s = String(d.status);
+    return s === 'active' || s === 'superseded';     // half-finished ingests stay hidden
+  });
+  var byId = {};
+  m.docs.forEach(function (d) { byId[d.docId] = d; });
+
+  var out = [];
+  docs.forEach(function (d) {
+    var internal = truthy_(d.internal);
+    if (internal && !user.internal) return;          // never send restricted index data
+    var idx = byId[d.docId] || { parts: [], stamp: '' };
+    out.push({
+      docId: d.docId, title: d.title, collection: d.collection, publisher: d.publisher,
+      docRef: d.docRef, edition: d.edition,
+      effectiveDate: fmtDate_(d.effectiveDate), jurisdiction: d.jurisdiction,
+      tags: String(d.tags || ''), sourceUrl: d.sourceUrl, driveFileId: d.driveFileId,
+      pages: Number(d.pages || 0), chunkCount: Number(d.chunkCount || 0),
+      internal: internal, status: d.status, supersedes: d.supersedes,
+      notes: d.notes, addedAt: fmtDate_(d.addedAt),
+      parts: idx.parts || [], stamp: idx.stamp || ''
+    });
+  });
+
+  return {
+    ok: true, dim: embedDim_(), updatedAt: m.updatedAt,
+    embeddings: !!cfg('GEMINI_KEY', ''), docs: out,
+    collections: uniq_(out.map(function (d) { return d.collection; }))
+  };
+}
+
+function fmtDate_(v) {
+  if (!v) return '';
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  return String(v);
+}
+
+function uniq_(a) {
+  var seen = {}, out = [];
+  a.forEach(function (x) { x = String(x || '').trim(); if (x && !seen[x]) { seen[x] = 1; out.push(x); } });
+  return out.sort();
+}
+
+/* ============================================================ index parts = */
+
+function partName_(docId, i) { return 'idx-' + docId + '-' + i + '.json'; }
+
+function docIndexAction_(req, user) {
+  var docId = String(req.docId || '');
+  var part = Number(req.part || 0);
+  var meta = docMeta_(docId);
+  if (!meta) return { ok: false, error: 'Document not found' };
+  if (truthy_(meta.internal) && !user.internal) return { ok: false, error: 'forbidden' };
+
+  var it = indexFolder_().getFilesByName(partName_(docId, part));
+  if (!it.hasNext()) return { ok: false, error: 'Index part not found' };
+  var payload = JSON.parse(it.next().getBlob().getDataAsString());
+  return { ok: true, docId: docId, part: part, chunks: payload.chunks || [] };
+}
+
+function docMeta_(docId) {
+  var rows = readRows_(SHEET_DOCS);
+  for (var i = 0; i < rows.length; i++) if (String(rows[i].docId) === docId) return rows[i];
+  return null;
+}
+
+/* ============================================================ pdf bytes === */
+
+function pdfAction_(req, user) {
+  var meta = docMeta_(String(req.docId || ''));
+  if (!meta) return { ok: false, error: 'Document not found' };
+  if (truthy_(meta.internal) && !user.internal) return { ok: false, error: 'forbidden' };
+  if (!meta.driveFileId) return { ok: false, error: 'No file stored for this document' };
+
+  var file = DriveApp.getFileById(meta.driveFileId);
+  var bytes = file.getBlob().getBytes();
+  var chunkSize = 5 * 1024 * 1024;               // 5 MB slices keep responses sane
+  var part = Number(req.part || 0);
+  var start = part * chunkSize;
+  if (start >= bytes.length && part > 0) return { ok: true, done: true, b64: '', total: bytes.length };
+  var slice = bytes.slice(start, Math.min(bytes.length, start + chunkSize));
+
+  audit_(user.name, 'open-pdf', meta.title + (part ? ' (part ' + part + ')' : ''));
+  return {
+    ok: true, part: part, total: bytes.length,
+    parts: Math.ceil(bytes.length / chunkSize),
+    mime: file.getMimeType(), name: file.getName(),
+    driveUrl: 'https://drive.google.com/file/d/' + meta.driveFileId + '/view',
+    b64: Utilities.base64Encode(slice),
+    done: start + slice.length >= bytes.length
+  };
+}
+
+/* ============================================================ ingest ====== */
+
+function beginDocAction_(req, user) {
+  var m = req.meta || {};
+  var docId = 'd' + Date.now().toString(36) + Math.floor(Math.random() * 4096).toString(36);
+  appendRow_(SHEET_DOCS, {
+    docId: docId,
+    title: m.title || 'Untitled',
+    collection: m.collection || 'Uncategorised',
+    publisher: m.publisher || '',
+    docRef: m.docRef || '',
+    edition: m.edition || '',
+    effectiveDate: m.effectiveDate || '',
+    jurisdiction: m.jurisdiction || '',
+    tags: (m.tags || []).join ? (m.tags || []).join(', ') : String(m.tags || ''),
+    sourceUrl: m.sourceUrl || '',
+    driveFileId: '',
+    pages: Number(m.pages || 0),
+    chunkCount: 0,
+    parts: 0,
+    internal: !!m.internal,
+    status: 'ingesting',
+    supersedes: m.supersedes || '',
+    notes: m.notes || '',
+    addedBy: user.name,
+    addedAt: new Date(),
+    updatedAt: new Date()
+  });
+  audit_(user.name, 'begin-doc', (m.title || '') + ' [' + docId + ']');
+  return { ok: true, docId: docId };
+}
+
+function uploadPartAction_(req) {
+  var docId = String(req.docId || '');
+  var i = Number(req.index || 0);
+  var name = 'up-' + docId + '-' + pad_(i, 4) + '.part';
+  var folder = stagingFolder_();
+  var it = folder.getFilesByName(name);
+  while (it.hasNext()) it.next().setTrashed(true);
+  folder.createFile(Utilities.newBlob(Utilities.base64Decode(req.b64), 'application/octet-stream', name));
+  return { ok: true, index: i };
+}
+
+function finishUploadAction_(req) {
+  var docId = String(req.docId || '');
+  var count = Number(req.count || 0);
+  var meta = docMeta_(docId);
+  if (!meta) return { ok: false, error: 'Document not found' };
+
+  if (count > 4) return { ok: false, error: 'File is too large to reassemble here (max 32 MB).' };
+  var folder = stagingFolder_();
+  var all = [];
+  for (var i = 0; i < count; i++) {
+    var it = folder.getFilesByName('up-' + docId + '-' + pad_(i, 4) + '.part');
+    if (!it.hasNext()) return { ok: false, error: 'Missing upload part ' + i };
+    var f = it.next();
+    var b = f.getBlob().getBytes();
+    all = (i === 0) ? b : all.concat(b);
+    f.setTrashed(true);
+  }
+  var target = childFolder_(libraryFolder_(), safeName_(meta.collection || 'Uncategorised'));
+  var fname = safeName_(req.filename || (meta.title + '.pdf'));
+  var old = target.getFilesByName(fname);
+  while (old.hasNext()) old.next().setTrashed(true);
+  var file = target.createFile(Utilities.newBlob(all, req.mime || 'application/pdf', fname));
+
+  writeDocFields_(docId, { driveFileId: file.getId(), updatedAt: new Date() });
+  return { ok: true, fileId: file.getId(), size: all.length };
+}
+
+function pad_(n, w) { var s = String(n); while (s.length < w) s = '0' + s; return s; }
+function safeName_(s) { return String(s).replace(/[\\/:*?"<>|]+/g, '-').slice(0, 180); }
+
+/**
+ * Receives a batch of extracted chunks, embeds them, and parks them in a
+ * staging JSON file. The client loops until every chunk is sent, so a large
+ * document survives the 6-minute execution limit.
+ */
+function addChunksAction_(req) {
+  var docId = String(req.docId || '');
+  if (!docMeta_(docId)) return { ok: false, error: 'Document not found' };
+  var incoming = req.chunks || [];
+  if (!incoming.length) return { ok: true, stored: 0 };
+
+  var vectors = null;
+  var embedError = '';
+  if (cfg('GEMINI_KEY', '') && !req.noEmbed) {
+    var texts = incoming.map(function (c) {
+      var head = [c.h, c.clause].filter(Boolean).join(' ');
+      return (head ? head + '\n' : '') + String(c.t || '').slice(0, 6000);
+    });
+    try {
+      vectors = embedTexts_(texts, 'RETRIEVAL_DOCUMENT');
+      if (vectors && vectors.length !== incoming.length) vectors = null;
+    } catch (err) {
+      // keep the text — a document that is only keyword-searchable still beats
+      // losing the whole ingest because a quota ran out mid-way
+      if (err && err.quota === 'minute') {
+        // nothing is stored — the client waits and resends this same batch
+        return { ok: true, retry: true, retrySec: err.retrySec || 30, message: String(err.message) };
+      }
+      vectors = null;
+      embedError = String((err && err.message) || err).slice(0, 300);
+    }
+  }
+
+  var batch = [];
+  for (var i = 0; i < incoming.length; i++) {
+    var c = incoming[i];
+    batch.push({
+      p: Number(c.p || 0),
+      h: String(c.h || '').slice(0, 300),
+      c: String(c.clause || '').slice(0, 60),
+      t: String(c.t || ''),
+      v: vectors ? packVec_(vectors[i]) : ''
+    });
+  }
+
+  // one file per batch — appending to a single growing file gets quadratic
+  var name = stagePrefix_(docId) + pad_(Number(req.seq || 0), 5) + '.json';
+  var folder = stagingFolder_();
+  var dup = folder.getFilesByName(name);
+  while (dup.hasNext()) dup.next().setTrashed(true);
+  folder.createFile(name, JSON.stringify(batch), MimeType.PLAIN_TEXT);
+
+  return { ok: true, stored: batch.length, embedded: !!vectors, embedError: embedError };
+}
+
+function stagePrefix_(docId) { return 'stg-' + docId + '-'; }
+
+function stagedBatches_(docId) {
+  var prefix = stagePrefix_(docId);
+  var it = stagingFolder_().getFiles();
+  var found = [];
+  while (it.hasNext()) {
+    var f = it.next();
+    if (f.getName().indexOf(prefix) === 0) found.push(f);
+  }
+  found.sort(function (a, b) { return a.getName() < b.getName() ? -1 : 1; });
+  return found;
+}
+
+function loadStaged_(docId) {
+  var out = [];
+  stagedBatches_(docId).forEach(function (f) {
+    try {
+      var arr = JSON.parse(f.getBlob().getDataAsString());
+      for (var i = 0; i < arr.length; i++) out.push(arr[i]);
+    } catch (e) { /* skip a corrupt batch rather than lose the document */ }
+  });
+  return out;
+}
+
+function clearStaged_(docId) {
+  stagedBatches_(docId).forEach(function (f) { f.setTrashed(true); });
+}
+
+/** Splits staged chunks into index parts, updates the manifest, goes live. */
+function commitDocAction_(req, user) {
+  var docId = String(req.docId || '');
+  var meta = docMeta_(docId);
+  if (!meta) return { ok: false, error: 'Document not found' };
+
+  var staged = loadStaged_(docId);
+  if (!staged.length) return { ok: false, error: 'No text was extracted for this document.' };
+
+  removeIndexParts_(docId);
+  var per = Number(cfg('PART_SIZE', '250'));
+  var parts = [];
+  for (var i = 0, p = 0; i < staged.length; i += per, p++) {
+    var slice = staged.slice(i, i + per);
+    var body = JSON.stringify({ docId: docId, part: p, chunks: slice });
+    indexFolder_().createFile(partName_(docId, p), body, MimeType.PLAIN_TEXT);
+    parts.push({ part: p, count: slice.length, bytes: body.length });
+  }
+
+  var stamp = String(Date.now());
+  var m = loadManifest_();
+  m.docs = (m.docs || []).filter(function (d) { return d.docId !== docId; });
+  m.docs.push({ docId: docId, parts: parts, stamp: stamp });
+  saveManifest_(m);
+
+  writeDocFields_(docId, {
+    chunkCount: staged.length, parts: parts.length,
+    pages: Number(req.pages || meta.pages || 0),
+    status: 'active', updatedAt: new Date()
+  });
+
+  clearStaged_(docId);
+
+  if (req.supersedes) {
+    var prior = docMeta_(String(req.supersedes));
+    if (prior) writeDocFields_(prior.docId, { status: 'superseded', updatedAt: new Date() });
+  }
+
+  audit_(user.name, 'commit-doc', meta.title + ' — ' + staged.length + ' chunks');
+  return { ok: true, docId: docId, chunks: staged.length, parts: parts.length, stamp: stamp };
+}
+
+/**
+ * Adds vectors to passages that were stored keyword-only (usually because a
+ * quota ran out during upload). One small batch per call so the client can pace it.
+ */
+function embedBackfillAction_(req, user) {
+  if (!cfg('GEMINI_KEY', '')) return { ok: false, error: 'No GEMINI_KEY script property is set.' };
+  var docId = String(req.docId || '');
+  var it = indexFolder_().getFilesByName(partName_(docId, Number(req.part || 0)));
+  if (!it.hasNext()) return { ok: false, error: 'Index part not found' };
+  var file = it.next();
+  var payload = JSON.parse(file.getBlob().getDataAsString());
+  var chunks = payload.chunks || [];
+
+  var missing = [];
+  for (var i = 0; i < chunks.length; i++) if (!chunks[i].v) missing.push(i);
+  var take = missing.slice(0, Number(cfg('EMBED_BATCH', '20')));
+  if (!take.length) return { ok: true, filled: 0, remaining: 0 };
+
+  var vecs;
+  try {
+    vecs = embedTexts_(take.map(function (ix) {
+      var c = chunks[ix];
+      var head = [c.h, c.c].filter(Boolean).join(' ');
+      return (head ? head + '\n' : '') + String(c.t || '').slice(0, 6000);
+    }), 'RETRIEVAL_DOCUMENT');
+  } catch (err) {
+    var p = pausedInfo_(err);
+    return { ok: true, filled: 0, remaining: missing.length,
+             quota: err.quota || 'error', retrySec: p.retrySec, message: p.message };
+  }
+  if (!vecs || vecs.length !== take.length) return { ok: false, error: 'Gemini returned the wrong number of vectors.' };
+
+  take.forEach(function (ix, k) { chunks[ix].v = packVec_(vecs[k]); });
+  file.setContent(JSON.stringify(payload));
+
+  var remaining = missing.length - take.length;
+  if (!remaining) {
+    // new stamp so every device re-downloads this document's index
+    var m = loadManifest_();
+    (m.docs || []).forEach(function (d) { if (d.docId === docId) d.stamp = String(Date.now()); });
+    saveManifest_(m);
+    audit_(user.name, 'embed-backfill', docId + ' part ' + Number(req.part || 0));
+  }
+  return { ok: true, filled: take.length, remaining: remaining };
+}
+
+function removeIndexParts_(docId) {
+  var it = indexFolder_().getFiles();
+  var prefix = 'idx-' + docId + '-';
+  while (it.hasNext()) {
+    var f = it.next();
+    if (f.getName().indexOf(prefix) === 0) f.setTrashed(true);
+  }
+}
+
+function updateDocAction_(req, user) {
+  var docId = String(req.docId || '');
+  if (!docMeta_(docId)) return { ok: false, error: 'Document not found' };
+  var allowed = ['title', 'collection', 'publisher', 'docRef', 'edition', 'effectiveDate',
+    'jurisdiction', 'tags', 'sourceUrl', 'internal', 'status', 'supersedes', 'notes'];
+  var fields = { updatedAt: new Date() };
+  allowed.forEach(function (k) { if (req.fields && req.fields[k] !== undefined) fields[k] = req.fields[k]; });
+  writeDocFields_(docId, fields);
+  audit_(user.name, 'update-doc', docId);
+  return { ok: true };
+}
+
+function deleteDocAction_(req, user) {
+  var docId = String(req.docId || '');
+  var meta = docMeta_(docId);
+  if (!meta) return { ok: false, error: 'Document not found' };
+
+  removeIndexParts_(docId);
+  clearStaged_(docId);
+  if (meta.driveFileId && req.deleteFile) {
+    try { DriveApp.getFileById(meta.driveFileId).setTrashed(true); } catch (e) { /* already gone */ }
+  }
+  var m = loadManifest_();
+  m.docs = (m.docs || []).filter(function (d) { return d.docId !== docId; });
+  saveManifest_(m);
+
+  var row = findDocRow_(docId);
+  if (row > 0) sheet_(SHEET_DOCS).deleteRow(row);
+
+  audit_(user.name, 'delete-doc', meta.title);
+  return { ok: true };
+}
+
+function purgeStaging_() {
+  var it = stagingFolder_().getFiles();
+  var n = 0;
+  while (it.hasNext()) { it.next().setTrashed(true); n++; }
+  return { ok: true, removed: n };
+}
+
+/* ============================================================ embeddings == */
+
+function embedDim_() { return Number(cfg('EMBED_DIM', '768')); }
+
+function embedTexts_(texts, taskType) {
+  var key = cfg('GEMINI_KEY', '');
+  if (!key) return null;
+  var cache = CacheService.getScriptCache();
+  var hold = cache.get('embedHold');
+  if (hold) {
+    // a limit was hit recently — fail fast instead of spending more calls on it
+    var h = JSON.parse(hold);
+    var held = new Error(h.msg);
+    held.quota = h.quota;
+    held.retrySec = Math.max(1, Math.ceil((h.until - Date.now()) / 1000));
+    throw held;
+  }
+  var model = cfg('EMBED_MODEL', 'gemini-embedding-001');
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model +
+    ':batchEmbedContents?key=' + encodeURIComponent(key);
+
+  var payload = {
+    requests: texts.map(function (t) {
+      return {
+        model: 'models/' + model,
+        content: { parts: [{ text: t }] },
+        taskType: taskType || 'RETRIEVAL_DOCUMENT',
+        outputDimensionality: embedDim_()
+      };
+    })
+  };
+
+  var res = fetchWithRetry_(url, {
+    method: 'post', contentType: 'application/json',
+    payload: JSON.stringify(payload), muteHttpExceptions: true
+  });
+  var code = res.getResponseCode();
+  var body = res.getContentText();
+  if (code !== 200) {
+    var err = geminiError_(code, body, model);
+    if (err.quota) {
+      var secs = err.quota === 'day' ? 3600 : Math.max(5, err.retrySec);
+      try {
+        cache.put('embedHold', JSON.stringify({ msg: err.message, quota: err.quota, until: Date.now() + secs * 1000 }), secs);
+      } catch (e2) { /* cache unavailable — the next call simply asks Gemini again */ }
+    }
+    throw err;
+  }
+  var data = JSON.parse(body);
+  return (data.embeddings || []).map(function (e) { return e.values || e.value || []; });
+}
+
+/**
+ * Retries only server hiccups. A 429 is never retried here: every retry counts
+ * against the same quota, and a daily cap won't clear by waiting seconds.
+ */
+function fetchWithRetry_(url, opts) {
+  var res;
+  for (var attempt = 0; attempt < 3; attempt++) {
+    res = UrlFetchApp.fetch(url, opts);
+    if (res.getResponseCode() < 500) return res;
+    Utilities.sleep(2000 * (attempt + 1));
+  }
+  return res;
+}
+
+/** Reads a Gemini 429 body: which limit was hit, and how long it asks us to wait. */
+function quotaInfo_(body) {
+  var s = String(body || '');
+  var m = s.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/);
+  return {
+    none: /"quotaValue"\s*:\s*"0"|limit:\s*0\b/i.test(s),
+    daily: /PerDay|per day/i.test(s),
+    retrySec: m ? Math.ceil(Number(m[1])) + 1 : 30
+  };
+}
+
+function geminiError_(code, body, model) {
+  var err;
+  if (code === 429) {
+    var qi = quotaInfo_(body);
+    if (qi.none) {
+      err = new Error('Your Gemini key has no free allowance for ' + model +
+        '. Choose another model in Script Properties, or turn on billing for that key.');
+      err.quota = 'day';
+    } else if (qi.daily) {
+      err = new Error('Gemini daily free limit reached for ' + model +
+        '. It resets at midnight Pacific time, around 8am Irish time.');
+      err.quota = 'day';
+    } else {
+      err = new Error('Gemini per-minute limit reached for ' + model +
+        '. Wait about ' + qi.retrySec + ' seconds.');
+      err.quota = 'minute';
+    }
+    err.retrySec = qi.retrySec;
+  } else {
+    err = new Error('Gemini returned ' + code + ': ' + String(body || '').slice(0, 300));
+  }
+  return err;
+}
+
+function pausedInfo_(err) {
+  return { quota: err.quota, retrySec: err.retrySec || 30, message: String(err.message || err) };
+}
+
+/** Normalises then quantises to signed int8 and base64-encodes. */
+function packVec_(v) {
+  var n = 0, i;
+  for (i = 0; i < v.length; i++) n += v[i] * v[i];
+  n = Math.sqrt(n) || 1;
+  var bytes = [];
+  for (i = 0; i < v.length; i++) {
+    var q = Math.round((v[i] / n) * 127);
+    if (q > 127) q = 127;
+    if (q < -127) q = -127;
+    bytes.push(q);
+  }
+  return Utilities.base64Encode(bytes);
+}
+
+function embedQueryAction_(req) {
+  if (!cfg('GEMINI_KEY', '')) return { ok: true, vec: '', embeddings: false };
+  var q = String(req.q || '').slice(0, 4000);
+  if (!q) return { ok: true, vec: '', embeddings: true };
+  var cache = CacheService.getScriptCache();
+  var ck = 'q:' + Utilities.base64Encode(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, q + '|' + embedDim_()));
+  var hit = cache.get(ck);
+  if (hit) return { ok: true, vec: hit, embeddings: true, cached: true };
+  var v;
+  try {
+    v = embedTexts_([q], 'RETRIEVAL_QUERY');
+  } catch (err) {
+    if (err && err.quota) return { ok: true, vec: '', embeddings: true, paused: pausedInfo_(err) };
+    throw err;
+  }
+  if (!v || !v.length) return { ok: true, vec: '', embeddings: false };
+  var packed = packVec_(v[0]);
+  try { cache.put(ck, packed, 21600); } catch (e) { /* too big, skip */ }
+  return { ok: true, vec: packed, embeddings: true };
+}
+
+/* ============================================================ ask ========= */
+
+function askAction_(req, user) {
+  var key = cfg('GEMINI_KEY', '');
+  if (!key) return { ok: false, error: 'Ask needs a GEMINI_KEY script property.' };
+  var q = String(req.q || '').trim();
+  var passages = req.passages || [];
+  if (!q) return { ok: false, error: 'No question' };
+  if (!passages.length) return { ok: false, error: 'No matching passages to answer from.' };
+
+  var ctx = passages.slice(0, 12).map(function (p, i) {
+    return '[' + (i + 1) + '] ' + p.title + (p.clause ? ' — clause ' + p.clause : '') +
+      (p.page ? ' (page ' + p.page + ')' : '') + '\n' + String(p.text || '').slice(0, 3000);
+  }).join('\n\n---\n\n');
+
+  var prompt =
+    'You are a reference assistant for building regulations, technical guidance and organisational policy.\n' +
+    'Answer ONLY from the numbered extracts below. Never rely on outside knowledge.\n' +
+    'Cite every statement with its extract number in square brackets, e.g. [2].\n' +
+    'If the extracts do not settle the question, say exactly what is missing.\n' +
+    'Quote the controlling wording when precision matters. Be concise and practical.\n' +
+    'Finish with a one-line "Check:" note reminding the reader to confirm against the current published edition.\n\n' +
+    'QUESTION: ' + q + '\n\nEXTRACTS:\n' + ctx;
+
+  var model = cfg('CHAT_MODEL', 'gemini-2.5-flash');
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model +
+    ':generateContent?key=' + encodeURIComponent(key);
+  var res = fetchWithRetry_(url, {
+    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    payload: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 1400 }
+    })
+  });
+  if (res.getResponseCode() !== 200) {
+    return { ok: false, error: geminiError_(res.getResponseCode(), res.getContentText(), model).message };
+  }
+  var data = JSON.parse(res.getContentText());
+  var cand = (data.candidates && data.candidates[0]) || null;
+  var text = '';
+  if (cand && cand.content && cand.content.parts) {
+    text = cand.content.parts.map(function (p) { return p.text || ''; }).join('');
+  }
+  audit_(user.name, 'ask', q.slice(0, 160));
+  return { ok: true, answer: text || '(no answer returned)' };
+}
+
+/* ============================================================ web fetch === */
+
+function fetchUrlAction_(req, user) {
+  var url = String(req.url || '').trim();
+  if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'Only http(s) URLs are allowed.' };
+  var res = UrlFetchApp.fetch(url, {
+    muteHttpExceptions: true, followRedirects: true,
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; RegVault/1.0)' }
+  });
+  var code = res.getResponseCode();
+  if (code !== 200) return { ok: false, error: 'Source returned HTTP ' + code };
+
+  var blob = res.getBlob();
+  var bytes = blob.getBytes();
+  var limit = 45 * 1024 * 1024;
+  if (bytes.length > limit) return { ok: false, error: 'File is larger than 45 MB.' };
+
+  var chunkSize = 5 * 1024 * 1024;
+  var part = Number(req.part || 0);
+  var start = part * chunkSize;
+  var slice = bytes.slice(start, Math.min(bytes.length, start + chunkSize));
+
+  if (part === 0) audit_(user.name, 'fetch-url', url);
+  return {
+    ok: true, part: part, total: bytes.length,
+    parts: Math.ceil(bytes.length / chunkSize),
+    mime: res.getHeaders()['Content-Type'] || blob.getContentType() || '',
+    b64: Utilities.base64Encode(slice),
+    done: start + slice.length >= bytes.length
+  };
+}
+
+/**
+ * Finds candidate documents on a page. Uses Firecrawl when a key is present
+ * (better with JavaScript-rendered listings), otherwise falls back to plain
+ * HTML link scraping, which is enough for most government publication pages.
+ */
+function discoverAction_(req, user) {
+  var url = String(req.url || '').trim();
+  if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'Only http(s) URLs are allowed.' };
+  audit_(user.name, 'discover', url);
+
+  var key = cfg('FIRECRAWL_KEY', '');
+  var links = [];
+  var markdown = '';
+  var via = 'html';
+
+  if (key) {
+    try {
+      var res = fetchWithRetry_(cfg('FIRECRAWL_BASE', 'https://api.firecrawl.dev/v1') + '/scrape', {
+        method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+        headers: { Authorization: 'Bearer ' + key },
+        payload: JSON.stringify({ url: url, formats: ['markdown', 'links'], onlyMainContent: false })
+      });
+      if (res.getResponseCode() === 200) {
+        var d = JSON.parse(res.getContentText()).data || {};
+        links = d.links || [];
+        markdown = d.markdown || '';
+        via = 'firecrawl';
+      }
+    } catch (e) { /* fall through to plain HTML */ }
+  }
+
+  if (!links.length) {
+    var raw = UrlFetchApp.fetch(url, {
+      muteHttpExceptions: true, followRedirects: true,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; RegVault/1.0)' }
+    });
+    if (raw.getResponseCode() !== 200) return { ok: false, error: 'Page returned HTTP ' + raw.getResponseCode() };
+    var html = raw.getContentText();
+    var re = /<a[^>]+href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    var m;
+    var seen = {};
+    while ((m = re.exec(html)) !== null) {
+      var href = absUrl_(m[1], url);
+      if (!href || seen[href]) continue;
+      seen[href] = 1;
+      links.push({ url: href, text: stripTags_(m[2]) });
+    }
+  }
+
+  var normalised = links.map(function (l) {
+    return (typeof l === 'string') ? { url: l, text: '' } : { url: l.url || '', text: l.text || '' };
+  }).filter(function (l) { return /^https?:\/\//i.test(l.url); });
+
+  var pdfs = normalised.filter(function (l) { return /\.pdf(\?|#|$)/i.test(l.url); });
+
+  return {
+    ok: true, via: via, url: url,
+    pdfs: pdfs.slice(0, 300),
+    links: normalised.slice(0, 400),
+    markdown: markdown.slice(0, 20000)
+  };
+}
+
+function absUrl_(href, base) {
+  href = String(href || '').trim();
+  if (!href || href.charAt(0) === '#' || /^(mailto|tel|javascript):/i.test(href)) return '';
+  if (/^https?:\/\//i.test(href)) return href;
+  var m = base.match(/^(https?:\/\/[^\/]+)(\/.*)?$/i);
+  if (!m) return '';
+  if (href.charAt(0) === '/') return m[1] + href;
+  var dir = (m[2] || '/').replace(/[^\/]*$/, '');
+  return m[1] + dir + href;
+}
+
+function stripTags_(s) {
+  return String(s).replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim().slice(0, 200);
+}
+
+/* ============================================================ study ====== */
+/* Project briefs ("what to look out for on a mental health unit") and
+ * flashcards, both built from passages the client has already retrieved.   */
+
+function studyFolder_() {
+  var id = cfg('STUDY_FOLDER_ID', '');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) { /* recreate below */ } }
+  var f = childFolder_(DriveApp.getFolderById(cfg('ROOT_FOLDER_ID', '')), 'Study');
+  setCfg('STUDY_FOLDER_ID', f.getId());
+  return f;
+}
+
+function readJson_(folder, name, dflt) {
+  var it = folder.getFilesByName(name);
+  if (!it.hasNext()) return dflt;
+  try { return JSON.parse(it.next().getBlob().getDataAsString()); } catch (e) { return dflt; }
+}
+
+function writeJson_(folder, name, obj) {
+  var body = JSON.stringify(obj);
+  var it = folder.getFilesByName(name);
+  if (it.hasNext()) it.next().setContent(body);
+  else folder.createFile(name, body, MimeType.PLAIN_TEXT);
+}
+
+function userKey_(user) { return String(user.codeHash || '').slice(0, 16) || 'anon'; }
+
+/** Gemini call that must come back as JSON. */
+function genJson_(prompt, maxTokens) {
+  var key = cfg('GEMINI_KEY', '');
+  if (!key) throw new Error('This needs a GEMINI_KEY script property.');
+  var model = cfg('CHAT_MODEL', 'gemini-2.5-flash');
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model +
+    ':generateContent?key=' + encodeURIComponent(key);
+  var res = fetchWithRetry_(url, {
+    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    payload: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.15,
+        maxOutputTokens: maxTokens || 6000,
+        responseMimeType: 'application/json'
+      }
+    })
+  });
+  if (res.getResponseCode() !== 200) {
+    throw geminiError_(res.getResponseCode(), res.getContentText(), model);
+  }
+  var data = JSON.parse(res.getContentText());
+  var cand = (data.candidates && data.candidates[0]) || null;
+  var text = '';
+  if (cand && cand.content && cand.content.parts) {
+    text = cand.content.parts.map(function (p) { return p.text || ''; }).join('');
+  }
+  text = String(text).replace(/^\s*```(?:json)?/i, '').replace(/```\s*$/, '').trim();
+  if (!text) throw new Error('Gemini returned an empty answer (the model may have hit its output limit).');
+  try { return JSON.parse(text); }
+  catch (e) { throw new Error('Could not read the model reply as JSON.'); }
+}
+
+/** Embeds up to 60 short queries in one round trip — used when building a brief. */
+function embedQueriesAction_(req) {
+  var qs = (req.qs || []).map(function (q) { return String(q || '').slice(0, 1000); }).filter(Boolean);
+  if (!qs.length) return { ok: true, vecs: [] };
+  if (!cfg('GEMINI_KEY', '')) return { ok: true, vecs: [], embeddings: false };
+  if (qs.length > 60) qs = qs.slice(0, 60);
+  var out = [];
+  try {
+    for (var i = 0; i < qs.length; i += 30) {
+      var vs = embedTexts_(qs.slice(i, i + 30), 'RETRIEVAL_QUERY') || [];
+      for (var k = 0; k < vs.length; k++) out.push(packVec_(vs[k]));
+    }
+  } catch (err) {
+    if (err && err.quota) return { ok: true, vecs: [], embeddings: true, paused: pausedInfo_(err) };
+    throw err;
+  }
+  return { ok: true, vecs: out, embeddings: true };
+}
+
+/* ---------- briefs ---------- */
+
+function briefAction_(req, user) {
+  var profile = String(req.profile || 'this project').slice(0, 200);
+  var notes = String(req.notes || '').slice(0, 1500);
+  var themes = req.themes || [];          // [{name, passages:[{n,title,clause,page,text}]}]
+  var missing = req.missing || [];
+  if (!themes.length) return { ok: false, error: 'Nothing in the library matched this project type yet.' };
+
+  var lines = [];
+  themes.forEach(function (t) {
+    lines.push('## THEME: ' + t.name);
+    (t.passages || []).forEach(function (p) {
+      lines.push('[' + p.n + '] ' + p.title + (p.clause ? ' - clause ' + p.clause : '') +
+        (p.page ? ' (p.' + p.page + ')' : '') + '\n' + String(p.text || '').slice(0, 1800));
+    });
+  });
+
+  var prompt =
+    'You are briefing an experienced estates / project engineer who is about to start work on:\n' +
+    profile + '\n' +
+    (notes ? 'Project notes from them: ' + notes + '\n' : '') + '\n' +
+    'Below are extracts from THEIR OWN document library, grouped by theme. Build a "what to look out for" brief.\n\n' +
+    'RULES\n' +
+    '- Every watch-out must come from the extracts. Cite with the bracket numbers, e.g. "refs": [3, 7].\n' +
+    '- Prefer the specific and checkable: dimensions, rates, distances, ratings, frequencies. Quote the controlling figure.\n' +
+    '- Do not invent clause numbers, document titles or values. If you are unsure, leave it out.\n' +
+    '- Severity: "critical" = life safety or statutory compliance; "important" = will cause rework or cost if missed;\n' +
+    '  "check" = confirm early, may or may not apply.\n' +
+    '- "gaps" should name themes where the extracts are thin or silent, so they know what to go and read.\n' +
+    '- "earlyDecisions" are the choices that must be settled at concept stage because they are expensive to reverse.\n' +
+    '- "sourcesToFind" may name well-known standard references for this building type that are NOT represented\n' +
+    '  in the extracts. Keep it short, and only titles you are confident exist.\n' +
+    (missing.length ? '- The library returned nothing for these themes: ' + missing.join('; ') + '\n' : '') +
+    '\nReturn JSON exactly in this shape:\n' +
+    '{"summary":"2-3 sentences on the shape of the job",' +
+    '"sections":[{"theme":"...","watchOuts":[{"point":"short imperative","detail":"1-2 sentences with the figure",' +
+    '"severity":"critical|important|check","refs":[1,2]}]}],' +
+    '"earlyDecisions":["..."],"gaps":["..."],"sourcesToFind":["..."]}\n\n' +
+    'EXTRACTS\n' + lines.join('\n\n');
+
+  var out = genJson_(prompt, 7000);
+  audit_(user.name, 'brief', profile);
+  return { ok: true, brief: out };
+}
+
+function briefSaveAction_(req, user) {
+  var b = req.brief || {};
+  var id = 'b' + Date.now().toString(36);
+  var rec = {
+    id: id, title: String(req.title || req.profile || 'Brief').slice(0, 160),
+    profile: String(req.profile || ''), notes: String(req.notes || ''),
+    createdBy: user.name, createdAt: nowIso_(),
+    internal: !!req.internal, brief: b, refs: req.refs || []
+  };
+  writeJson_(studyFolder_(), 'brief-' + id + '.json', rec);
+  audit_(user.name, 'brief-save', rec.title);
+  return { ok: true, id: id };
+}
+
+function briefListAction_(user) {
+  var it = studyFolder_().getFiles();
+  var out = [];
+  while (it.hasNext()) {
+    var f = it.next();
+    if (f.getName().indexOf('brief-') !== 0) continue;
+    try {
+      var r = JSON.parse(f.getBlob().getDataAsString());
+      if (r.internal && !user.internal) continue;
+      out.push({ id: r.id, title: r.title, profile: r.profile, createdBy: r.createdBy,
+                 createdAt: r.createdAt, internal: !!r.internal });
+    } catch (e) { /* skip unreadable */ }
+  }
+  out.sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+  return { ok: true, briefs: out };
+}
+
+function briefGetAction_(req, user) {
+  var r = readJson_(studyFolder_(), 'brief-' + String(req.id || '') + '.json', null);
+  if (!r) return { ok: false, error: 'Brief not found' };
+  if (r.internal && !user.internal) return { ok: false, error: 'forbidden' };
+  return { ok: true, record: r };
+}
+
+function briefDeleteAction_(req, user) {
+  var name = 'brief-' + String(req.id || '') + '.json';
+  var r = readJson_(studyFolder_(), name, null);
+  if (!r) return { ok: false, error: 'Brief not found' };
+  if (r.createdBy !== user.name && user.role !== 'admin') {
+    return { ok: false, error: 'forbidden', message: 'Only the author or an admin can delete this.' };
+  }
+  var it = studyFolder_().getFilesByName(name);
+  while (it.hasNext()) it.next().setTrashed(true);
+  return { ok: true };
+}
 
 /* ---------- flashcards ---------- */
-.deckbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
-.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-sm);padding:7px 12px;text-align:center;min-width:74px}
-.stat b{display:block;font-size:19px;line-height:1.2}
-.stat span{font-size:11px;color:var(--ink-3)}
-.flash{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);
-  min-height:230px;display:flex;flex-direction:column;justify-content:center;padding:26px 22px;text-align:center;cursor:pointer}
-.flash .qq{font-size:19px;font-weight:650;line-height:1.45}
-.flash .aa{font-size:17px;line-height:1.55;color:var(--accent);margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
-.flash .src{font-size:12px;color:var(--ink-3);margin-top:14px}
-.grade{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
-.grade button{border:1px solid var(--line);background:var(--panel);border-radius:var(--r-sm);padding:11px 4px;font-weight:650;font-size:13px;line-height:1.25}
-.grade button small{display:block;font-weight:500;font-size:10.5px;color:var(--ink-3);margin-top:2px}
-.grade button.g1{border-color:var(--danger);color:var(--danger)}
-.grade button.g4{border-color:var(--accent);color:var(--accent)}
-.cardrow{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line);font-size:13.5px}
-.cardrow:last-child{border-bottom:0}
-</style>
-</head>
-<body>
 
-<div id="app" class="hide">
-  <header class="topbar">
-    <div class="brand"><span class="dot">R</span><span>RegVault</span></div>
-    <div class="searchwrap" id="searchwrap">
-      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--ink-3);flex:none"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input id="q" type="text" placeholder="Search regulations, clauses, policies…" autocomplete="off" enterkeyhint="search" spellcheck="false">
-      <button class="iconbtn hide" id="clearq" style="width:28px;height:28px;border:0;background:transparent" title="Clear">✕</button>
-    </div>
-    <div class="modeswap" role="group" aria-label="Search mode">
-      <button id="mFind" aria-pressed="true">Find</button>
-      <button id="mAsk" aria-pressed="false">Ask</button>
-    </div>
-    <button class="iconbtn" id="syncBtn" title="Sync library">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></svg>
-    </button>
-  </header>
+function genCardsAction_(req, user) {
+  var passages = req.passages || [];
+  if (!passages.length) return { ok: false, error: 'No passages to make cards from.' };
+  var perPassage = Math.min(3, Math.max(1, Number(req.per || 1)));
 
-  <div class="filters" id="filters"></div>
+  var body = passages.map(function (p, i) {
+    return '[' + i + '] ' + p.title + (p.clause ? ' - clause ' + p.clause : '') +
+      (p.page ? ' (p.' + p.page + ')' : '') + '\n' + String(p.text || '').slice(0, 1800);
+  }).join('\n\n');
 
-  <main>
-    <div class="wrap">
-      <section id="view-search"></section>
-      <section id="view-brief" class="hide"></section>
-      <section id="view-cards" class="hide"></section>
-      <section id="view-library" class="hide"></section>
-      <section id="view-add" class="hide"></section>
-      <section id="view-settings" class="hide"></section>
-    </div>
-  </main>
+  var prompt =
+    'Write recall flashcards for an experienced estates / building services engineer, from the extracts below.\n\n' +
+    'RULES\n' +
+    '- Up to ' + perPassage + ' card(s) per extract, and skip an extract entirely if it has nothing worth memorising.\n' +
+    '- Test something checkable: a figure, a limit, a rate, a rating, a frequency, a required provision.\n' +
+    '- The question must stand on its own - name the building type or context inside the question,\n' +
+    '  because the reader will not see the extract.\n' +
+    '- The answer must be short: the figure or rule, plus at most one clarifying clause.\n' +
+    '- Never invent a value. Only use what the extract states. No trivia about document formatting.\n\n' +
+    'Return JSON: {"cards":[{"q":"...","a":"...","ref":0}]}  where ref is the extract number.\n\n' +
+    'EXTRACTS\n' + body;
 
-  <nav class="tabs" id="tabs">
-    <button data-view="search" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search</button>
-    <button data-view="brief" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 2.5 20h19z"/><path d="M12 10v4M12 17.2v.1"/></svg>Brief</button>
-    <button data-view="cards" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="14" height="12" rx="2"/><path d="M8 3h10a3 3 0 0 1 3 3v10"/></svg>Cards</button>
-    <button data-view="library" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h6v14H4zM14 5h6v14h-6z"/></svg>Library</button>
-    <button data-view="settings" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1A1.7 1.7 0 0 0 17 4.6l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
-  </nav>
-</div>
-
-<div id="gate" class="wrap" style="max-width:440px;padding-top:8vh">
-  <div class="card">
-    <div class="brand" style="margin-bottom:6px"><span class="dot">R</span><span style="font-size:19px">RegVault</span></div>
-    <p class="muted" style="margin:0 0 18px;font-size:14px">Your regulations, technical guidance and policy library — searchable on any device.</p>
-    <label class="f"><span>Service address (Apps Script /exec URL)</span>
-      <input id="gEndpoint" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>
-    <label class="f"><span>Access code</span>
-      <input id="gCode" type="password" placeholder="XXX-XXX-XXX" autocomplete="current-password"></label>
-    <div class="switch"><input type="checkbox" id="gRemember" checked><label for="gRemember">Remember on this device</label></div>
-    <button class="btn primary" id="gGo" style="width:100%;margin-top:6px">Connect</button>
-    <p id="gMsg" class="muted" style="font-size:13px;margin:12px 0 0"></p>
-  </div>
-</div>
-
-<div id="toast"></div>
-<div id="modal"></div>
-
-<script>
-"use strict";
-/* ============================================================== state ==== */
-const LS = 'regvault.settings.v1';
-const state = {
-  endpoint:'', code:'', user:null, embeddings:false, firecrawl:false,
-  view:'search', mode:'find',
-  docs:[], collections:[], filters:{collection:null, superseded:false, internalOnly:false},
-  chunks:[], vecs:null, dim:0, inv:null, avgdl:0,
-  results:[], lastQuery:'', busy:false
-};
-const $ = s => document.querySelector(s);
-const $$ = s => Array.from(document.querySelectorAll(s));
-const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-
-function toast(msg, kind, ms){
-  const el = document.createElement('div');
-  el.className = 'toast' + (kind==='err'?' err':'');
-  el.innerHTML = msg;
-  $('#toast').appendChild(el);
-  setTimeout(()=>el.remove(), ms || (kind==='err'?6000:2600));
-  return el;
+  var out = genJson_(prompt, 5000);
+  var cards = (out && out.cards) || [];
+  var made = [];
+  cards.forEach(function (c) {
+    var src = passages[Number(c.ref)] || passages[0];
+    if (!c.q || !c.a || !src) return;
+    made.push({
+      q: String(c.q).slice(0, 400), a: String(c.a).slice(0, 600),
+      docId: src.docId || '', title: src.title || '', clause: src.clause || '',
+      page: Number(src.page || 0), tags: src.tags || ''
+    });
+  });
+  audit_(user.name, 'gen-cards', made.length + ' cards');
+  return { ok: true, cards: made };
 }
 
-/* ============================================================== storage == */
-const DB = (()=>{
-  let dbp = null;
-  function open(){
-    if (dbp) return dbp;
-    dbp = new Promise((res,rej)=>{
-      const r = indexedDB.open('regvault', 1);
-      r.onupgradeneeded = () => {
-        const db = r.result;
-        if(!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
-        if(!db.objectStoreNames.contains('parts')) db.createObjectStore('parts');
-        if(!db.objectStoreNames.contains('files')) db.createObjectStore('files');
+function loadBank_() { return readJson_(studyFolder_(), 'cards.json', []); }
+
+function cardsAddAction_(req, user) {
+  var incoming = req.cards || [];
+  if (!incoming.length) return { ok: false, error: 'No cards supplied' };
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var bank = loadBank_();
+    var added = [];
+    incoming.forEach(function (c, i) {
+      var docId = String(c.docId || '');
+      var meta = docId ? docMeta_(docId) : null;
+      var card = {
+        id: 'c' + Date.now().toString(36) + i.toString(36) + Math.floor(Math.random() * 1296).toString(36),
+        q: String(c.q || '').slice(0, 400),
+        a: String(c.a || '').slice(0, 600),
+        docId: docId,
+        title: String(c.title || (meta ? meta.title : '')).slice(0, 200),
+        clause: String(c.clause || '').slice(0, 60),
+        page: Number(c.page || 0),
+        deck: String(c.deck || 'General').slice(0, 80),
+        tags: String(c.tags || '').slice(0, 200),
+        internal: meta ? truthy_(meta.internal) : !!c.internal,
+        createdBy: user.name,
+        createdAt: nowIso_()
       };
-      r.onsuccess = ()=>res(r.result);
-      r.onerror = ()=>rej(r.error);
+      if (card.q && card.a) { bank.push(card); added.push(card); }
     });
-    return dbp;
-  }
-  const tx = async (store, mode, fn) => {
-    const db = await open();
-    return new Promise((res,rej)=>{
-      const t = db.transaction(store, mode);
-      const s = t.objectStore(store);
-      let out;
-      try { out = fn(s); } catch(e){ rej(e); return; }
-      t.oncomplete = ()=>res(out && out.result !== undefined ? out.result : out);
-      t.onerror = ()=>rej(t.error);
-    });
-  };
-  // Private windows, sandboxed frames and locked-down browsers can refuse
-  // IndexedDB outright. Fall back to memory so the app still runs — it just
-  // re-downloads the index next launch instead of opening offline.
-  const mem = {kv:new Map(), parts:new Map(), files:new Map()};
-  let broken = false;
-  async function guard(run, fallback){
-    if (broken) return fallback();
-    try { return await run(); }
-    catch(e){
-      broken = true;
-      if (!DB._warned){ DB._warned = true; setTimeout(()=>toast('This browser is blocking local storage — offline mode is off.','err'), 400); }
-      return fallback();
-    }
-  }
-  const DB = {
-    get: (store,k)=>guard(()=>tx(store,'readonly',s=>s.get(k)), ()=>mem[store].get(k)),
-    put: (store,k,v)=>guard(()=>tx(store,'readwrite',s=>s.put(v,k)), ()=>{ mem[store].set(k,v); }),
-    del: (store,k)=>guard(()=>tx(store,'readwrite',s=>s.delete(k)), ()=>{ mem[store].delete(k); }),
-    keys: (store)=>guard(()=>tx(store,'readonly',s=>s.getAllKeys()), ()=>Array.from(mem[store].keys())),
-    clear: (store)=>guard(()=>tx(store,'readwrite',s=>s.clear()), ()=>{ mem[store].clear(); }),
-    get available(){ return !broken; }
-  };
-  return DB;
-})();
+    writeJson_(studyFolder_(), 'cards.json', bank);
+    audit_(user.name, 'cards-add', added.length + ' cards');
+    return { ok: true, added: added };
+  } finally { lock.releaseLock(); }
+}
 
-function loadSettings(){
+function cardsSyncAction_(user) {
+  var bank = loadBank_().filter(function (c) { return !(c.internal && !user.internal); });
+  var st = readJson_(studyFolder_(), 'state-' + userKey_(user) + '.json', {});
+  return { ok: true, cards: bank, state: st, decks: uniq_(bank.map(function (c) { return c.deck; })) };
+}
+
+function cardsReviewAction_(req, user) {
+  var reviews = req.reviews || [];
+  if (!reviews.length) return { ok: true, saved: 0 };
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
   try {
-    const s = JSON.parse(localStorage.getItem(LS) || '{}');
-    state.endpoint = s.endpoint || '';
-    state.code = s.code || '';
-    if (s.theme) document.documentElement.setAttribute('data-theme', s.theme);
-  } catch(e){}
-}
-function saveSettings(extra){
-  let s = {};
-  try { s = JSON.parse(localStorage.getItem(LS) || '{}'); } catch(e){}
-  Object.assign(s, {endpoint:state.endpoint, code:state.code}, extra||{});
-  localStorage.setItem(LS, JSON.stringify(s));
-}
-function settingsRaw(){ try { return JSON.parse(localStorage.getItem(LS)||'{}'); } catch(e){ return {}; } }
-
-/* ============================================================== api ====== */
-async function api(action, body, opts){
-  if(!state.endpoint) throw new Error('No service address configured.');
-  const payload = Object.assign({action, code: state.code}, body||{});
-  const ctl = new AbortController();
-  const t = setTimeout(()=>ctl.abort(), (opts&&opts.timeout) || 180000);
-  let res;
-  try {
-    res = await fetch(state.endpoint, {
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify(payload),
-      redirect:'follow',
-      signal: ctl.signal
-    });
-  } catch(e){
-    clearTimeout(t);
-    throw new Error('Could not reach the service. Check the address and your connection.');
-  }
-  clearTimeout(t);
-  const text = await res.text();
-  let j;
-  try { j = JSON.parse(text); }
-  catch(e){ throw new Error('Unexpected reply from the service (is the deployment set to "Anyone"?)'); }
-  if (j.ok === false && j.error === 'auth'){ signOut('Your access code was rejected.'); throw new Error(j.message||'Not authorised'); }
-  if (j.ok === false) throw new Error(j.message || j.error || 'Request failed');
-  return j;
-}
-
-/* ============================================================== vectors == */
-function b64ToI8(s){
-  const bin = atob(s);
-  const a = new Int8Array(bin.length);
-  for (let i=0;i<bin.length;i++){ const c = bin.charCodeAt(i); a[i] = c>127 ? c-256 : c; }
-  return a;
-}
-
-/* ============================================================== text ===== */
-const STOP = new Set(('a an the of to in for on with by or and be is are as at from that this these those it its shall must may can should would could not no if then than which who whom whose where when what how any all such other into over under be been being do does did have has had').split(' '));
-
-function tokenize(s){
-  const out = [];
-  const raw = String(s).toLowerCase().replace(/[‘’]/g,"'").match(/[a-z0-9][a-z0-9.'\-]*/g) || [];
-  for (let w of raw){
-    w = w.replace(/^[.'-]+|[.'-]+$/g,'');
-    if (!w) continue;
-    if (/^\d+(\.\d+)+$/.test(w)) { out.push(w); continue; }   // clause numbers kept whole
-    if (w.length < 2 || STOP.has(w)) continue;
-    out.push(stem(w));
-  }
-  return out;
-}
-function stem(w){
-  if (w.length < 5) return w;
-  return w.replace(/(ations|ation|ings|ing|ies|ied|es|s|ly|ment)$/,'') || w;
-}
-
-/* ============================================================== index ==== */
-function buildIndex(){
-  const chunks = state.chunks;
-  const inv = new Map();
-  let total = 0;
-  for (let i=0;i<chunks.length;i++){
-    const c = chunks[i];
-    const toks = tokenize((c.h?c.h+' ':'') + (c.c?c.c+' ':'') + c.t);
-    c.len = toks.length || 1;
-    total += c.len;
-    const tf = new Map();
-    for (const t of toks) tf.set(t, (tf.get(t)||0)+1);
-    for (const [t,n] of tf){
-      let p = inv.get(t);
-      if (!p) { p = []; inv.set(t, p); }
-      p.push(i, n);
-    }
-  }
-  state.inv = inv;
-  state.avgdl = chunks.length ? total/chunks.length : 1;
-
-  // pack vectors into one buffer
-  const withVec = chunks.filter(c=>c.v);
-  if (withVec.length){
-    const dim = b64ToI8(withVec[0].v).length;
-    state.dim = dim;
-    const buf = new Int8Array(chunks.length * dim);
-    const has = new Uint8Array(chunks.length);
-    for (let i=0;i<chunks.length;i++){
-      if (!chunks[i].v) continue;
-      const a = b64ToI8(chunks[i].v);
-      if (a.length !== dim) continue;
-      buf.set(a, i*dim);
-      has[i] = 1;
-      chunks[i].v = null;                        // free the base64 string
-    }
-    state.vecs = {buf, has, dim};
-  } else {
-    state.vecs = null; state.dim = 0;
-  }
-}
-
-function bm25(qtoks){
-  const inv = state.inv, chunks = state.chunks, N = chunks.length;
-  if (!N) return new Map();
-  const k1 = 1.4, b = 0.72;
-  const scores = new Map();
-  const counted = new Set();
-  for (const t of qtoks){
-    if (counted.has(t)) continue;
-    counted.add(t);
-    const p = inv.get(t);
-    if (!p) continue;
-    const df = p.length/2;
-    const idf = Math.log(1 + (N - df + 0.5)/(df + 0.5));
-    for (let j=0;j<p.length;j+=2){
-      const i = p[j], f = p[j+1];
-      const dl = chunks[i].len;
-      const s = idf * (f*(k1+1))/(f + k1*(1 - b + b*dl/state.avgdl));
-      scores.set(i, (scores.get(i)||0) + s);
-    }
-  }
-  return scores;
-}
-
-function cosineAll(qvecB64){
-  const V = state.vecs;
-  if (!V || !qvecB64) return null;
-  const q = b64ToI8(qvecB64);
-  if (q.length !== V.dim) return null;
-  const out = new Float32Array(state.chunks.length);
-  const dim = V.dim, buf = V.buf, has = V.has;
-  for (let i=0;i<out.length;i++){
-    if (!has[i]) continue;
-    let dot = 0;
-    const off = i*dim;
-    for (let d=0; d<dim; d++) dot += buf[off+d]*q[d];
-    out[i] = dot / 16129;                       // 127*127
-  }
-  return out;
-}
-
-function docById(id){ return state.docs.find(d=>d.docId===id) || {title:'(unknown)', collection:''}; }
-
-function passesFilter(c){
-  const d = docById(c.d);
-  if (state.filters.collection && d.collection !== state.filters.collection) return false;
-  if (!state.filters.superseded && d.status === 'superseded') return false;
-  if (state.filters.internalOnly && !d.internal) return false;
-  return true;
-}
-
-async function runSearch(query, wantVec, presetVec){
-  const q = String(query||'').trim();
-  if (!q) return [];
-  const qtoks = tokenize(q);
-  const kw = bm25(qtoks);
-
-  let vec = null;
-  if (presetVec && state.vecs){
-    vec = cosineAll(presetVec);
-  } else if (wantVec && state.embeddings && state.vecs){
-    try {
-      const r = await api('embedQuery', {q});
-      if (r.vec) vec = cosineAll(r.vec);
-    } catch(e){ /* keyword-only fallback */ }
-  }
-
-  let maxKw = 0;
-  for (const v of kw.values()) if (v > maxKw) maxKw = v;
-  const candidates = new Set(kw.keys());
-  if (vec){
-    // add the strongest semantic matches even when no keyword hit
-    const idx = [];
-    for (let i=0;i<vec.length;i++) if (vec[i] > 0.25) idx.push(i);
-    idx.sort((a,b)=>vec[b]-vec[a]);
-    for (let i=0;i<Math.min(idx.length, 400); i++) candidates.add(idx[i]);
-  }
-
-  const phrase = q.toLowerCase().replace(/\s+/g,' ').trim();
-  const clauseQ = (q.match(/\b\d+(?:\.\d+){1,4}\b/)||[])[0] || '';
-  const rawWords = phrase.split(' ').filter(w=>w.length>2);
-
-  const out = [];
-  for (const i of candidates){
-    const c = state.chunks[i];
-    if (!c || !passesFilter(c)) continue;
-    const k = maxKw ? (kw.get(i)||0)/maxKw : 0;
-    const v = vec ? Math.max(0, vec[i]) : 0;
-    let score = vec ? (0.55*k + 0.45*v) : k;
-
-    const low = c.t.toLowerCase();
-    if (phrase.length>6 && low.includes(phrase)) score += 0.22;
-    if (clauseQ && (String(c.c)===clauseQ || low.indexOf(clauseQ)>=0)) score += 0.30;
-    const d = docById(c.d);
-    const title = (d.title+' '+(d.docRef||'')).toLowerCase();
-    let tHit = 0;
-    for (const w of rawWords) if (title.includes(w)) tHit++;
-    if (tHit) score += Math.min(0.12, tHit*0.05);
-    if (d.status === 'superseded') score *= 0.6;
-
-    out.push({i, score, kw:k, vec:v});
-  }
-  out.sort((a,b)=>b.score-a.score);
-  return out.slice(0, 60);
-}
-
-/* ============================================================== snippets = */
-function snippet(text, query, len){
-  len = len || 300;
-  const words = Array.from(new Set(String(query).toLowerCase().match(/[a-z0-9][a-z0-9.\-]*/g)||[])).filter(w=>w.length>2 && !STOP.has(w));
-  const low = text.toLowerCase();
-  let best = 0, bestScore = -1;
-  const step = 40;
-  for (let s=0; s<Math.max(1, text.length-len); s+=step){
-    const seg = low.slice(s, s+len);
-    let sc = 0;
-    for (const w of words){ let p = seg.indexOf(w); if (p>=0) sc += 1 + (seg.indexOf(w, p+1)>=0?0.3:0); }
-    if (sc > bestScore){ bestScore = sc; best = s; }
-  }
-  let start = best;
-  if (start > 0){ const sp = text.indexOf(' ', start); if (sp>=0 && sp-start<25) start = sp+1; }
-  let out = text.slice(start, start+len).trim();
-  if (start > 0) out = '… ' + out;
-  if (start+len < text.length) out = out + ' …';
-  return highlight(out, words);
-}
-function highlight(text, words){
-  let html = esc(text);
-  if (!words.length) return html;
-  const pat = words.map(w=>w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).sort((a,b)=>b.length-a.length).join('|');
-  try { html = html.replace(new RegExp('('+pat+')','gi'), '<mark>$1</mark>'); } catch(e){}
-  return html;
-}
-
-/* ============================================================== sync ===== */
-async function sync(force){
-  if (state.busy) return;
-  state.busy = true;
-  const t = toast('<span class="spin"></span> Syncing library…', null, 60000);
-  try {
-    const m = await api('manifest');
-    state.docs = m.docs || [];
-    state.collections = m.collections || [];
-    state.embeddings = !!m.embeddings;
-
-    const localStamps = (await DB.get('kv','stamps')) || {};
-    const chunks = [];
-    let fetched = 0;
-
-    for (const d of state.docs){
-      const key = 'doc:'+d.docId;
-      let cached = (!force && localStamps[d.docId] === d.stamp) ? await DB.get('parts', key) : null;
-      if (!cached){
-        const all = [];
-        for (const p of (d.parts||[])){
-          t.innerHTML = '<span class="spin"></span> Downloading “'+esc(d.title.slice(0,40))+'” part '+(p.part+1)+'/'+d.parts.length;
-          const r = await api('docIndex', {docId:d.docId, part:p.part});
-          for (const c of (r.chunks||[])) all.push(c);
-        }
-        cached = all;
-        await DB.put('parts', key, all);
-        localStamps[d.docId] = d.stamp;
-        fetched++;
-      }
-      for (let n=0;n<cached.length;n++){
-        const c = cached[n];
-        chunks.push({d:d.docId, n, p:c.p, h:c.h, c:c.c, t:c.t, v:c.v||''});
-      }
-    }
-    // drop caches for documents that are gone
-    const live = new Set(state.docs.map(d=>'doc:'+d.docId));
-    for (const k of await DB.keys('parts')) if (!live.has(k)) await DB.del('parts', k);
-    for (const id of Object.keys(localStamps)) if (!state.docs.some(d=>d.docId===id)) delete localStamps[id];
-    await DB.put('kv','stamps', localStamps);
-    await DB.put('kv','docs', state.docs);
-
-    state.chunks = chunks;
-    buildIndex();
-    renderFilters();
-    if (state.view==='library') renderLibrary();
-    t.remove();
-    toast('Library ready — '+state.docs.length+' documents, '+chunks.length.toLocaleString()+' passages'+(fetched?' ('+fetched+' updated)':''));
-  } catch(e){
-    t.remove();
-    toast(esc(e.message), 'err');
-  } finally {
-    state.busy = false;
-  }
-}
-
-async function loadFromCache(){
-  const docs = await DB.get('kv','docs');
-  if (!docs || !docs.length) return false;
-  state.docs = docs;
-  state.collections = Array.from(new Set(docs.map(d=>d.collection).filter(Boolean))).sort();
-  const chunks = [];
-  for (const d of docs){
-    const cached = await DB.get('parts','doc:'+d.docId);
-    if (!cached) continue;
-    for (let n=0;n<cached.length;n++){
-      const c = cached[n];
-      chunks.push({d:d.docId, n, p:c.p, h:c.h, c:c.c, t:c.t, v:c.v||''});
-    }
-  }
-  if (!chunks.length) return false;
-  state.chunks = chunks;
-  buildIndex();
-  renderFilters();
-  return true;
-}
-
-/* ============================================================== views ==== */
-function setView(v){
-  if (state.view==='cards' && v!=='cards') flushReviews();
-  state.view = v;
-  ['search','brief','cards','library','add','settings'].forEach(x=>{
-    $('#view-'+x).classList.toggle('hide', x!==v);
-  });
-  $$('#tabs button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.view===v || (v==='add' && b.dataset.view==='library'))));
-  $('#filters').classList.toggle('hide', v!=='search');
-  if (v==='search' && !$('#view-search').innerHTML.trim()) renderSearchHome();
-  if (v==='library') renderLibrary();
-  if (v==='add') renderAdd();
-  if (v==='brief') renderBrief();
-  if (v==='cards') renderCards();
-  if (v==='settings') renderSettings();
-  window.scrollTo(0,0);
-  document.querySelector('main').scrollTop = 0;
-}
-
-function renderFilters(){
-  const f = $('#filters');
-  const cols = state.collections;
-  let html = '<button class="chip" data-col="" aria-pressed="'+(!state.filters.collection)+'">All</button>';
-  for (const c of cols){
-    html += '<button class="chip" data-col="'+esc(c)+'" aria-pressed="'+(state.filters.collection===c)+'">'+esc(c)+'</button>';
-  }
-  if (state.user && state.user.internal && state.docs.some(d=>d.internal)){
-    html += '<button class="chip" data-toggle="internalOnly" aria-pressed="'+state.filters.internalOnly+'">Internal only</button>';
-  }
-  html += '<button class="chip" data-toggle="superseded" aria-pressed="'+state.filters.superseded+'">Include superseded</button>';
-  f.innerHTML = html;
-  f.querySelectorAll('[data-col]').forEach(b=>b.onclick=()=>{
-    state.filters.collection = b.dataset.col || null;
-    renderFilters(); doSearch();
-  });
-  f.querySelectorAll('[data-toggle]').forEach(b=>b.onclick=()=>{
-    const k = b.dataset.toggle;
-    state.filters[k] = !state.filters[k];
-    renderFilters(); doSearch();
-  });
-}
-
-/* ---------- search view ---------- */
-let searchTimer = null;
-function onQueryInput(){
-  $('#clearq').classList.toggle('hide', !$('#q').value);
-  clearTimeout(searchTimer);
-  if (state.mode==='ask') return;
-  searchTimer = setTimeout(()=>doSearch(), 220);
-}
-
-async function doSearch(){
-  const q = $('#q').value.trim();
-  state.lastQuery = q;
-  const v = $('#view-search');
-  if (!q){ renderSearchHome(); return; }
-  if (!state.chunks.length){
-    v.innerHTML = emptyState('Nothing indexed yet', 'Add documents on the Add tab, then sync.');
-    return;
-  }
-
-  if (state.mode==='ask'){ return; }
-
-  v.innerHTML = '<p class="muted" style="padding:8px 2px"><span class="spin"></span> Searching…</p>';
-  const hits = await runSearch(q, true);
-  if (q !== state.lastQuery) return;
-  state.results = hits;
-  if (!hits.length){
-    v.innerHTML = emptyState('No matches', 'Try fewer words, a clause number like 3.2.1, or turn on “Include superseded”.');
-    return;
-  }
-  let html = '<h2 class="sec">'+hits.length+' passage'+(hits.length===1?'':'s')+(state.vecs&&state.embeddings?' · keyword + meaning':' · keyword')+'</h2>';
-  hits.forEach((h,ix)=>{ html += hitCard(h, q, ix); });
-  v.innerHTML = html;
-  v.querySelectorAll('.hit').forEach(el=>el.onclick=()=>openReader(Number(el.dataset.i)));
-}
-
-function hitCard(h, q, ix){
-  const c = state.chunks[h.i];
-  const d = docById(c.d);
-  const loc = [c.c ? 'Clause '+esc(c.c) : '', c.p ? 'p.'+c.p : ''].filter(Boolean).join(' · ');
-  return '<article class="card hit" data-i="'+h.i+'">'
-    + '<div class="meta">'
-    + '<span class="tag accent">'+esc(d.collection||'—')+'</span>'
-    + (d.docRef?'<span class="tag">'+esc(d.docRef)+'</span>':'')
-    + (d.internal?'<span class="tag warn">Internal</span>':'')
-    + (d.status==='superseded'?'<span class="tag danger">Superseded</span>':'')
-    + (loc?'<span>'+loc+'</span>':'')
-    + '</div>'
-    + '<h3>'+esc(c.h || d.title)+'</h3>'
-    + (c.h ? '<div class="muted" style="font-size:12.5px;margin:-2px 0 7px">'+esc(d.title)+'</div>' : '')
-    + '<div class="snippet">'+snippet(c.t, q)+'</div>'
-    + '<div class="scorebar"><i style="width:'+Math.round(Math.min(1,h.score)*100)+'%"></i></div>'
-    + '</article>';
-}
-
-function emptyState(title, sub){
-  return '<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 5h6v14H4zM14 5h6v14h-6z"/></svg>'
-    + '<h3>'+esc(title)+'</h3><p style="margin:0;font-size:14px">'+sub+'</p></div>';
-}
-
-function renderSearchHome(){
-  const v = $('#view-search');
-  if (!state.docs.length){
-    v.innerHTML = emptyState('Your library is empty', 'Go to <b>Add</b> to upload PDFs or pull documents from an official web page.');
-    return;
-  }
-  const byCol = {};
-  state.docs.forEach(d=>{ (byCol[d.collection||'Uncategorised'] ||= []).push(d); });
-  const passages = state.chunks.length.toLocaleString();
-  let html = '<div class="card tight" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">'
-    + '<div><div style="font-size:22px;font-weight:700">'+state.docs.length+'</div><div class="muted" style="font-size:12px">documents</div></div>'
-    + '<div><div style="font-size:22px;font-weight:700">'+passages+'</div><div class="muted" style="font-size:12px">passages</div></div>'
-    + '<div><div style="font-size:22px;font-weight:700">'+Object.keys(byCol).length+'</div><div class="muted" style="font-size:12px">collections</div></div>'
-    + '<div style="flex:1"></div>'
-    + '<div class="muted" style="font-size:12.5px">'+(state.embeddings&&state.vecs?'Meaning search on':'Keyword search only')+'</div>'
-    + '</div>';
-
-  const dueNow = cardState.loaded ? dueCards('').length : 0;
-  if (dueNow){
-    html += '<article class="card tight hit" id="homeDue"><div style="display:flex;gap:10px;align-items:center">'
-      + '<span class="tag accent">'+dueNow+'</span><b style="font-size:14.5px">flashcard'+(dueNow===1?'':'s')+' due</b>'
-      + '<span class="muted" style="margin-left:auto;font-size:13px">Review →</span></div></article>';
-  }
-
-  html += '<h2 class="sec">Recently added</h2>';
-  const recent = state.docs.slice().sort((a,b)=>String(b.addedAt).localeCompare(String(a.addedAt))).slice(0,6);
-  recent.forEach(d=>{
-    html += '<article class="card tight hit" data-doc="'+esc(d.docId)+'">'
-      + '<div class="meta"><span class="tag accent">'+esc(d.collection||'—')+'</span>'
-      + (d.docRef?'<span class="tag">'+esc(d.docRef)+'</span>':'')
-      + (d.internal?'<span class="tag warn">Internal</span>':'')
-      + '<span>'+(d.chunkCount||0)+' passages</span></div>'
-      + '<h3 style="margin:0">'+esc(d.title)+'</h3></article>';
-  });
-  html += '<h2 class="sec">Try</h2><div class="card tight muted" style="font-size:13.5px;line-height:1.9">'
-    + 'Type a clause number like <span class="kbd">3.2.1</span> · a phrase in quotes-free form like <span class="kbd">means of escape travel distance</span>'
-    + (state.embeddings?' · or switch to <b>Ask</b> for a cited answer.':'')
-    + '<br>Press <span class="kbd">/</span> anywhere to jump to the search box.</div>';
-  v.innerHTML = html;
-  v.querySelectorAll('[data-doc]').forEach(el=>el.onclick=()=>openDocSheet(el.dataset.doc));
-  if ($('#homeDue')) $('#homeDue').onclick = ()=>setView('cards');
-}
-
-/* ---------- ask ---------- */
-async function doAsk(){
-  const q = $('#q').value.trim();
-  const v = $('#view-search');
-  if (!q) return;
-  if (!state.embeddings){ toast('Ask needs a Gemini key on the service.', 'err'); return; }
-  v.innerHTML = '<div class="card"><p class="muted" style="margin:0"><span class="spin"></span> Reading the library…</p></div>';
-  try {
-    const hits = await runSearch(q, true);
-    if (!hits.length){ v.innerHTML = emptyState('Nothing to answer from','No passage in the library matches that.'); return; }
-    const top = hits.slice(0,12).map(h=>{
-      const c = state.chunks[h.i], d = docById(c.d);
-      return {title:d.title+(d.docRef?' ('+d.docRef+')':''), clause:c.c, page:c.p, text:c.t, _i:h.i};
-    });
-    v.innerHTML = '<div class="card"><p class="muted" style="margin:0"><span class="spin"></span> Drafting a cited answer…</p></div>';
-    const r = await api('ask', {q, passages: top.map(p=>({title:p.title, clause:p.clause, page:p.page, text:p.text}))});
-    let html = '<div class="card"><div class="meta"><span class="tag accent">Answer</span><span>from '+top.length+' passages</span></div>'
-      + '<div class="answer">'+formatAnswer(r.answer)+'</div>'
-      + '<p class="muted" style="font-size:12px;margin:14px 0 0;border-top:1px solid var(--line);padding-top:10px">'
-      + 'Generated from your indexed extracts. Always confirm against the published document before relying on it.</p></div>';
-    html += '<h2 class="sec">Sources</h2>';
-    top.forEach((p,ix)=>{
-      const h = hits[ix];
-      html += '<article class="card tight hit" data-i="'+p._i+'"><div class="meta"><span class="tag accent">['+(ix+1)+']</span>'
-        + '<span>'+esc(p.title)+'</span>'+(p.clause?'<span class="tag">'+esc(p.clause)+'</span>':'')+(p.page?'<span>p.'+p.page+'</span>':'')+'</div>'
-        + '<div class="snippet">'+snippet(p.text, q, 220)+'</div></article>';
-    });
-    v.innerHTML = html;
-    v.querySelectorAll('.hit').forEach(el=>el.onclick=()=>openReader(Number(el.dataset.i)));
-    v.querySelectorAll('.cite').forEach(el=>el.onclick=()=>{
-      const n = Number(el.dataset.n)-1;
-      if (top[n]) openReader(top[n]._i);
-    });
-  } catch(e){
-    v.innerHTML = '<div class="card"><p style="margin:0;color:var(--danger)">'+esc(e.message)+'</p></div>';
-  }
-}
-
-function formatAnswer(md){
-  let h = esc(md||'');
-  h = h.replace(/^### (.*)$/gm,'<h4>$1</h4>').replace(/^## (.*)$/gm,'<h4>$1</h4>');
-  h = h.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<i>$2</i>');
-  h = h.replace(/\[(\d{1,2})\]/g, (m,n)=>'<span class="cite" data-n="'+n+'">'+n+'</span>');
-  h = h.split(/\n{2,}/).map(p=>{
-    if (/^\s*[-*]\s/m.test(p) && p.split('\n').every(l=>/^\s*[-*]\s|^\s*$/.test(l))){
-      return '<ul>'+p.split('\n').filter(l=>l.trim()).map(l=>'<li>'+l.replace(/^\s*[-*]\s/,'')+'</li>').join('')+'</ul>';
-    }
-    if (/^<h4>/.test(p)) return p;
-    return '<p>'+p.replace(/\n/g,'<br>')+'</p>';
-  }).join('');
-  return h;
-}
-
-/* ============================================================== reader === */
-function closeModal(){ $('#modal').innerHTML = ''; document.body.style.overflow=''; }
-function showSheet(title, bodyHtml, footerHtml){
-  document.body.style.overflow='hidden';
-  $('#modal').innerHTML = '<div class="sheet" id="sheet"><div class="panel">'
-    + '<header><h3>'+title+'</h3><button class="iconbtn" id="sheetClose">✕</button></header>'
-    + '<div class="body">'+bodyHtml+'</div>'
-    + (footerHtml?'<footer>'+footerHtml+'</footer>':'')
-    + '</div></div>';
-  $('#sheetClose').onclick = closeModal;
-  $('#sheet').onclick = e => { if (e.target.id==='sheet') closeModal(); };
-}
-
-function openReader(i){
-  const c = state.chunks[i];
-  if (!c) return;
-  const d = docById(c.d);
-  const q = state.lastQuery;
-  const words = Array.from(new Set(String(q).toLowerCase().match(/[a-z0-9][a-z0-9.\-]*/g)||[])).filter(w=>w.length>2 && !STOP.has(w));
-
-  const sibs = state.chunks;
-  const prev = (i>0 && sibs[i-1].d===c.d) ? sibs[i-1] : null;
-  const next = (i+1<sibs.length && sibs[i+1].d===c.d) ? sibs[i+1] : null;
-
-  const head = '<div class="meta" style="margin-bottom:2px"><span class="tag accent">'+esc(d.collection||'—')+'</span>'
-    + (d.docRef?'<span class="tag">'+esc(d.docRef)+'</span>':'')
-    + (d.edition?'<span class="tag">'+esc(d.edition)+'</span>':'')
-    + (d.internal?'<span class="tag warn">Internal</span>':'')
-    + (d.status==='superseded'?'<span class="tag danger">Superseded</span>':'')
-    + '</div>' + esc(d.title);
-
-  let body = '';
-  if (c.h || c.c) body += '<div style="font-weight:700;margin-bottom:8px">'+esc([c.c,c.h].filter(Boolean).join('  '))+'</div>';
-  if (c.p) body += '<div class="muted" style="font-size:12.5px;margin-bottom:12px">Page '+c.p+'</div>';
-  if (prev) body += '<div class="passage ctx">'+highlight(prev.t.slice(-320), words)+'</div><div class="divider"></div>';
-  body += '<div class="passage">'+highlight(c.t, words)+'</div>';
-  if (next) body += '<div class="divider"></div><div class="passage ctx">'+highlight(next.t.slice(0,320), words)+'</div>';
-
-  const foot = '<button class="btn" id="rPrev"'+(prev?'':' disabled')+'>← Previous</button>'
-    + '<button class="btn" id="rNext"'+(next?'':' disabled')+'>Next →</button>'
-    + '<div style="flex:1"></div>'
-    + (state.embeddings ? '<button class="btn" id="rCard">Make card</button>' : '')
-    + '<button class="btn" id="rCite">Copy citation</button>'
-    + (d.driveFileId ? '<button class="btn primary" id="rPdf">Open document</button>' : '');
-
-  showSheet(head, body, foot);
-  if ($('#rCard')) $('#rCard').onclick = ()=>makeCardsFrom([{
-    docId:d.docId, title:d.title, clause:c.c, page:c.p, text:c.t, tags:d.tags||''
-  }], d.collection || 'General', 2);
-  if (prev) $('#rPrev').onclick = ()=>openReader(i-1);
-  if (next) $('#rNext').onclick = ()=>openReader(i+1);
-  $('#rCite').onclick = ()=>{
-    const cite = [d.title, d.docRef, d.edition, c.c?('clause '+c.c):'', c.p?('p. '+c.p):''].filter(Boolean).join(', ');
-    navigator.clipboard.writeText(cite).then(()=>toast('Citation copied')).catch(()=>toast('Copy failed','err'));
-  };
-  if (d.driveFileId) $('#rPdf').onclick = ()=>openPdf(d, c.p);
-}
-
-function openDocSheet(docId){
-  const d = docById(docId);
-  const idx = state.chunks.findIndex(c=>c.d===docId);
-  const rows = [
-    ['Reference', d.docRef], ['Edition', d.edition], ['Effective', d.effectiveDate],
-    ['Publisher', d.publisher], ['Jurisdiction', d.jurisdiction], ['Pages', d.pages||''],
-    ['Passages', d.chunkCount||''], ['Added', d.addedAt], ['Tags', d.tags],
-    ['Source', d.sourceUrl ? '<a href="'+esc(d.sourceUrl)+'" target="_blank" rel="noopener">'+esc(d.sourceUrl.slice(0,60))+'…</a>' : '']
-  ].filter(r=>r[1]!=='' && r[1]!=null);
-  let body = '<ul class="list-clean">' + rows.map(r=>'<li><span class="muted" style="width:110px;flex:none">'+r[0]+'</span><span>'+ (String(r[1]).startsWith('<a')?r[1]:esc(r[1])) +'</span></li>').join('') + '</ul>';
-  if (d.notes) body += '<div class="divider"></div><div class="muted" style="font-size:14px">'+esc(d.notes)+'</div>';
-  const foot = (idx>=0?'<button class="btn" id="dStart">Read from start</button>':'')
-    + (d.driveFileId?'<button class="btn primary" id="dPdf">Open document</button>':'')
-    + '<div style="flex:1"></div>'
-    + (state.user && state.user.role==='admin' ? '<button class="btn danger" id="dDel">Remove</button>' : '');
-  showSheet(esc(d.title), body, foot);
-  if (idx>=0) $('#dStart').onclick = ()=>openReader(idx);
-  if (d.driveFileId) $('#dPdf').onclick = ()=>openPdf(d, 1);
-  if ($('#dDel')) $('#dDel').onclick = ()=>removeDoc(d);
-}
-
-/* ---------- pdf viewer ---------- */
-let pdfjsReady = null;
-function loadPdfJs(){
-  if (pdfjsReady) return pdfjsReady;
-  pdfjsReady = new Promise((res,rej)=>{
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-    s.onload = ()=>{
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      res(window.pdfjsLib);
-    };
-    s.onerror = ()=>rej(new Error('Could not load the PDF engine (needs internet the first time).'));
-    document.head.appendChild(s);
-  });
-  return pdfjsReady;
-}
-
-async function getPdfBytes(docId, onProgress){
-  const cached = await DB.get('files','pdf:'+docId);
-  if (cached) return cached;
-  let part = 0, out = [], total = 0, driveUrl = '';
-  for(;;){
-    const r = await api('pdf', {docId, part});
-    driveUrl = r.driveUrl || driveUrl;
-    const bin = atob(r.b64 || '');
-    const a = new Uint8Array(bin.length);
-    for (let i=0;i<bin.length;i++) a[i] = bin.charCodeAt(i);
-    out.push(a); total += a.length;
-    if (onProgress) onProgress(total, r.total||0);
-    if (r.done || !r.b64) break;
-    part++;
-    if (part > 40) break;
-  }
-  const buf = new Uint8Array(total);
-  let off = 0;
-  for (const a of out){ buf.set(a, off); off += a.length; }
-  try { if (total < 30*1024*1024) await DB.put('files','pdf:'+docId, buf); } catch(e){}
-  buf._driveUrl = driveUrl;
-  return buf;
-}
-
-async function openPdf(d, page){
-  showSheet(esc(d.title), '<p class="muted" id="pdfMsg"><span class="spin"></span> Fetching document…</p><div class="bar"><i id="pdfBar" style="width:0"></i></div>', '');
-  try {
-    const [lib, bytes] = await Promise.all([
-      loadPdfJs(),
-      getPdfBytes(d.docId, (got,tot)=>{ const b=$('#pdfBar'); if(b&&tot) b.style.width = Math.round(got/tot*100)+'%'; })
-    ]);
-    const pdf = await lib.getDocument({data: bytes.slice(0)}).promise;
-    let cur = Math.min(Math.max(1, page||1), pdf.numPages);
-    let scale = 1.3;
-    const panel = $('#sheet .body');
-    const footer = $('#sheet footer');
-    panel.innerHTML = '<div class="pdfstage"><canvas id="pdfCanvas"></canvas></div>';
-    footer.innerHTML = '<button class="btn" id="pPrev">←</button>'
-      + '<span id="pNum" class="muted" style="align-self:center;min-width:88px;text-align:center"></span>'
-      + '<button class="btn" id="pNext">→</button>'
-      + '<button class="btn" id="pOut">−</button><button class="btn" id="pIn">+</button>'
-      + '<div style="flex:1"></div>'
-      + '<a class="btn" href="https://drive.google.com/file/d/'+esc(d.driveFileId)+'/view" target="_blank" rel="noopener">Drive</a>';
-    async function draw(){
-      const p = await pdf.getPage(cur);
-      const vp = p.getViewport({scale: scale * (window.devicePixelRatio>1?1.4:1)});
-      const cv = $('#pdfCanvas');
-      cv.width = vp.width; cv.height = vp.height;
-      cv.style.width = Math.round(vp.width/(window.devicePixelRatio>1?1.4:1))+'px';
-      await p.render({canvasContext: cv.getContext('2d'), viewport: vp}).promise;
-      $('#pNum').textContent = cur+' / '+pdf.numPages;
-    }
-    $('#pPrev').onclick = ()=>{ if(cur>1){cur--;draw();} };
-    $('#pNext').onclick = ()=>{ if(cur<pdf.numPages){cur++;draw();} };
-    $('#pIn').onclick = ()=>{ scale=Math.min(3,scale+0.25); draw(); };
-    $('#pOut').onclick = ()=>{ scale=Math.max(0.5,scale-0.25); draw(); };
-    await draw();
-  } catch(e){
-    const b = $('#sheet .body');
-    if (b) b.innerHTML = '<p style="color:var(--danger)">'+esc(e.message)+'</p>'
-      + (d.driveFileId?'<p><a href="https://drive.google.com/file/d/'+esc(d.driveFileId)+'/view" target="_blank" rel="noopener">Open in Google Drive instead</a></p>':'');
-  }
-}
-
-/* ============================================================== library == */
-function renderLibrary(){
-  const v = $('#view-library');
-  if (!state.docs.length){
-    v.innerHTML = emptyState('No documents yet','Start by adding a few PDFs.')
-      + '<div class="btnrow" style="justify-content:center"><button class="btn primary" id="libAdd0">+ Add documents</button></div>';
-    $('#libAdd0').onclick = ()=>setView('add');
-    return;
-  }
-  const groups = {};
-  state.docs.forEach(d=>{ (groups[d.collection||'Uncategorised'] ||= []).push(d); });
-  const isAdmin = state.user && state.user.role==='admin';
-  let html = '<div class="btnrow" style="margin-bottom:10px">'
-    + (isAdmin?'<button class="btn primary" id="libAdd">+ Add documents</button>':'')
-    + '<button class="btn" id="libSync">Sync now</button>'
-    + '<button class="btn" id="libForce">Rebuild local cache</button>'
-    + '<span class="muted" style="font-size:13px">'+state.docs.length+' documents · '+state.chunks.length.toLocaleString()+' passages</span></div>';
-  Object.keys(groups).sort().forEach(col=>{
-    html += '<h2 class="sec">'+esc(col)+'</h2><div class="card" style="padding:4px 6px"><table class="lib"><thead><tr>'
-      + '<th>Title</th><th style="width:96px">Ref</th><th style="width:88px">Edition</th><th style="width:74px">Passages</th>'
-      + (isAdmin?'<th style="width:80px"></th>':'') + '</tr></thead><tbody>';
-    groups[col].sort((a,b)=>String(a.title).localeCompare(String(b.title))).forEach(d=>{
-      html += '<tr data-doc="'+esc(d.docId)+'" style="cursor:pointer">'
-        + '<td><b>'+esc(d.title)+'</b>'
-        + (d.internal?' <span class="tag warn">Internal</span>':'')
-        + (d.status==='superseded'?' <span class="tag danger">Superseded</span>':'')
-        + (d.tags?'<div class="muted" style="font-size:12px">'+esc(d.tags)+'</div>':'')
-        + '</td><td>'+esc(d.docRef||'—')+'</td><td>'+esc(d.edition||'—')+'</td><td>'+(d.chunkCount||0)+'</td>'
-        + (isAdmin?'<td><button class="btn" data-del="'+esc(d.docId)+'" style="padding:4px 9px;font-size:12px">Remove</button></td>':'')
-        + '</tr>';
-    });
-    html += '</tbody></table></div>';
-  });
-  v.innerHTML = html;
-  if ($('#libAdd')) $('#libAdd').onclick = ()=>setView('add');
-  $('#libSync').onclick = ()=>sync(false);
-  $('#libForce').onclick = async ()=>{ await DB.clear('parts'); await DB.put('kv','stamps',{}); sync(true); };
-  v.querySelectorAll('tr[data-doc]').forEach(tr=>tr.onclick=e=>{
-    if (e.target.dataset.del) return;
-    openDocSheet(tr.dataset.doc);
-  });
-  v.querySelectorAll('[data-del]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); removeDoc(docById(b.dataset.del)); });
-}
-
-async function removeDoc(d){
-  if (!confirm('Remove "'+d.title+'" from the library?\n\nThe search index is deleted. Tick OK then choose whether to bin the stored file.')) return;
-  const alsoFile = confirm('Also move the stored file to Drive bin?\n\nOK = bin the file.  Cancel = keep the file in Drive.');
-  try {
-    await api('deleteDoc', {docId:d.docId, deleteFile:alsoFile});
-    await DB.del('parts','doc:'+d.docId);
-    await DB.del('files','pdf:'+d.docId);
-    closeModal();
-    toast('Removed');
-    sync(false);
-  } catch(e){ toast(esc(e.message),'err'); }
-}
-
-/* ============================================================== add ====== */
-const addState = { queue: [], collectionSuggestions: [] };
-
-function renderAdd(){
-  const v = $('#view-add');
-  if (!state.user || state.user.role!=='admin'){
-    v.innerHTML = emptyState('Read-only access','Your access code can search the library but not add to it.');
-    return;
-  }
-  const cols = Array.from(new Set(state.collections.concat([
-    'Building Regulations (IE)','Health Technical Memoranda (HTM)','Health Building Notes (HBN)',
-    'Fire Safety','Health & Safety','Electrical','Water & Drainage','Accessibility',
-    'Healthcare Standards','Internal Policies'
-  ]))).sort();
-
-  v.innerHTML = ''
-  + '<div class="btnrow" style="margin-bottom:4px"><button class="btn" id="addBack">← Library</button></div>'
-  + '<h2 class="sec">1 · From this device</h2>'
-  + '<div class="card"><div class="dz" id="dz">'
-  +   '<b>Drop PDFs, Word files or text here</b><div style="font-size:13px;margin-top:4px">or <label style="color:var(--accent);cursor:pointer;text-decoration:underline">choose files<input type="file" id="filePick" multiple accept=".pdf,.docx,.txt,.md,.html,.htm" style="display:none"></label></div>'
-  + '</div></div>'
-
-  + '<h2 class="sec">2 · From the web</h2>'
-  + '<div class="card">'
-  +   '<label class="f"><span>Direct link to a PDF</span><input type="url" id="urlPdf" placeholder="https://…/TGD-Part-B.pdf"></label>'
-  +   '<div class="btnrow"><button class="btn" id="btnUrl">Fetch this file</button></div>'
-  +   '<div class="divider"></div>'
-  +   '<label class="f"><span>Or a publications page to scan for documents</span><input type="url" id="urlPage" placeholder="https://www.gov.ie/en/collection/…"></label>'
-  +   '<div class="btnrow"><button class="btn" id="btnDiscover">Find documents on that page</button>'
-  +   '<select id="catPick" style="width:auto;max-width:260px"><option value="">Known starting points…</option></select></div>'
-  +   '<div id="discovered"></div>'
-  + '</div>'
-
-  + '<h2 class="sec">Details applied to what you add</h2>'
-  + '<div class="card">'
-  +   '<div class="row">'
-  +     '<label class="f"><span>Collection</span><input type="text" id="mCollection" list="collist" placeholder="Building Regulations (IE)">'
-  +       '<datalist id="collist">'+cols.map(c=>'<option value="'+esc(c)+'">').join('')+'</datalist></label>'
-  +     '<label class="f"><span>Publisher</span><input type="text" id="mPublisher" placeholder="Dept. of Housing"></label>'
-  +   '</div>'
-  +   '<div class="row">'
-  +     '<label class="f"><span>Reference</span><input type="text" id="mRef" placeholder="TGD Part B"></label>'
-  +     '<label class="f"><span>Edition / year</span><input type="text" id="mEdition" placeholder="2024"></label>'
-  +   '</div>'
-  +   '<div class="row">'
-  +     '<label class="f"><span>Effective from</span><input type="date" id="mEffective"></label>'
-  +     '<label class="f"><span>Jurisdiction</span><input type="text" id="mJurisdiction" placeholder="Ireland"></label>'
-  +   '</div>'
-  +   '<label class="f"><span>Tags (comma separated)</span><input type="text" id="mTags" placeholder="fire, escape, compartmentation"></label>'
-  +   '<div class="switch"><input type="checkbox" id="mInternal"><label for="mInternal">Internal — only access codes cleared for internal material can see or search it</label></div>'
-  + '</div>'
-  + '<div id="queue"></div>';
-
-  $('#addBack').onclick = ()=>setView('library');
-  const cat = $('#catPick');
-  CATALOGUE.groups.forEach(g=>{
-    const og = document.createElement('optgroup');
-    og.label = g.collection;
-    g.sources.filter(s=>s.url).forEach(s=>{
-      const o = document.createElement('option');
-      o.value = s.url; o.textContent = s.label;
-      o.dataset.collection = g.collection; o.dataset.publisher = g.publisher || '';
-      o.dataset.jurisdiction = g.jurisdiction || '';
-      og.appendChild(o);
-    });
-    cat.appendChild(og);
-  });
-  cat.onchange = ()=>{
-    const o = cat.selectedOptions[0];
-    if (!o || !o.value) return;
-    $('#urlPage').value = o.value;
-    if (o.dataset.collection) $('#mCollection').value = o.dataset.collection;
-    if (o.dataset.publisher) $('#mPublisher').value = o.dataset.publisher;
-    if (o.dataset.jurisdiction) $('#mJurisdiction').value = o.dataset.jurisdiction;
-  };
-
-  const dz = $('#dz');
-  ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('over');}));
-  ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('over');}));
-  dz.addEventListener('drop', e=>{ handleFiles(Array.from(e.dataTransfer.files)); });
-  $('#filePick').onchange = e => handleFiles(Array.from(e.target.files));
-  $('#btnUrl').onclick = fetchUrlDoc;
-  $('#btnDiscover').onclick = discoverPage;
-  renderQueue();
-}
-
-function currentMeta(){
-  return {
-    collection: ($('#mCollection')||{}).value || 'Uncategorised',
-    publisher: ($('#mPublisher')||{}).value || '',
-    docRef: ($('#mRef')||{}).value || '',
-    edition: ($('#mEdition')||{}).value || '',
-    effectiveDate: ($('#mEffective')||{}).value || '',
-    jurisdiction: ($('#mJurisdiction')||{}).value || '',
-    tags: (($('#mTags')||{}).value || '').split(',').map(s=>s.trim()).filter(Boolean),
-    internal: !!($('#mInternal')||{}).checked
-  };
-}
-
-function renderQueue(){
-  const el = $('#queue');
-  if (!el) return;
-  if (!addState.queue.length){ el.innerHTML = ''; return; }
-  let html = '<h2 class="sec">In progress</h2>';
-  addState.queue.forEach((j,ix)=>{
-    html += '<div class="card tight"><div style="display:flex;gap:10px;align-items:center">'
-      + '<b style="flex:1;font-size:14px">'+esc(j.name)+'</b>'
-      + '<span class="muted" style="font-size:12.5px">'+esc(j.status)+'</span></div>'
-      + '<div class="bar"><i style="width:'+Math.round(j.pct*100)+'%'+(j.error?';background:var(--danger)':'')+'"></i></div>'
-      + (j.error?'<div style="color:var(--danger);font-size:13px">'+esc(j.error)+'</div>':'')
-      + '</div>';
-  });
-  el.innerHTML = html;
-}
-
-function pushJob(name){
-  const j = {name, status:'queued', pct:0, error:''};
-  addState.queue.push(j);
-  renderQueue();
-  return j;
-}
-function updJob(j, status, pct, error){
-  j.status = status; if (pct!=null) j.pct = pct; if (error) j.error = error;
-  renderQueue();
-}
-
-async function handleFiles(files){
-  for (const f of files){
-    try { await ingestFile(f, currentMeta()); }
-    catch(e){ toast(esc(e.message),'err'); }
-  }
-  sync(false);
-}
-
-async function fetchUrlDoc(){
-  const url = $('#urlPdf').value.trim();
-  if (!url) return;
-  const j = pushJob(url.split('/').pop().slice(0,60));
-  try {
-    updJob(j,'downloading',0.05);
-    const bytes = await fetchRemote(url, (g,t)=>updJob(j,'downloading', t?0.05+0.25*(g/t):0.1));
-    const name = decodeURIComponent(url.split('/').pop().split('?')[0]) || 'document.pdf';
-    const file = new File([bytes], name, {type:'application/pdf'});
-    await ingestFile(file, Object.assign(currentMeta(), {sourceUrl:url}), j);
-    $('#urlPdf').value = '';
-    sync(false);
-  } catch(e){ updJob(j,'failed', j.pct, e.message); }
-}
-
-async function fetchRemote(url, onProgress){
-  let part = 0, out = [], total = 0;
-  for(;;){
-    const r = await api('fetchUrl', {url, part});
-    const bin = atob(r.b64||'');
-    const a = new Uint8Array(bin.length);
-    for (let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i);
-    out.push(a); total += a.length;
-    if (onProgress) onProgress(total, r.total||0);
-    if (r.done || !r.b64) break;
-    part++;
-    if (part>40) break;
-  }
-  const buf = new Uint8Array(total);
-  let off=0; for (const a of out){ buf.set(a,off); off+=a.length; }
-  return buf;
-}
-
-async function discoverPage(){
-  const url = $('#urlPage').value.trim();
-  if (!url) return;
-  const box = $('#discovered');
-  box.innerHTML = '<p class="muted"><span class="spin"></span> Scanning…</p>';
-  try {
-    const r = await api('discover', {url});
-    if (!r.pdfs.length){
-      box.innerHTML = '<p class="muted">No PDF links found on that page'+(r.via==='html'?' (Firecrawl not configured — pages that build their lists with JavaScript may need it).':'.')+'</p>';
-      return;
-    }
-    let html = '<div class="divider"></div><div class="muted" style="font-size:12.5px;margin-bottom:6px">'+r.pdfs.length+' documents found via '+esc(r.via)+' — tick the ones you want</div>';
-    html += '<div style="max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px">';
-    r.pdfs.forEach((p,ix)=>{
-      const label = p.text || decodeURIComponent(p.url.split('/').pop());
-      html += '<label style="display:flex;gap:9px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px">'
-        + '<input type="checkbox" data-pdf="'+ix+'" style="margin-top:3px;flex:none">'
-        + '<span><b>'+esc(label.slice(0,110))+'</b><br><span class="muted" style="font-size:11.5px;word-break:break-all">'+esc(p.url)+'</span></span></label>';
-    });
-    html += '</div><div class="btnrow" style="margin-top:10px"><button class="btn primary" id="btnGrab">Add selected</button>'
-      + '<button class="btn" id="btnAllPdf">Select all</button></div>';
-    box.innerHTML = html;
-    $('#btnAllPdf').onclick = ()=>box.querySelectorAll('[data-pdf]').forEach(cb=>cb.checked=true);
-    $('#btnGrab').onclick = async ()=>{
-      const picks = Array.from(box.querySelectorAll('[data-pdf]:checked')).map(cb=>r.pdfs[Number(cb.dataset.pdf)]);
-      if (!picks.length) return;
-      $('#btnGrab').disabled = true;
-      for (const p of picks){
-        const j = pushJob((p.text||p.url.split('/').pop()).slice(0,60));
-        try {
-          updJob(j,'downloading',0.05);
-          const bytes = await fetchRemote(p.url, (g,t)=>updJob(j,'downloading', t?0.05+0.25*(g/t):0.1));
-          const name = decodeURIComponent(p.url.split('/').pop().split('?')[0]) || 'document.pdf';
-          const file = new File([bytes], name, {type:'application/pdf'});
-          await ingestFile(file, Object.assign(currentMeta(), {sourceUrl:p.url, title:(p.text||'').slice(0,140)||undefined}), j);
-        } catch(e){ updJob(j,'failed', j.pct, e.message); }
-      }
-      $('#btnGrab').disabled = false;
-      sync(false);
-    };
-  } catch(e){
-    box.innerHTML = '<p style="color:var(--danger)">'+esc(e.message)+'</p>';
-  }
-}
-
-/* ---------- extraction ---------- */
-function cleanTitle(name){
-  return name.replace(/\.[a-z0-9]+$/i,'').replace(/[_+]+/g,' ').replace(/\s{2,}/g,' ')
-    .replace(/\b(\d{4})\b/, '$1').trim().slice(0,150);
-}
-
-async function extractPdf(file, onProgress){
-  const lib = await loadPdfJs();
-  const buf = await file.arrayBuffer();
-  const pdf = await lib.getDocument({data: buf}).promise;
-  const pages = [];
-  for (let n=1; n<=pdf.numPages; n++){
-    const page = await pdf.getPage(n);
-    const tc = await page.getTextContent();
-    const lines = [];
-    let cur = null;
-    const items = tc.items.slice().sort((a,b)=>{
-      const dy = b.transform[5]-a.transform[5];
-      if (Math.abs(dy) > 2.5) return dy;
-      return a.transform[4]-b.transform[4];
-    });
-    for (const it of items){
-      const y = it.transform[5];
-      const size = Math.abs(it.transform[0]) || it.height || 10;
-      if (!cur || Math.abs(cur.y - y) > 2.5){
-        cur = {y, size, text: it.str};
-        lines.push(cur);
-      } else {
-        const needsSpace = cur.text && !/[\s\-‐-―]$/.test(cur.text) && !/^\s/.test(it.str);
-        cur.text += (needsSpace ? ' ' : '') + it.str;
-        cur.size = Math.max(cur.size, size);
-      }
-    }
-    pages.push({page:n, lines: lines.map(l=>({text:l.text.replace(/\s+/g,' ').trim(), size:l.size})).filter(l=>l.text)});
-    if (onProgress) onProgress(n, pdf.numPages);
-  }
-  let title = '';
-  try { const md = await pdf.getMetadata(); title = (md.info && md.info.Title) || ''; } catch(e){}
-  return {pages, numPages: pdf.numPages, title: (title||'').trim()};
-}
-
-let mammothReady = null;
-function loadMammoth(){
-  if (mammothReady) return mammothReady;
-  mammothReady = new Promise((res,rej)=>{
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
-    s.onload = ()=>res(window.mammoth);
-    s.onerror = ()=>rej(new Error('Could not load the Word reader (needs internet the first time).'));
-    document.head.appendChild(s);
-  });
-  return mammothReady;
-}
-
-async function extractDocx(file){
-  const m = await loadMammoth();
-  const r = await m.convertToHtml({arrayBuffer: await file.arrayBuffer()});
-  const div = document.createElement('div');
-  div.innerHTML = r.value;
-  const lines = [];
-  div.querySelectorAll('h1,h2,h3,h4,h5,p,li,td').forEach(el=>{
-    const t = (el.textContent||'').replace(/\s+/g,' ').trim();
-    if (!t) return;
-    const heading = /^H[1-5]$/.test(el.tagName);
-    lines.push({text:t, size: heading ? 18 : 10});
-  });
-  // synthetic pages of ~45 lines so citations still have a locator
-  const pages = [];
-  for (let i=0;i<lines.length;i+=45) pages.push({page: pages.length+1, lines: lines.slice(i, i+45)});
-  return {pages, numPages: pages.length, title:''};
-}
-
-async function extractPlain(file){
-  let text = await file.text();
-  if (/\.html?$/i.test(file.name)){
-    const d = document.createElement('div');
-    d.innerHTML = text.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<style[\s\S]*?<\/style>/gi,'');
-    text = d.textContent || '';
-  }
-  const lines = text.split(/\r?\n/).map(t=>({text:t.replace(/\s+/g,' ').trim(), size:10})).filter(l=>l.text);
-  const pages = [];
-  for (let i=0;i<lines.length;i+=50) pages.push({page: pages.length+1, lines: lines.slice(i, i+50)});
-  return {pages, numPages: pages.length, title:''};
-}
-
-const CLAUSE_RE = /^((?:\d{1,3}(?:\.\d{1,3}){1,4})|(?:[A-Z]\d{1,3}(?:\.\d{1,3}){0,3})|(?:Table\s+\d+[\.\d]*)|(?:Diagram\s+\d+[\.\d]*)|(?:Appendix\s+[A-Z0-9]+)|(?:Section\s+\d+[\.\d]*)|(?:Part\s+[A-Z0-9]+))[\s:.–-]+(.*)$/;
-
-function chunkPages(pages, target, overlap){
-  target = target || 1100; overlap = overlap || 160;
-  // work out the body text size so we can spot headings
-  const sizes = {};
-  pages.forEach(p=>p.lines.forEach(l=>{ const k = Math.round(l.size); sizes[k]=(sizes[k]||0)+l.text.length; }));
-  let body = 10, bestN = -1;
-  Object.keys(sizes).forEach(k=>{ if (sizes[k] > bestN){ bestN = sizes[k]; body = Number(k); } });
-
-  const chunks = [];
-  let buf = '', bufPage = 1, head = '', clause = '';
-  const flush = () => {
-    const t = buf.trim();
-    if (t.length > 40) chunks.push({p:bufPage, h:head, clause:clause, t:t});
-    buf = '';
-  };
-
-  for (const pg of pages){
-    for (const line of pg.lines){
-      const txt = line.text;
-      if (!txt) continue;
-      if (/^(page\s+)?\d{1,4}(\s+of\s+\d+)?$/i.test(txt)) continue;    // page furniture
-
-      const m = txt.match(CLAUSE_RE);
-      const looksHeading =
-        (m && txt.length < 160) ||
-        (line.size > body + 0.9 && txt.length < 140) ||
-        (/^[A-Z0-9][A-Z0-9 ,&()\/'\-]{4,80}$/.test(txt) && txt.length < 90);
-
-      if (looksHeading){
-        // a new numbered clause always starts a new passage once there is real
-        // content behind it, so short clauses keep their own citation
-        const held = buf.trim().length;
-        if (held > target*0.35 || (held > 120 && (m || clause))) flush();
-        if (m){ clause = m[1]; head = (m[2]||'').trim() || head; }
-        else { head = txt; clause = ''; }
-        if (!buf) bufPage = pg.page;
-        buf += (buf?'\n':'') + txt;
-        continue;
-      }
-      if (!buf) bufPage = pg.page;
-      buf += (buf?'\n':'') + txt;
-      if (buf.length >= target){
-        const tail = buf.slice(-overlap);
-        flush();
-        const cut = tail.indexOf(' ');
-        buf = cut>0 ? tail.slice(cut+1) : tail;
-        bufPage = pg.page;
-      }
-    }
-  }
-  flush();
-  return chunks;
-}
-
-async function ingestFile(file, meta, job){
-  const j = job || pushJob(file.name);
-  const name = file.name;
-  updJob(j,'reading text', 0.3);
-
-  let ex;
-  if (/\.pdf$/i.test(name) || file.type==='application/pdf'){
-    ex = await extractPdf(file, (n,t)=>updJob(j,'reading page '+n+'/'+t, 0.30+0.25*(n/t)));
-  } else if (/\.docx$/i.test(name)){
-    ex = await extractDocx(file);
-  } else {
-    ex = await extractPlain(file);
-  }
-
-  const chunks = chunkPages(ex.pages);
-  if (!chunks.length) throw new Error('No readable text found in '+name+' (it may be a scan — OCR it first).');
-
-  const m = Object.assign({}, meta);
-  m.title = (meta.title || ex.title || cleanTitle(name)).slice(0,180);
-  m.pages = ex.numPages;
-
-  updJob(j,'creating record', 0.56);
-  const {docId} = await api('beginDoc', {meta:m});
-
-  // upload the original, in 3 MB slices
-  updJob(j,'uploading file', 0.6);
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  if (bytes.length > 32*1024*1024) throw new Error(name+' is larger than 32 MB — split it first.');
-  const SLICE = 8*1024*1024;
-  const parts = Math.max(1, Math.ceil(bytes.length/SLICE));
-  for (let i=0;i<parts;i++){
-    const sl = bytes.subarray(i*SLICE, Math.min(bytes.length,(i+1)*SLICE));
-    await api('uploadPart', {docId, index:i, b64: u8ToB64(sl)});
-    updJob(j,'uploading file '+(i+1)+'/'+parts, 0.6+0.12*((i+1)/parts));
-  }
-  await api('finishUpload', {docId, count:parts, filename:name, mime: file.type||'application/pdf'});
-
-  // send chunks for embedding, in batches
-  const BATCH = 40;
-  let embedWarn = '';
-  for (let i=0, seq=0; i<chunks.length; i+=BATCH, seq++){
-    const slice = chunks.slice(i, i+BATCH);
-    const r = await api('addChunks', {docId, seq, chunks: slice});
-    if (r.embedError && !embedWarn) embedWarn = r.embedError;
-    updJob(j,'indexing '+Math.min(i+BATCH, chunks.length)+'/'+chunks.length+' passages', 0.72+0.25*((i+BATCH)/chunks.length));
-  }
-  if (embedWarn) toast('Stored as keyword-only — embedding said: '+esc(embedWarn), 'err', 9000);
-
-  await api('commitDoc', {docId, pages: ex.numPages});
-  updJob(j,'done', 1);
-  toast('Added “'+esc(m.title.slice(0,50))+'” — '+chunks.length+' passages');
-  return docId;
-}
-
-function u8ToB64(u8){
-  let s = '';
-  const step = 0x8000;
-  for (let i=0;i<u8.length;i+=step) s += String.fromCharCode.apply(null, u8.subarray(i, i+step));
-  return btoa(s);
-}
-
-/* ============================================================== profiles = */
-/* Each theme is a set of retrieval queries. The brief is only ever as good as
-   the library behind it, so coverage is reported alongside the answer.      */
-const PROFILES = [
- {id:'acute', group:'Healthcare', label:'Acute hospital ward', themes:[
-   {name:'Ventilation and air quality', q:['air change rates hospital ward mechanical ventilation','pressure differential between clinical spaces','ventilation validation commissioning and annual verification']},
-   {name:'Infection prevention', q:['clinical hand wash basin provision and location','single room en-suite provision for infection control','cleanable surface finishes in clinical areas']},
-   {name:'Fire safety and evacuation', q:['progressive horizontal evacuation in healthcare premises','compartmentation and sub-compartment sizes hospital','fire door specification and hold open devices ward']},
-   {name:'Electrical resilience', q:['essential electrical supply and standby generator healthcare','uninterruptible power supply for clinical areas','socket outlet provision at bed spaces']},
-   {name:'Water safety', q:['legionella control hot and cold water systems','thermostatic mixing valve and water temperature control','water safety plan and responsible person']},
-   {name:'Medical gases', q:['medical gas pipeline terminal units provision','medical gas alarm panels and area valve service units']},
-   {name:'Accessibility', q:['accessible sanitary facility dimensions','corridor width and wheelchair turning circle']},
-   {name:'Space and storage', q:['bed space dimensions and clearance around beds','storage and equipment parking provision on wards']}
- ]},
- {id:'mentalhealth', group:'Healthcare', label:'Mental health inpatient unit', themes:[
-   {name:'Anti-ligature', q:['anti-ligature fittings bedroom and en-suite','ligature risk assessment doors and door tops','impact resistant glazing and safety glass patient areas','fixing of furniture in patient accessible areas']},
-   {name:'Observation and sightlines', q:['lines of sight and observation from staff base','observation panels and vision panels to bedrooms']},
-   {name:'Seclusion and de-escalation', q:['seclusion room design requirements','de-escalation space provision on the ward']},
-   {name:'Doors and ironmongery', q:['outward opening and anti-barricade bedroom doors','ironmongery specification for patient areas']},
-   {name:'Therapeutic environment', q:['natural light daylight and views mental health unit','acoustic privacy between bedrooms','secure courtyard or garden external space']},
-   {name:'Fire safety with locked doors', q:['fire safety strategy where doors are locked for patient safety','automatic detection and alarm in patient bedrooms']},
-   {name:'Concealed services', q:['concealed pipework and boxed in services patient areas','tamper resistant controls fittings and grilles']},
-   {name:'Security and alarms', q:['staff personal attack alarm system','access control and zoning of the ward']}
- ]},
- {id:'disability', group:'Healthcare', label:'Disability / residential care', themes:[
-   {name:'Accessibility', q:['access and use requirements dwellings Part M','clear door width and wheelchair turning circle','accessible bathroom and level access shower dimensions']},
-   {name:'Hoisting and transfer', q:['ceiling track hoist provision and structural support','assisted bathing and transfer space']},
-   {name:'Means of escape', q:['evacuation of people with reduced mobility','refuge areas and evacuation lift provision']},
-   {name:'Sanitary provision', q:['assisted WC dimensions and grab rail positions','changing places facility requirements']},
-   {name:'Sensory and wayfinding', q:['visual contrast and wayfinding for sensory impairment','lighting and acoustic design for sensory needs']},
-   {name:'Fire safety', q:['fire safety in residential care premises','compartmentation of sleeping accommodation']},
-   {name:'Space standards', q:['bedroom and living space sizes residential care','staff and ancillary accommodation provision']}
- ]},
- {id:'older', group:'Healthcare', label:'Older persons / nursing home', themes:[
-   {name:'Dementia friendly design', q:['dementia friendly design contrast and legibility','orientation cues and wayfinding for older people']},
-   {name:'Falls and safety', q:['floor finishes slip resistance and falls prevention','grab rails and handrail provision']},
-   {name:'Bedrooms and sanitary', q:['bedroom size and en-suite provision nursing home','assisted bathroom provision ratio']},
-   {name:'Accessibility', q:['clear door width and turning circle wheelchair','level access and threshold requirements']},
-   {name:'Fire safety', q:['progressive horizontal evacuation residential care','fire compartmentation of bedrooms']},
-   {name:'Ventilation and comfort', q:['ventilation of bedrooms and communal spaces','overheating and thermal comfort']},
-   {name:'Water and hygiene', q:['hot water temperature and scald prevention','sluice and dirty utility provision']}
- ]},
- {id:'respite', group:'Healthcare', label:'Respite unit', themes:[
-   {name:'Short stay bedrooms', q:['bedroom and en-suite provision short stay','space for a family member to stay']},
-   {name:'Accessibility', q:['wheelchair accessible bedroom and bathroom dimensions','ceiling track hoist provision']},
-   {name:'Assisted bathing', q:['assisted bathroom and changing facility','changing places facility requirements']},
-   {name:'Fire safety', q:['evacuation of dependent residents','fire compartmentation sleeping accommodation']},
-   {name:'Communal and therapy space', q:['communal living and dining space provision','sensory or therapy room requirements']},
-   {name:'Staff facilities', q:['staff base sleepover and welfare accommodation']}
- ]},
- {id:'theatre', group:'Healthcare', label:'Operating theatre suite', themes:[
-   {name:'Ventilation', q:['ultraclean ventilation canopy operating theatre','air change rates and pressure cascade theatre suite','theatre ventilation validation and annual verification']},
-   {name:'Layout and flows', q:['segregation of clean and dirty flows theatre suite','anaesthetic room scrub and utility provision']},
-   {name:'Finishes', q:['wall floor and ceiling finishes in theatres','sealed joints and cleanability operating suite']},
-   {name:'Electrical and medical gas', q:['isolated power supply and earthing operating theatre','medical gas terminal units theatre and anaesthetic room']},
-   {name:'Lighting and equipment', q:['operating light and pendant support structure','equipment loading on ceilings theatre']}
- ]},
- {id:'isolation', group:'Healthcare', label:'Isolation rooms / IPC', themes:[
-   {name:'Pressure regime', q:['negative pressure isolation room requirements','positive pressure protective isolation room','pressure differential monitoring and alarm']},
-   {name:'Lobby and anteroom', q:['ventilated lobby and anteroom isolation room','door interlock and airtightness isolation']},
-   {name:'Air change and extract', q:['air change rate isolation room','extract discharge and filtration isolation']},
-   {name:'En-suite and finishes', q:['en-suite provision isolation room','cleanable finishes and sealed penetrations']},
-   {name:'Commissioning', q:['commissioning and validation of isolation rooms','routine testing of pressure regimes']}
- ]},
- {id:'decontam', group:'Healthcare', label:'Decontamination / SSD', themes:[
-   {name:'Flow and layout', q:['unidirectional flow decontamination unit','segregation of dirty inspection and sterile areas']},
-   {name:'Washer disinfectors and sterilizers', q:['washer disinfector requirements','steam sterilizer installation and testing']},
-   {name:'Water quality', q:['water quality for final rinse decontamination','reverse osmosis water treatment']},
-   {name:'Ventilation and environment', q:['ventilation and air change rates decontamination unit','temperature and humidity control packing room']},
-   {name:'Validation', q:['validation and periodic testing decontamination equipment']}
- ]},
- {id:'primarycare', group:'Healthcare', label:'Primary care centre', themes:[
-   {name:'Consulting and treatment rooms', q:['consulting room and treatment room size','clinical hand wash basin in consulting rooms']},
-   {name:'Accessibility', q:['accessible entrance reception and counter height','accessible WC provision public building']},
-   {name:'Fire safety', q:['means of escape from assembly and healthcare premises','travel distance and exit capacity']},
-   {name:'Ventilation', q:['ventilation of consulting and waiting areas','mechanical ventilation rates non domestic']},
-   {name:'Waiting and circulation', q:['waiting area space per person','corridor widths in healthcare buildings']},
-   {name:'Services and energy', q:['energy performance non domestic building','electrical installation requirements clinical']}
- ]},
- {id:'housing', group:'Buildings', label:'Housing — new dwellings', themes:[
-   {name:'Structure and site', q:['structural requirements dwellings Part A','site preparation and radon protection']},
-   {name:'Fire safety', q:['means of escape dwelling houses','fire detection and alarm dwellings','external fire spread and boundary distance']},
-   {name:'Sound', q:['sound insulation between dwellings','airborne and impact sound performance']},
-   {name:'Ventilation', q:['ventilation of dwellings background and purge','extract rates wet rooms']},
-   {name:'Energy and NZEB', q:['nearly zero energy building dwellings requirements','renewable energy ratio and primary energy']},
-   {name:'Water and drainage', q:['drainage and waste water disposal dwellings','water supply and hygiene requirements']},
-   {name:'Stairs and safety in use', q:['stairway rise going and headroom','guarding heights and protection from falling']},
-   {name:'Access', q:['access and use of dwellings Part M','level entry threshold and door widths']}
- ]},
- {id:'apartments', group:'Buildings', label:'Apartment development', themes:[
-   {name:'Means of escape', q:['means of escape from apartments common areas','protected lobby and single stair apartment building']},
-   {name:'Firefighting provision', q:['firefighting shaft and firefighting lift','rising mains and fire service access']},
-   {name:'Compartmentation', q:['compartmentation between apartments','fire stopping of service penetrations']},
-   {name:'Sound and privacy', q:['sound insulation between apartments','impact sound floors apartments']},
-   {name:'Ventilation and smoke control', q:['smoke control common corridors','ventilation of apartments and internal rooms']},
-   {name:'Amenity and storage', q:['private amenity space apartments','bicycle and refuse storage provision']},
-   {name:'Access', q:['lift provision and accessible apartments','clear door width and circulation apartments']}
- ]},
- {id:'school', group:'Buildings', label:'School / education', themes:[
-   {name:'Fire safety', q:['means of escape from schools and assembly buildings','travel distance and exit widths']},
-   {name:'Ventilation and air quality', q:['classroom ventilation rates and CO2','natural ventilation strategy classrooms']},
-   {name:'Acoustics', q:['acoustic performance of teaching spaces','reverberation time classrooms']},
-   {name:'Accessibility', q:['accessible route and sanitary facilities public buildings','changing places and accessible WC']},
-   {name:'Energy', q:['energy performance non domestic buildings','insulation and air tightness requirements']}
- ]},
- {id:'kitchen', group:'Buildings', label:'Commercial kitchen / catering', themes:[
-   {name:'Extract ventilation', q:['kitchen extract canopy and air flow rates','grease filtration and duct cleaning access']},
-   {name:'Fire safety', q:['fire suppression over cooking appliances','fire resistance of kitchen extract ductwork']},
-   {name:'Gas safety', q:['gas interlock with ventilation kitchen','gas installation and isolation catering']},
-   {name:'Finishes and drainage', q:['floor and wall finishes in food areas','floor gullies and grease trap drainage']},
-   {name:'Hygiene', q:['hand wash provision food preparation','separation of raw and ready to eat areas']}
- ]},
- {id:'office', group:'Buildings', label:'Office fit-out', themes:[
-   {name:'Means of escape', q:['occupancy capacity and escape route widths offices','travel distances in offices']},
-   {name:'Ventilation and comfort', q:['fresh air rates for offices','thermal comfort and overheating']},
-   {name:'Accessibility', q:['accessible sanitary facilities in workplaces','accessible route and door widths']},
-   {name:'Lighting and power', q:['lighting levels for office work','small power and containment provision']},
-   {name:'Sanitary provision', q:['number of sanitary facilities by occupancy']}
- ]},
- {id:'custom', group:'Other', label:'Something else — describe it below', themes:[
-   {name:'Fire safety', q:['means of escape and travel distance','compartmentation and fire resistance']},
-   {name:'Ventilation', q:['ventilation rates and air changes']},
-   {name:'Accessibility', q:['access and use requirements','accessible sanitary facilities']},
-   {name:'Water and drainage', q:['water supply hygiene and drainage requirements']},
-   {name:'Electrical', q:['electrical installation and supply requirements']},
-   {name:'Structure and fabric', q:['structural and fabric performance requirements']}
- ]}
-];
-
-const briefState = { profileId:'acute', notes:'', result:null, refs:[], coverage:[], saved:null, savedList:[] };
-
-function findChunkFor(docId, page, clause){
-  let best = -1;
-  for (let i=0;i<state.chunks.length;i++){
-    const c = state.chunks[i];
-    if (c.d !== docId) continue;
-    if (clause && String(c.c) === String(clause)) return i;
-    if (page && Number(c.p) === Number(page) && best < 0) best = i;
-    if (best < 0) best = i;
-  }
-  return best;
-}
-
-/* ---------- retrieval across a profile's themes ---------- */
-async function retrieveThemes(profile, notes, onStep){
-  const themes = profile.themes.map(t=>({name:t.name, q:t.q.slice()}));
-  const extra = notes.trim();
-  if (extra) themes.push({name:'Your project notes', q:[extra.slice(0,400)]});
-
-  const flat = [];
-  themes.forEach((t,ti)=>t.q.forEach(q=>flat.push({ti,q})));
-
-  let vecs = [];
-  if (state.embeddings && state.vecs){
-    if (onStep) onStep('understanding the brief');
-    try {
-      const r = await api('embedQueries', {qs: flat.map(x=>x.q)});
-      vecs = r.vecs || [];
-    } catch(e){ vecs = []; }
-  }
-
-  const per = themes.map(()=>new Map());
-  for (let i=0;i<flat.length;i++){
-    if (onStep) onStep('searching ('+(i+1)+'/'+flat.length+')');
-    const hits = await runSearch(flat[i].q, false, vecs[i] || null);
-    for (const h of hits.slice(0,5)){
-      const prev = per[flat[i].ti].get(h.i);
-      if (!prev || h.score > prev) per[flat[i].ti].set(h.i, h.score);
-    }
-  }
-
-  const used = new Set();
-  const chosen = [], coverage = [];
-  let budget = 26;
-  themes.forEach((t,ti)=>{
-    const ranked = Array.from(per[ti].entries())
-      .filter(e=>e[1] > 0.10)
-      .sort((a,b)=>b[1]-a[1]);
-    const take = [];
-    for (const [ix] of ranked){
-      if (take.length >= 3 || budget <= 0) break;
-      if (used.has(ix)) continue;
-      used.add(ix); budget--; take.push(ix);
-    }
-    coverage.push({name:t.name, n:take.length});
-    if (take.length) chosen.push({name:t.name, idx:take});
-  });
-
-  const refs = [];
-  const payload = chosen.map(t=>({
-    name: t.name,
-    passages: t.idx.map(ix=>{
-      const c = state.chunks[ix], d = docById(c.d);
-      const n = refs.length + 1;
-      refs.push({n, i:ix, docId:c.d, title:d.title, docRef:d.docRef, clause:c.c, page:c.p,
-                 snippet:c.t.slice(0,180), internal:!!d.internal});
-      return {n, title: d.title + (d.docRef ? ' ('+d.docRef+')' : ''), clause:c.c, page:c.p, text:c.t};
-    })
-  }));
-
-  return {payload, refs, coverage, missing: coverage.filter(c=>!c.n).map(c=>c.name)};
-}
-
-/* ---------- brief view ---------- */
-function renderBrief(){
-  const v = $('#view-brief');
-  const groups = {};
-  PROFILES.forEach(p=>{ (groups[p.group] ||= []).push(p); });
-
-  let html = '<div class="card">'
-    + '<label class="f"><span>What are you working on?</span><select id="bProfile">'
-    + Object.keys(groups).map(g=>'<optgroup label="'+esc(g)+'">'
-        + groups[g].map(p=>'<option value="'+p.id+'"'+(p.id===briefState.profileId?' selected':'')+'>'+esc(p.label)+'</option>').join('')
-      + '</optgroup>').join('')
-    + '</select></label>'
-    + '<label class="f"><span>Anything specific? (optional — bed numbers, existing building, storeys, constraints)</span>'
-    + '<textarea id="bNotes" placeholder="e.g. 12-bed acute admission unit, single storey extension to a 1970s block, no sprinklers at present">'+esc(briefState.notes)+'</textarea></label>'
-    + '<div class="btnrow"><button class="btn primary" id="bGo">Build the brief</button>'
-    + '<span class="muted" style="font-size:12.5px">Drawn only from your library — gaps are reported</span></div>'
-    + '</div><div id="bOut"></div>';
-
-  v.innerHTML = html;
-  $('#bProfile').onchange = e => briefState.profileId = e.target.value;
-  $('#bNotes').oninput = e => briefState.notes = e.target.value;
-  $('#bGo').onclick = buildBrief;
-  if (briefState.result) renderBriefResult(briefState.result);
-  else loadSavedBriefs();
-}
-
-async function loadSavedBriefs(){
-  try {
-    const r = await api('briefList');
-    briefState.savedList = r.briefs || [];
-  } catch(e){ return; }
-  if (!briefState.savedList.length || briefState.result) return;
-  const out = $('#bOut');
-  if (!out) return;
-  out.innerHTML = '<h2 class="sec">Saved briefs</h2>'
-    + briefState.savedList.map(b=>'<article class="card tight hit" data-brief="'+esc(b.id)+'">'
-      + '<div class="meta"><span class="tag accent">'+esc(b.profile||'Brief')+'</span>'
-      + (b.internal?'<span class="tag warn">Internal</span>':'')
-      + '<span>'+esc(String(b.createdAt||'').slice(0,10))+' · '+esc(b.createdBy||'')+'</span></div>'
-      + '<h3 style="margin:0">'+esc(b.title)+'</h3></article>').join('');
-  out.querySelectorAll('[data-brief]').forEach(el=>el.onclick=async ()=>{
-    try {
-      const r = await api('briefGet', {id: el.dataset.brief});
-      briefState.result = {profile:r.record.profile, notes:r.record.notes, brief:r.record.brief,
-                           refs:r.record.refs||[], coverage:[], id:r.record.id, title:r.record.title};
-      briefState.refs = r.record.refs || [];
-      renderBriefResult(briefState.result);
-    } catch(e){ toast(esc(e.message),'err'); }
-  });
-}
-
-async function buildBrief(){
-  if (!state.chunks.length){ toast('Add some documents first.','err'); return; }
-  if (!state.embeddings){ toast('Briefs need a Gemini key on the service.','err'); return; }
-  const profile = PROFILES.find(p=>p.id===briefState.profileId) || PROFILES[0];
-  const notes = briefState.notes;
-  const out = $('#bOut');
-  const setMsg = m => { out.innerHTML = '<div class="card"><p class="muted" style="margin:0"><span class="spin"></span> '+esc(m)+'</p></div>'; };
-  setMsg('reading the library');
-  $('#bGo').disabled = true;
-  try {
-    const found = await retrieveThemes(profile, notes, setMsg);
-    briefState.refs = found.refs;
-    briefState.coverage = found.coverage;
-    if (!found.payload.length){
-      out.innerHTML = '<div class="card"><p style="margin:0">Nothing in your library matched this project type yet. '
-        + 'Add the relevant guidance first — the themes it looked for were:</p>'
-        + '<div class="cov" style="margin-top:10px">'+found.coverage.map(c=>'<span class="none">'+esc(c.name)+'</span>').join('')+'</div></div>';
-      return;
-    }
-    setMsg('writing the brief');
-    const r = await api('brief', {profile: profile.label, notes, themes: found.payload, missing: found.missing});
-    briefState.result = {profile: profile.label, notes, brief: r.brief, refs: found.refs, coverage: found.coverage};
-    renderBriefResult(briefState.result);
-  } catch(e){
-    out.innerHTML = '<div class="card"><p style="margin:0;color:var(--danger)">'+esc(e.message)+'</p></div>';
-  } finally {
-    const g = $('#bGo'); if (g) g.disabled = false;
-  }
-}
-
-function refChips(refs){
-  if (!refs || !refs.length) return '';
-  return '<div>' + refs.map(n=>'<span class="refchip" data-ref="'+n+'">'+n+'</span>').join('') + '</div>';
-}
-
-function renderBriefResult(res){
-  const b = res.brief || {};
-  const out = $('#bOut');
-  const cov = res.coverage || [];
-  let html = '';
-
-  if (cov.length){
-    html += '<h2 class="sec">Coverage in your library</h2><div class="card tight"><div class="cov">'
-      + cov.map(c=>'<span class="'+(c.n?'good':'none')+'">'+esc(c.name)+(c.n?' · '+c.n:' · nothing found')+'</span>').join('')
-      + '</div></div>';
-  }
-
-  html += '<h2 class="sec">'+esc(res.profile||'Brief')+'</h2>';
-  if (b.summary) html += '<div class="card"><div class="answer"><p style="margin:0">'+esc(b.summary)+'</p></div></div>';
-
-  (b.sections||[]).forEach(sec=>{
-    html += '<div class="card"><h3 style="margin:0 0 12px;font-size:15px">'+esc(sec.theme||'')+'</h3>';
-    (sec.watchOuts||[]).forEach(w=>{
-      const sev = ['critical','important','check'].includes(w.severity) ? w.severity : 'check';
-      html += '<div class="sev '+sev+'">'
-        + '<b><span class="sevtag '+sev+'">'+sev+'</span>'+esc(w.point||'')+'</b>'
-        + '<p>'+esc(w.detail||'')+'</p>'
-        + refChips(w.refs)
-        + '</div>';
-    });
-    html += '</div>';
-  });
-
-  if ((b.earlyDecisions||[]).length){
-    html += '<h2 class="sec">Settle these early</h2><div class="card"><ul class="list-clean">'
-      + b.earlyDecisions.map(x=>'<li><span style="color:var(--accent);flex:none">▸</span><span>'+esc(x)+'</span></li>').join('')
-      + '</ul></div>';
-  }
-  if ((b.gaps||[]).length){
-    html += '<h2 class="sec">Thin or silent in your library</h2><div class="card"><ul class="list-clean">'
-      + b.gaps.map(x=>'<li><span style="color:var(--warn);flex:none">!</span><span>'+esc(x)+'</span></li>').join('')
-      + '</ul></div>';
-  }
-  if ((b.sourcesToFind||[]).length){
-    html += '<h2 class="sec">Worth sourcing</h2><div class="card"><ul class="list-clean">'
-      + b.sourcesToFind.map(x=>'<li><span class="muted" style="flex:none">+</span><span>'+esc(x)+'</span></li>').join('')
-      + '</ul><p class="muted" style="font-size:12px;margin:12px 0 0;border-top:1px solid var(--line);padding-top:10px">'
-      + 'These are the model’s suggestions of standard references for this building type. They are <b>not</b> checked '
-      + 'against any source — confirm each one exists and is current before acting on it.</p></div>';
-  }
-
-  const docsUsed = {};
-  (res.refs||[]).forEach(r=>{ docsUsed[r.title] = (docsUsed[r.title]||0)+1; });
-  const dl = Object.keys(docsUsed).sort((a,b)=>docsUsed[b]-docsUsed[a]);
-  if (dl.length){
-    html += '<h2 class="sec">Drawn from</h2><div class="card tight"><ul class="list-clean">'
-      + dl.map(t=>'<li><span>'+esc(t)+'</span><span class="muted" style="margin-left:auto">'+docsUsed[t]+'</span></li>').join('')
-      + '</ul></div>';
-  }
-
-  html += '<div class="card tight"><div class="btnrow">'
-    + (res.id ? '' : '<button class="btn" id="bSave">Save this brief</button>')
-    + '<button class="btn" id="bCards">Make flashcards from it</button>'
-    + '<button class="btn" id="bCopy">Copy as text</button>'
-    + '<button class="btn" id="bNew">Start again</button>'
-    + '</div><p class="muted" style="font-size:12px;margin:12px 0 0">'
-    + 'Written from your own extracts by Gemini. Treat it as a prompt list, not a compliance check — '
-    + 'confirm every figure against the published document before it goes in a drawing or a report.</p></div>';
-
-  out.innerHTML = html;
-
-  out.querySelectorAll('[data-ref]').forEach(el=>el.onclick=()=>{
-    const r = (briefState.refs||[]).find(x=>String(x.n)===el.dataset.ref);
-    if (!r) return;
-    const ix = (r.i !== undefined && state.chunks[r.i] && state.chunks[r.i].d === r.docId)
-      ? r.i : findChunkFor(r.docId, r.page, r.clause);
-    if (ix >= 0) openReader(ix);
-    else toast('That document is no longer in the library.','err');
-  });
-
-  if ($('#bSave')) $('#bSave').onclick = async ()=>{
-    try {
-      const anyInternal = (res.refs||[]).some(r=>r.internal);
-      await api('briefSave', {
-        title: res.profile + (res.notes ? ' — ' + res.notes.slice(0,60) : ''),
-        profile: res.profile, notes: res.notes, brief: res.brief,
-        internal: anyInternal, refs: res.refs
-      });
-      toast('Brief saved' + (anyInternal ? ' (marked internal)' : ''));
-      $('#bSave').disabled = true;
-    } catch(e){ toast(esc(e.message),'err'); }
-  };
-  $('#bNew').onclick = ()=>{ briefState.result = null; renderBrief(); };
-  $('#bCopy').onclick = ()=>{
-    navigator.clipboard.writeText(briefToText(res)).then(()=>toast('Copied')).catch(()=>toast('Copy failed','err'));
-  };
-  $('#bCards').onclick = ()=>{
-    const passages = (res.refs||[]).map(r=>{
-      const ix = (r.i !== undefined && state.chunks[r.i]) ? r.i : findChunkFor(r.docId, r.page, r.clause);
-      const c = ix >= 0 ? state.chunks[ix] : null;
-      return c ? {docId:r.docId, title:r.title, clause:r.clause, page:r.page, text:c.t} : null;
-    }).filter(Boolean).slice(0,16);
-    if (!passages.length){ toast('No source passages available locally.','err'); return; }
-    makeCardsFrom(passages, res.profile, 1);
-  };
-}
-
-function briefToText(res){
-  const b = res.brief || {};
-  const L = [];
-  L.push(res.profile);
-  if (res.notes) L.push(res.notes);
-  L.push('');
-  if (b.summary) { L.push(b.summary); L.push(''); }
-  (b.sections||[]).forEach(s=>{
-    L.push('## ' + (s.theme||''));
-    (s.watchOuts||[]).forEach(w=>{
-      L.push('- [' + (w.severity||'check').toUpperCase() + '] ' + (w.point||''));
-      if (w.detail) L.push('    ' + w.detail);
-      (w.refs||[]).forEach(n=>{
-        const r = (res.refs||[]).find(x=>x.n===n);
-        if (r) L.push('    ref ' + n + ': ' + r.title + (r.clause?', clause '+r.clause:'') + (r.page?', p.'+r.page:''));
-      });
-    });
-    L.push('');
-  });
-  if ((b.earlyDecisions||[]).length){ L.push('## Settle early'); b.earlyDecisions.forEach(x=>L.push('- '+x)); L.push(''); }
-  if ((b.gaps||[]).length){ L.push('## Gaps in the library'); b.gaps.forEach(x=>L.push('- '+x)); L.push(''); }
-  if ((b.sourcesToFind||[]).length){ L.push('## Worth sourcing (unverified)'); b.sourcesToFind.forEach(x=>L.push('- '+x)); }
-  return L.join('\n');
-}
-
-/* ============================================================== cards ==== */
-const cardState = { cards:[], sched:{}, deck:'', queue:[], pos:0, shown:false, pending:[], loaded:false, session:{done:0, again:0} };
-
-const DAY = 86400000;
-function cardDue(id){
-  const s = cardState.sched[id];
-  if (!s) return 0;                       // never seen = due now
-  return Number(s.due || 0);
-}
-function dueCards(deck){
-  const now = Date.now();
-  return cardState.cards.filter(c=>(!deck || c.deck===deck) && cardDue(c.id) <= now);
-}
-
-function schedule(prev, grade){
-  let interval = prev ? Number(prev.interval||0) : 0;
-  let ease = prev ? Number(prev.ease||2.5) : 2.5;
-  let reps = prev ? Number(prev.reps||0) : 0;
-  let lapses = prev ? Number(prev.lapses||0) : 0;
-  if (grade === 1){ lapses++; reps = 0; ease = Math.max(1.3, ease-0.2); interval = 0; }
-  else if (grade === 2){ ease = Math.max(1.3, ease-0.15); interval = reps ? Math.max(1, Math.round(interval*1.2)) : 1; reps++; }
-  else if (grade === 3){ interval = reps === 0 ? 1 : (reps === 1 ? 3 : Math.round(Math.max(1,interval)*ease)); reps++; }
-  else { ease = Math.min(3.2, ease+0.15); interval = reps === 0 ? 3 : Math.round(Math.max(1,interval)*ease*1.3); reps++; }
-  interval = Math.min(interval, 365);
-  return {interval, ease, reps, lapses, due: Date.now() + interval*DAY, last: Date.now()};
-}
-
-async function loadCardBank(force){
-  if (cardState.loaded && !force) return;
-  const local = await DB.get('kv','cards');
-  if (local && !force){ cardState.cards = local.cards||[]; cardState.sched = local.sched||{}; cardState.loaded = true; }
-  try {
-    const r = await api('cardsSync');
-    cardState.cards = r.cards || [];
-    const server = r.state || {};
-    // a review that hasn't been pushed yet is newer than whatever the server holds
-    const unpushed = new Set(cardState.pending.map(p=>p.id));
-    Object.keys(cardState.sched || {}).forEach(id=>{ if (unpushed.has(id)) server[id] = cardState.sched[id]; });
-    cardState.sched = server;
-    cardState.loaded = true;
-    await DB.put('kv','cards', {cards:cardState.cards, sched:cardState.sched});
-  } catch(e){
-    if (!cardState.loaded) throw e;
-  }
-}
-
-async function flushReviews(){
-  if (!cardState.pending.length) return;
-  const batch = cardState.pending.splice(0, cardState.pending.length);
-  try { await api('cardsReview', {reviews: batch}); }
-  catch(e){ cardState.pending = batch.concat(cardState.pending); }
-}
-
-function renderCards(){
-  const v = $('#view-cards');
-  v.innerHTML = '<div class="card"><p class="muted" style="margin:0"><span class="spin"></span> Loading cards…</p></div>';
-  loadCardBank(false).then(()=>drawCards()).catch(e=>{
-    v.innerHTML = '<div class="card"><p style="margin:0;color:var(--danger)">'+esc(e.message)+'</p></div>';
-  });
-}
-
-function drawCards(){
-  const v = $('#view-cards');
-  const decks = Array.from(new Set(cardState.cards.map(c=>c.deck))).sort();
-  const due = dueCards(cardState.deck);
-  const total = cardState.cards.filter(c=>!cardState.deck || c.deck===cardState.deck).length;
-  const isAdmin = state.user && state.user.role==='admin';
-
-  let html = '<div class="deckbar">'
-    + '<div class="stat"><b>'+due.length+'</b><span>due now</span></div>'
-    + '<div class="stat"><b>'+total+'</b><span>in deck</span></div>'
-    + '<div class="stat"><b>'+cardState.session.done+'</b><span>this session</span></div>'
-    + '<div style="flex:1"></div>'
-    + (state.embeddings?'<button class="btn" id="cMake">Generate cards</button>':'')
-    + '<button class="btn" id="cBrowse">Browse</button>'
-    + '</div>';
-
-  if (decks.length > 1){
-    html += '<div class="filters" style="border:0;background:transparent;padding:0 0 10px">'
-      + '<button class="chip" data-deck="" aria-pressed="'+(!cardState.deck)+'">All decks</button>'
-      + decks.map(d=>'<button class="chip" data-deck="'+esc(d)+'" aria-pressed="'+(cardState.deck===d)+'">'+esc(d)+'</button>').join('')
-      + '</div>';
-  }
-
-  if (!cardState.cards.length){
-    html += emptyState('No flashcards yet', state.embeddings
-      ? 'Hit <b>Generate cards</b>, or open any passage in Search and choose <b>Make card</b>.'
-      : 'Flashcards need a Gemini key on the service.');
-    v.innerHTML = html;
-    bindCardBar();
-    return;
-  }
-
-  if (!cardState.queue.length || cardState.pos >= cardState.queue.length){
-    if (due.length){
-      cardState.queue = due.slice().sort(()=>Math.random()-0.5).slice(0,40);
-      cardState.pos = 0; cardState.shown = false;
-    } else {
-      const next = cardState.cards.filter(c=>!cardState.deck||c.deck===cardState.deck)
-        .map(c=>cardDue(c.id)).filter(Boolean).sort((a,b)=>a-b)[0];
-      html += '<div class="card" style="text-align:center;padding:34px 20px">'
-        + '<div style="font-size:34px">✓</div>'
-        + '<h3 style="margin:8px 0 4px">Nothing due</h3>'
-        + '<p class="muted" style="margin:0;font-size:14px">'
-        + (next ? 'Next card comes back '+relDay(next)+'.' : 'Generate some cards to get started.')
-        + '</p>'
-        + (total?'<div class="btnrow" style="justify-content:center;margin-top:14px"><button class="btn" id="cCram">Review anyway</button></div>':'')
-        + '</div>';
-      v.innerHTML = html;
-      bindCardBar();
-      if ($('#cCram')) $('#cCram').onclick = ()=>{
-        cardState.queue = cardState.cards.filter(c=>!cardState.deck||c.deck===cardState.deck)
-          .slice().sort(()=>Math.random()-0.5).slice(0,20);
-        cardState.pos = 0; cardState.shown = false; drawCards();
+    var name = 'state-' + userKey_(user) + '.json';
+    var st = readJson_(studyFolder_(), name, {});
+    reviews.forEach(function (r) {
+      if (!r || !r.id) return;
+      st[r.id] = {
+        due: r.due, interval: r.interval, ease: r.ease,
+        reps: r.reps, lapses: r.lapses, last: r.last
       };
-      return;
-    }
-  }
-
-  const card = cardState.queue[cardState.pos];
-  const src = [card.title, card.clause?('clause '+card.clause):'', card.page?('p.'+card.page):''].filter(Boolean).join(' · ');
-  html += '<div class="flash" id="flash">'
-    + '<div class="qq">'+esc(card.q)+'</div>'
-    + (cardState.shown ? '<div class="aa">'+esc(card.a)+'</div><div class="src">'+esc(src)+'</div>'
-                       : '<div class="src" style="margin-top:18px">tap to reveal · <span class="kbd">space</span></div>')
-    + '</div>';
-
-  if (cardState.shown){
-    html += '<div class="grade">'
-      + '<button class="g1" data-g="1">Again<small>&lt; 1 day</small></button>'
-      + '<button data-g="2">Hard<small>sooner</small></button>'
-      + '<button data-g="3">Good<small>on track</small></button>'
-      + '<button class="g4" data-g="4">Easy<small>later</small></button>'
-      + '</div>';
-    html += '<div class="btnrow" style="margin-top:10px;justify-content:center">'
-      + (card.docId?'<button class="btn" id="cSource">Read the source</button>':'')
-      + '<button class="btn" id="cDrop">Delete card</button></div>';
-  } else {
-    html += '<div class="btnrow" style="margin-top:12px;justify-content:center"><button class="btn primary" id="cShow" style="min-width:180px">Show answer</button></div>';
-  }
-  html += '<p class="muted" style="text-align:center;font-size:12px;margin-top:14px">'
-    + (cardState.pos+1)+' of '+cardState.queue.length+' in this round</p>';
-
-  v.innerHTML = html;
-  bindCardBar();
-
-  const reveal = ()=>{ cardState.shown = true; drawCards(); };
-  $('#flash').onclick = ()=>{ if (!cardState.shown) reveal(); };
-  if ($('#cShow')) $('#cShow').onclick = reveal;
-  v.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>gradeCard(Number(b.dataset.g)));
-  if ($('#cSource')) $('#cSource').onclick = ()=>{
-    const ix = findChunkFor(card.docId, card.page, card.clause);
-    if (ix >= 0) openReader(ix); else toast('That document is no longer in the library.','err');
-  };
-  if ($('#cDrop')) $('#cDrop').onclick = async ()=>{
-    if (!confirm('Delete this card?')) return;
-    try {
-      await api('cardsDelete', {ids:[card.id]});
-      cardState.cards = cardState.cards.filter(c=>c.id!==card.id);
-      cardState.queue.splice(cardState.pos,1);
-      cardState.shown = false;
-      await DB.put('kv','cards', {cards:cardState.cards, sched:cardState.sched});
-      drawCards();
-    } catch(e){ toast(esc(e.message),'err'); }
-  };
-}
-
-function bindCardBar(){
-  const v = $('#view-cards');
-  v.querySelectorAll('[data-deck]').forEach(b=>b.onclick=()=>{
-    cardState.deck = b.dataset.deck || '';
-    cardState.queue = []; cardState.pos = 0; cardState.shown = false;
-    drawCards();
-  });
-  if ($('#cMake')) $('#cMake').onclick = openGenerator;
-  if ($('#cBrowse')) $('#cBrowse').onclick = browseCards;
-}
-
-function relDay(ts){
-  const d = Math.round((ts - Date.now())/DAY);
-  if (d <= 0) return 'today';
-  if (d === 1) return 'tomorrow';
-  if (d < 30) return 'in '+d+' days';
-  return 'in '+Math.round(d/30)+' months';
-}
-
-function gradeCard(g){
-  const card = cardState.queue[cardState.pos];
-  if (!card) return;
-  const s = schedule(cardState.sched[card.id], g);
-  cardState.sched[card.id] = s;
-  cardState.pending.push(Object.assign({id:card.id}, s));
-  cardState.session.done++;
-  if (g === 1){
-    cardState.session.again++;
-    cardState.queue.push(card);                    // see it again before the round ends
-  }
-  cardState.pos++;
-  cardState.shown = false;
-  DB.put('kv','cards', {cards:cardState.cards, sched:cardState.sched}).catch(()=>{});
-  if (cardState.pending.length >= 5) flushReviews();
-  drawCards();
-}
-
-/* ---------- generating cards ---------- */
-function openGenerator(){
-  const docs = state.docs.slice().sort((a,b)=>String(a.title).localeCompare(String(b.title)));
-  const body = '<label class="f"><span>Make cards from</span><select id="gSource">'
-    + '<option value="">— pick a document —</option>'
-    + docs.map(d=>'<option value="'+esc(d.docId)+'">'+esc(d.title)+'</option>').join('')
-    + '</select></label>'
-    + '<div class="row">'
-    + '<label class="f"><span>How many passages to draw on</span><select id="gCount">'
-    + '<option value="8">8 — quick</option><option value="16" selected>16 — a decent set</option><option value="26">26 — thorough</option>'
-    + '</select></label>'
-    + '<label class="f"><span>Deck name</span><input type="text" id="gDeck" placeholder="e.g. Part B"></label>'
-    + '</div>'
-    + '<p class="muted" style="font-size:13px;margin:0">Passages are sampled evenly across the document, favouring ones that carry a clause number and a real figure.</p>';
-  showSheet('Generate flashcards', body, '<div style="flex:1"></div><button class="btn primary" id="gRun">Generate</button>');
-  const sel = $('#gSource');
-  sel.onchange = ()=>{ const d = docById(sel.value); if (d && !$('#gDeck').value) $('#gDeck').value = d.docRef || d.collection || 'General'; };
-  $('#gRun').onclick = async ()=>{
-    const docId = sel.value;
-    if (!docId){ toast('Pick a document first.','err'); return; }
-    const n = Number($('#gCount').value);
-    const deck = $('#gDeck').value.trim() || (docById(docId).docRef || 'General');
-    const pool = state.chunks
-      .map((c,i)=>({c,i}))
-      .filter(x=>x.c.d===docId && x.c.t.length>180)
-      .sort((a,b)=>{
-        const sa = (a.c.c?2:0) + (/\d/.test(a.c.t)?1:0);
-        const sb = (b.c.c?2:0) + (/\d/.test(b.c.t)?1:0);
-        return sb-sa;
-      });
-    if (!pool.length){ toast('That document has no passages long enough.','err'); return; }
-    const step = Math.max(1, Math.floor(pool.length/n));
-    const picked = [];
-    for (let i=0;i<pool.length && picked.length<n;i+=step) picked.push(pool[i]);
-    const d = docById(docId);
-    const passages = picked.map(x=>({docId, title:d.title, clause:x.c.c, page:x.c.p, text:x.c.t, tags:d.tags||''}));
-    closeModal();
-    makeCardsFrom(passages, deck, 1);
-  };
-}
-
-async function makeCardsFrom(passages, deck, per){
-  if (!state.embeddings){ toast('Card writing needs a Gemini key on the service.','err'); return; }
-  showSheet('Writing cards', '<p class="muted"><span class="spin"></span> Reading '+passages.length+' passage'+(passages.length===1?'':'s')+'…</p>', '');
-  let made = [];
-  try {
-    const r = await api('genCards', {passages: passages.map(p=>({docId:p.docId, title:p.title, clause:p.clause, page:p.page, text:p.text, tags:p.tags})), per: per||1});
-    made = r.cards || [];
-  } catch(e){
-    const b = $('#sheet .body'); if (b) b.innerHTML = '<p style="color:var(--danger)">'+esc(e.message)+'</p>';
-    return;
-  }
-  if (!made.length){
-    const b = $('#sheet .body'); if (b) b.innerHTML = '<p class="muted">Nothing in those passages was worth a card.</p>';
-    return;
-  }
-  const body = '<label class="f"><span>Deck</span><input type="text" id="mDeck" value="'+esc(deck||'General')+'"></label>'
-    + '<div class="muted" style="font-size:12.5px;margin-bottom:6px">Untick anything that reads badly — nothing is saved until you press Save.</div>'
-    + made.map((c,i)=>'<label class="cardrow"><input type="checkbox" data-c="'+i+'" checked style="margin-top:4px;flex:none">'
-      + '<span><b>'+esc(c.q)+'</b><br><span style="color:var(--accent)">'+esc(c.a)+'</span>'
-      + '<br><span class="muted" style="font-size:11.5px">'+esc([c.title, c.clause?('clause '+c.clause):'', c.page?('p.'+c.page):''].filter(Boolean).join(' · '))+'</span></span></label>').join('');
-  const panel = $('#sheet .body');
-  if (!panel) return;
-  panel.innerHTML = body;
-  const foot = $('#sheet footer') || (()=>{ const f=document.createElement('footer'); $('#sheet .panel').appendChild(f); return f; })();
-  foot.innerHTML = '<span class="muted" style="align-self:center;font-size:13px">'+made.length+' proposed</span><div style="flex:1"></div>'
-    + '<button class="btn primary" id="mSave">Save selected</button>';
-  $('#sheet header h3').textContent = 'Review the cards';
-  $('#mSave').onclick = async ()=>{
-    const picks = Array.from(panel.querySelectorAll('[data-c]:checked')).map(cb=>made[Number(cb.dataset.c)]);
-    if (!picks.length){ closeModal(); return; }
-    const dk = $('#mDeck').value.trim() || 'General';
-    $('#mSave').disabled = true;
-    try {
-      const r = await api('cardsAdd', {cards: picks.map(c=>Object.assign({}, c, {deck:dk}))});
-      cardState.cards = cardState.cards.concat(r.added||[]);
-      cardState.queue = []; cardState.pos = 0; cardState.shown = false;
-      await DB.put('kv','cards', {cards:cardState.cards, sched:cardState.sched});
-      closeModal();
-      toast('Saved '+(r.added||[]).length+' cards to “'+esc(dk)+'”');
-      if (state.view === 'cards') drawCards();
-    } catch(e){ toast(esc(e.message),'err'); $('#mSave').disabled = false; }
-  };
-}
-
-function browseCards(){
-  const list = cardState.cards.filter(c=>!cardState.deck || c.deck===cardState.deck);
-  if (!list.length){ showSheet('All cards','<p class="muted">No cards yet.</p>',''); return; }
-  const body = list.map(c=>{
-    const nxt = cardDue(c.id);
-    return '<div class="cardrow"><span style="flex:1"><b>'+esc(c.q)+'</b><br>'
-      + '<span style="color:var(--accent)">'+esc(c.a)+'</span><br>'
-      + '<span class="muted" style="font-size:11.5px">'+esc(c.deck)+' · '+esc(c.title||'')
-      + (c.clause?' · clause '+esc(c.clause):'')+' · '+(nxt?relDay(nxt):'new')+'</span></span>'
-      + '<button class="btn" data-del="'+esc(c.id)+'" style="padding:4px 9px;font-size:12px;flex:none">✕</button></div>';
-  }).join('');
-  showSheet(list.length+' cards', body, '');
-  $('#sheet .body').querySelectorAll('[data-del]').forEach(b=>b.onclick=async ()=>{
-    try {
-      await api('cardsDelete', {ids:[b.dataset.del]});
-      cardState.cards = cardState.cards.filter(c=>c.id!==b.dataset.del);
-      await DB.put('kv','cards', {cards:cardState.cards, sched:cardState.sched});
-      b.closest('.cardrow').remove();
-      if (state.view==='cards') { cardState.queue=[]; }
-    } catch(e){ toast(esc(e.message),'err'); }
-  });
-}
-
-/* ============================================================== settings = */
-function renderSettings(){
-  const v = $('#view-settings');
-  const s = settingsRaw();
-  const theme = document.documentElement.getAttribute('data-theme') || 'auto';
-  v.innerHTML = ''
-  + '<h2 class="sec">Account</h2>'
-  + '<div class="card"><ul class="list-clean">'
-  +   '<li><span class="muted" style="width:120px;flex:none">Signed in</span><b>'+esc(state.user?state.user.name:'—')+'</b></li>'
-  +   '<li><span class="muted" style="width:120px;flex:none">Role</span>'+esc(state.user?state.user.role:'—')+'</li>'
-  +   '<li><span class="muted" style="width:120px;flex:none">Internal access</span>'+(state.user&&state.user.internal?'Yes':'No')+'</li>'
-  +   '<li><span class="muted" style="width:120px;flex:none">Meaning search</span>'+(state.embeddings?'On':'Off — add GEMINI_KEY to the script')+'</li>'
-  +   '<li><span class="muted" style="width:120px;flex:none">Web discovery</span>'+(state.firecrawl?'Firecrawl connected':'Plain HTML scraping')+'</li>'
-  + '</ul><div class="btnrow" style="margin-top:12px"><button class="btn danger" id="sOut">Sign out of this device</button></div></div>'
-
-  + '<h2 class="sec">Appearance</h2>'
-  + '<div class="card"><div class="btnrow">'
-  +   ['auto','light','dark'].map(t=>'<button class="chip" data-theme="'+t+'" aria-pressed="'+(theme===t)+'">'+t[0].toUpperCase()+t.slice(1)+'</button>').join('')
-  + '</div></div>'
-
-  + '<h2 class="sec">Offline copy</h2>'
-  + '<div class="card"><p class="muted" style="margin:0 0 10px;font-size:13.5px">The search index lives on this device, so searching works with no signal. Opening a document still needs a connection unless you have viewed it before.</p>'
-  +   '<div id="storeStats" class="muted" style="font-size:13px"></div>'
-  +   '<div class="btnrow" style="margin-top:10px">'
-  +     '<button class="btn" id="sSync">Sync now</button>'
-  +     '<button class="btn" id="sRebuild">Re-download index</button>'
-  +     '<button class="btn" id="sClearPdf">Clear cached documents</button>'
-  +   '</div></div>'
-
-  + '<h2 class="sec">Service</h2>'
-  + '<div class="card">'
-  +   '<label class="f"><span>Service address</span><input type="url" id="sEndpoint" value="'+esc(state.endpoint)+'"></label>'
-  +   '<div class="btnrow"><button class="btn" id="sSave">Save address</button>'
-  +   (state.user&&state.user.role==='admin'?'<button class="btn" id="sUsers">Who has access</button><button class="btn" id="sPurge">Clear server staging files</button>':'')
-  +   '</div>'
-  + '</div>'
-
-  + '<p class="muted" style="font-size:12px;text-align:center;margin:22px 0">RegVault · your documents stay in your own Google Drive</p>';
-
-  $('#sOut').onclick = ()=>{ if(confirm('Sign out and forget this device?')) signOut(); };
-  v.querySelectorAll('[data-theme]').forEach(b=>b.onclick=()=>{
-    const t = b.dataset.theme;
-    if (t==='auto') document.documentElement.setAttribute('data-theme','auto');
-    else document.documentElement.setAttribute('data-theme', t);
-    saveSettings({theme:t}); renderSettings();
-  });
-  $('#sSync').onclick = ()=>sync(false);
-  $('#sRebuild').onclick = async ()=>{ await DB.clear('parts'); await DB.put('kv','stamps',{}); sync(true); };
-  $('#sClearPdf').onclick = async ()=>{ await DB.clear('files'); toast('Cached documents cleared'); statStore(); };
-  $('#sSave').onclick = ()=>{ state.endpoint = $('#sEndpoint').value.trim(); saveSettings(); toast('Saved'); };
-  if ($('#sUsers')) $('#sUsers').onclick = async ()=>{
-    try {
-      const r = await api('listUsers');
-      showSheet('Access codes', '<ul class="list-clean">'+r.users.map(u=>
-        '<li><b style="width:150px;flex:none">'+esc(u.name)+'</b><span class="tag">'+esc(u.role)+'</span>'
-        +(u.internal?'<span class="tag warn">internal</span>':'')
-        +(u.active?'':'<span class="tag danger">disabled</span>')
-        +'<span class="muted" style="margin-left:auto;font-size:12px">'+esc(String(u.lastSeen||'never').slice(0,10))+'</span></li>').join('')
-        +'</ul><p class="muted" style="font-size:13px;margin-top:14px">Add a code by running <b>createAccessCode()</b> in the Apps Script editor. Codes are stored hashed — the editor log shows the code once.</p>','');
-    } catch(e){ toast(esc(e.message),'err'); }
-  };
-  if ($('#sPurge')) $('#sPurge').onclick = async ()=>{
-    try { const r = await api('purgeStaging'); toast('Removed '+r.removed+' staging files'); } catch(e){ toast(esc(e.message),'err'); }
-  };
-  statStore();
-}
-
-async function statStore(){
-  const el = $('#storeStats');
-  if (!el) return;
-  let line = state.docs.length+' documents · '+state.chunks.length.toLocaleString()+' passages indexed';
-  try {
-    if (navigator.storage && navigator.storage.estimate){
-      const e = await navigator.storage.estimate();
-      line += ' · '+(e.usage/1048576).toFixed(1)+' MB stored on this device';
-    }
-  } catch(e){}
-  el.textContent = line;
-}
-
-/* ============================================================== auth ===== */
-function signOut(msg){
-  const keep = settingsRaw();
-  localStorage.setItem(LS, JSON.stringify({endpoint: keep.endpoint||'', theme: keep.theme||''}));
-  state.code = ''; state.user = null;
-  cardState.cards = []; cardState.sched = {}; cardState.queue = []; cardState.pending = []; cardState.loaded = false;
-  briefState.result = null; briefState.refs = []; briefState.savedList = [];
-  DB.del('kv','cards').catch(()=>{});
-  $('#gCode').value = '';
-  $('#gEndpoint').value = keep.endpoint || '';
-  $('#app').classList.add('hide');
-  $('#gate').classList.remove('hide');
-  if (msg) $('#gMsg').textContent = msg;
-}
-
-async function connect(endpoint, code, remember){
-  state.endpoint = endpoint.trim().replace(/\s+/g,'');
-  state.code = code.trim();
-  const r = await api('auth', {});
-  state.user = r.user;
-  state.embeddings = !!r.embeddings;
-  state.firecrawl = !!r.firecrawl;
-  if (remember) saveSettings();
-  else localStorage.removeItem(LS);
-  $('#gate').classList.add('hide');
-  $('#app').classList.remove('hide');
-  const hadCache = await loadFromCache();
-  if (hadCache) renderSearchHome();
-  sync(false).then(()=>{ if (state.view==='search' && !state.lastQuery) renderSearchHome(); });
-  loadCardBank(false)
-    .then(()=>{ if (state.view==='search' && !state.lastQuery) renderSearchHome(); })
-    .catch(()=>{});
-}
-
-/* ============================================================== boot ===== */
-const CATALOGUE = {"groups":[
- {"collection":"Building Regulations (IE)","publisher":"Department of Housing, Local Government and Heritage","jurisdiction":"Ireland","sources":[
-   {"label":"Technical Guidance Documents A–M (hub)","url":"https://www.gov.ie/en/collection/e4327-technical-guidance-documents/"},
-   {"label":"Building Standards – publications","url":"https://www.gov.ie/en/organisation-information/74d4d-building-standards/"},
-   {"label":"Building Control Regulations & amendments","url":"https://www.gov.ie/en/collection/9f2ec-building-control-regulations/"},
-   {"label":"NZEB / Part L guidance","url":"https://www.gov.ie/en/collection/nearly-zero-energy-buildings-nzeb/"}]},
- {"collection":"Health Technical Memoranda (HTM)","publisher":"NHS England / DHSC","jurisdiction":"UK (referenced in IE)","sources":[
-   {"label":"HTM index – NHS England","url":"https://www.england.nhs.uk/publication/health-technical-memorandum/"},
-   {"label":"Estates & facilities publications","url":"https://www.england.nhs.uk/estates/"}]},
- {"collection":"Health Building Notes (HBN)","publisher":"NHS England / DHSC","jurisdiction":"UK (referenced in IE)","sources":[
-   {"label":"HBN index – NHS England","url":"https://www.england.nhs.uk/publication/health-building-note/"},
-   {"label":"GOV.UK HBN core elements","url":"https://www.gov.uk/government/collections/health-building-notes-core-elements"}]},
- {"collection":"Fire Safety","publisher":"Various","jurisdiction":"Ireland","sources":[
-   {"label":"Fire services publications","url":"https://www.gov.ie/en/collection/fire-services-publications/"}]},
- {"collection":"Health & Safety","publisher":"Health and Safety Authority","jurisdiction":"Ireland","sources":[
-   {"label":"HSA publications and codes of practice","url":"https://www.hsa.ie/eng/publications_and_forms/publications/"},
-   {"label":"HSA construction guidance","url":"https://www.hsa.ie/eng/your_industry/construction/"}]},
- {"collection":"Electrical","publisher":"NSAI / Safe Electric","jurisdiction":"Ireland","sources":[
-   {"label":"Safe Electric – rules and guidance","url":"https://www.safeelectric.ie/"},
-   {"label":"CRU publications","url":"https://www.cru.ie/publications/"}]},
- {"collection":"Water & Drainage","publisher":"Uisce Éireann","jurisdiction":"Ireland","sources":[
-   {"label":"Standard details and codes of practice","url":"https://www.water.ie/connections/developer-services/standard-details/"}]},
- {"collection":"Accessibility","publisher":"NDA","jurisdiction":"Ireland","sources":[
-   {"label":"Centre for Excellence in Universal Design","url":"https://universaldesign.ie/built-environment/"}]},
- {"collection":"Healthcare Standards","publisher":"HIQA","jurisdiction":"Ireland","sources":[
-   {"label":"HIQA standards and guidance","url":"https://www.hiqa.ie/reports-and-publications/standard"}]}
-]};
-
-function bindShell(){
-  $$('#tabs button').forEach(b=>b.onclick=()=>setView(b.dataset.view));
-  $('#q').addEventListener('input', onQueryInput);
-  $('#q').addEventListener('keydown', e=>{
-    if (e.key==='Enter'){ e.preventDefault(); state.mode==='ask' ? doAsk() : doSearch(); }
-    if (e.key==='Escape'){ $('#q').value=''; onQueryInput(); renderSearchHome(); }
-  });
-  $('#clearq').onclick = ()=>{ $('#q').value=''; onQueryInput(); renderSearchHome(); $('#q').focus(); };
-  $('#mFind').onclick = ()=>setMode('find');
-  $('#mAsk').onclick = ()=>setMode('ask');
-  $('#syncBtn').onclick = ()=>sync(false);
-  document.addEventListener('keydown', e=>{
-    const typing = ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName);
-    if (state.view==='cards' && !typing && !$('#modal').innerHTML){
-      if (e.key===' '){
-        e.preventDefault();
-        if (!cardState.shown && cardState.queue.length){ cardState.shown = true; drawCards(); }
-        return;
-      }
-      if (cardState.shown && ['1','2','3','4'].includes(e.key)){ e.preventDefault(); gradeCard(Number(e.key)); return; }
-    }
-    if (e.key==='/' && document.activeElement.tagName!=='INPUT' && document.activeElement.tagName!=='TEXTAREA'){
-      e.preventDefault(); setView('search'); $('#q').focus(); $('#q').select();
-    }
-    if (e.key==='Escape' && $('#modal').innerHTML) closeModal();
-  });
-}
-function setMode(m){
-  state.mode = m;
-  $('#mFind').setAttribute('aria-pressed', String(m==='find'));
-  $('#mAsk').setAttribute('aria-pressed', String(m==='ask'));
-  $('#q').placeholder = m==='ask'
-    ? 'Ask a question — e.g. what travel distance is allowed in a dead end?'
-    : 'Search regulations, clauses, policies…';
-  if ($('#q').value.trim()) { m==='ask' ? doAsk() : doSearch(); }
-}
-
-(function boot(){
-  loadSettings();
-  bindShell();
-  $('#gEndpoint').value = state.endpoint;
-  $('#gGo').onclick = async ()=>{
-    const btn = $('#gGo');
-    btn.disabled = true; $('#gMsg').textContent = 'Connecting…';
-    try {
-      await connect($('#gEndpoint').value, $('#gCode').value, $('#gRemember').checked);
-      $('#gMsg').textContent = '';
-    } catch(e){
-      $('#gMsg').innerHTML = '<span style="color:var(--danger)">'+esc(e.message)+'</span>';
-    } finally { btn.disabled = false; }
-  };
-  $('#gCode').addEventListener('keydown', e=>{ if(e.key==='Enter') $('#gGo').click(); });
-
-  if (state.endpoint && state.code){
-    $('#gMsg').textContent = 'Connecting…';
-    connect(state.endpoint, state.code, true).catch(e=>{
-      $('#gMsg').innerHTML = '<span style="color:var(--danger)">'+esc(e.message)+'</span>';
     });
-  }
+    writeJson_(studyFolder_(), name, st);
+    return { ok: true, saved: reviews.length };
+  } finally { lock.releaseLock(); }
+}
 
-  if (location.protocol.startsWith('http') && 'serviceWorker' in navigator){
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
-  }
-})();
-</script>
-</body>
-</html>
+function cardsDeleteAction_(req, user) {
+  var ids = {};
+  (req.ids || []).forEach(function (i) { ids[i] = 1; });
+  if (!Object.keys(ids).length) return { ok: false, error: 'No card ids supplied' };
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var bank = loadBank_();
+    var kept = bank.filter(function (c) {
+      if (!ids[c.id]) return true;
+      return !(c.createdBy === user.name || user.role === 'admin');   // refuse other people's cards
+    });
+    writeJson_(studyFolder_(), 'cards.json', kept);
+    audit_(user.name, 'cards-delete', (bank.length - kept.length) + ' cards');
+    return { ok: true, removed: bank.length - kept.length };
+  } finally { lock.releaseLock(); }
+}
