@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#006354">
 <title>St Finbarr's Campus | Find your way</title>
+<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/HSE-Estates/HSE-Estates.github.io/refs/heads/main/HSE-Logo-Green-NEW-no-background.png">
+<link rel="apple-touch-icon" href="https://raw.githubusercontent.com/HSE-Estates/HSE-Estates.github.io/refs/heads/main/HSE-Logo-Green-NEW-no-background.png">
+<meta name="apple-mobile-web-app-title" content="Find your way">
+<meta name="mobile-web-app-capable" content="yes">
 <style>/* Leaflet 1.9.4, BSD-2-Clause, bundled so the app needs no CDN */
 /* required styles */
 
@@ -766,6 +770,7 @@ button{font:inherit;color:inherit}
   padding-bottom:env(safe-area-inset-bottom);transition:max-height .22s ease;
 }
 #sheet.tall{max-height:82vh}
+body.kb .mapbtns,body.kb .banner,body.kb .toast{display:none}
 #sheet.short{max-height:28vh}
 .grab{width:44px;height:5px;border-radius:3px;background:#cfdad7;margin:8px auto 2px;flex:0 0 auto}
 .sheetBody{overflow-y:auto;padding:6px 14px 16px;-webkit-overflow-scrolling:touch}
@@ -902,6 +907,9 @@ textarea.t{min-height:110px;font-family:ui-monospace,Menlo,Consolas,monospace;fo
     <button class="mapbtn" id="btnLayer" title="Map style" aria-label="Map style">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg>
     </button>
+    <button class="mapbtn hide" id="btnPlan" title="Site plan overlay" aria-label="Site plan overlay">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+    </button>
     <button class="mapbtn" id="btnFit" title="Whole campus" aria-label="Whole campus">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
     </button>
@@ -939,10 +947,11 @@ textarea.t{min-height:110px;font-family:ui-monospace,Menlo,Consolas,monospace;fo
         </div>
       </div>
       <div class="btnRow">
-        <button class="btn" id="btnGo">Directions</button>
-        <button class="btn ghost sm" id="btnDrive" title="Open in maps">Drive here</button>
+        <button class="btn" id="btnGo">Walk here</button>
+        <button class="btn ghost" id="btnDrive" title="Open driving directions">Drive here</button>
       </div>
       <div class="note" id="placeNote"></div>
+      <div class="note" id="placeWalk" style="background:#fff8e6;color:#5a4300;display:none"></div>
       <h3 class="sec">What's in this block</h3>
       <ul class="floors" id="placeFloors"></ul>
     </section>
@@ -966,6 +975,7 @@ textarea.t{min-height:110px;font-family:ui-monospace,Menlo,Consolas,monospace;fo
         <button class="pillbtn" id="btnStepFree">Step-free route: off</button>
         <button class="pillbtn" id="btnCompass">Compass</button>
       </div>
+      <div class="note" id="routeWalk" style="background:#fff8e6;color:#5a4300;display:none"></div>
       <h3 class="sec">Step by step</h3>
       <ol class="steps" id="steps"></ol>
       <div class="footer" id="routeFoot"></div>
@@ -1008,12 +1018,19 @@ textarea.t{min-height:110px;font-family:ui-monospace,Menlo,Consolas,monospace;fo
       </div>
 
       <div class="setupPane" id="pane-paths">
-        <p class="mini">Walking routes follow this path network, so people are sent along roads and footpaths rather than through buildings. Draw mode adds a point on each map tap and joins it to the previous one.</p>
+        <div class="warn">The network that came with the app was traced off the site plan by eye, so some legs cut across ground they should not. Walk the campus once with Record on and it replaces the guesswork with the real thing.</div>
+        <p class="mini">Routes follow this network, so people are sent along roads and footpaths. Record drops a point every 12 m as you walk. Draw adds a point wherever you tap. Move drags points into place. Erase removes the point you tap.</p>
         <div class="srow">
-          <button class="pillbtn" id="pathDraw">Draw mode: off</button>
+          <button class="pillbtn" id="pathRecord">Record walk: off</button>
+          <button class="pillbtn" id="pathDraw">Draw: off</button>
+          <button class="pillbtn" id="pathMove">Move: off</button>
+          <button class="pillbtn" id="pathErase">Erase: off</button>
+        </div>
+        <div class="srow">
           <button class="pillbtn" id="pathShow">Show network: on</button>
           <button class="pillbtn" id="pathUndo">Undo last point</button>
           <button class="pillbtn" id="pathBreak">Start a new branch</button>
+          <button class="pillbtn" id="pathWipe">Clear whole network</button>
         </div>
         <div class="toggle"><input type="checkbox" id="pathStepFree" checked><label for="pathStepFree">New segments are step-free (no steps, suitable for wheelchairs)</label></div>
         <div id="pathInfo" class="mini"></div>
@@ -1051,6 +1068,13 @@ textarea.t{min-height:110px;font-family:ui-monospace,Menlo,Consolas,monospace;fo
         <label class="f">Walking speed (metres per minute)</label>
         <input class="t" id="optSpeed" type="number" min="30" max="120" step="5" value="70">
         <p class="mini">70 m/min is a steady older-adult walking pace. Lower it for a campus with hills or long corridors.</p>
+        <label class="f">Map images</label>
+        <p class="mini">The app ships with keyless sources that allow third party use. If you take out a map account, paste its tile URL here with the key in it and it becomes the first choice. Anything you paste is visible to anyone who opens the app, so lock the key to your own domain in the provider's dashboard.</p>
+        <input class="t" id="optTileUrl" placeholder="https://provider/tiles/{z}/{x}/{y}.png?key=YOURKEY">
+        <input class="t" id="optTileAttr" placeholder="Attribution line required by the provider" style="margin-top:8px">
+        <div class="srow"><button class="pillbtn" id="optTileSave">Use this map</button>
+        <button class="pillbtn" id="optTileClear">Back to the built-in maps</button></div>
+
         <label class="f">Logo</label>
         <p class="mini">The header pulls the HSE Estates logo straight from your GitHub repo. If that ever goes offline it falls back to a file named <b>hse-logo.png</b> sitting beside this one, and then to a plain text lockup, so the header never breaks.</p>
         <div class="footer">Built for HSE Capital &amp; Estates, South West &middot; runs from a single file, no server, no map keys</div>
@@ -1109,12 +1133,12 @@ const SEED = {
       kw:'endas elizabeths activity colposcopy clinic b primary care older persons public health finance'},
     {id:'B11', hidden:['swab', 'specimen', 'sample drop off', 'culture'], x:2313, y:1485, name:'Block 11', cat:'lab', items:[['','Microbiology Lab']], kw:'micro microbiology lab swabs'},
     {id:'B12', hidden:['blood test', 'bloods', 'phlebotomy', 'fbc', 'sample', 'blood sample'], x:2393, y:1498, name:'Block 12', cat:'lab', items:[['','Bloodbank']], kw:'blood bank bloods samples phlebotomy'},
-    {id:'B13', x:2572, y:1382, name:'Block 13', cat:'office', items:[['','UCC Gerontology']], kw:'ucc gerontology university research'},
-    {id:'B15', hidden:['prescription', 'medicines', 'brace fitting', 'orthodontic appointment', 'sterile services'], x:2360, y:1437, name:'Block 15', cat:'clinic', items:[
+    {id:'B13', lat:51.88798275, lng:-8.459564395, x:2572, y:1382, name:'Block 13', cat:'office', items:[['','UCC Gerontology']], kw:'ucc gerontology university research'},
+    {id:'B15', lat:51.88778498, lng:-8.460699227, hidden:['prescription', 'medicines', 'brace fitting', 'orthodontic appointment', 'sterile services'], x:2360, y:1437, name:'Block 15', cat:'clinic', items:[
       ['SF','Primary Care Unit offices'],['FF','Orthodontics'],['GF','Pharmacy'],['GF','Clinic A'],['GF','Training room'],
       ['GF','CSSD'],['GF','CAMHS, ID offices'],['LGF','Biomed']],
       kw:'pharmacy chemist medication orthodontics braces clinic a training cssd camhs biomed primary care'},
-    {id:'B16', hidden:['dental appointment', 'filling', 'extraction', 'check up', 'dental review'], x:2570, y:1510, name:'Block 16 &middot; Ravenscourt', cat:'clinic', items:[
+    {id:'B16', lat:51.88739444, lng:-8.459548715, hidden:['dental appointment', 'filling', 'extraction', 'check up', 'dental review'], x:2570, y:1510, name:'Block 16 &middot; Ravenscourt', cat:'clinic', items:[
       ['GF','Dental Clinic 2'],['FF','Tusla'],['FF','Procurement Officers'],['SF','Tusla']],
       kw:'ravenscourt dental dentist teeth tusla procurement'},
     {id:'B17', x:2487, y:1573, name:'Block 17', cat:'service', items:[['','Church']], kw:'church chapel mass prayer oratory'},
@@ -1126,7 +1150,7 @@ const SEED = {
     {id:'B23', hidden:['counselling appointment', 'psychology appointment'], x:2502, y:1662, name:'Block 23', cat:'clinic', items:[
       ['GF','Psychology'],['FF','CHA General Manager'],['FF','National MH offices']],
       kw:'psychology cha general manager national mental health'},
-    {id:'B24', x:2525, y:1690, name:'Block 24', cat:'service', items:[['','Residents kitchen']], kw:'residents kitchen'},
+    {id:'B24', lat:51.88674568, lng:-8.459752749, x:2525, y:1690, name:'Block 24', cat:'service', items:[['','Residents kitchen']], kw:'residents kitchen'},
     {id:'B26', hidden:['childrens ot', 'paediatric therapy', 'child ot appointment'], x:2317, y:1767, name:'Block 26', cat:'clinic', items:[['','Community Paediatric OT Clinics']],
       kw:'paediatric pediatric children ot occupational therapy kids'},
     {id:'B32', x:2238, y:1780, name:'Block 32', cat:'office', items:[['','Social Inclusion']], kw:'social inclusion addiction'},
@@ -1134,7 +1158,7 @@ const SEED = {
     {id:'B34', hidden:['physiotherapy appointment', 'occupational therapy appointment', 'antenatal', 'midwife appointment', 'home birth'], x:2178, y:1800, name:'Block 34', cat:'clinic', items:[
       ['GF','Community OT &amp; Physio offices, CHA 11'],['GF','Community Midwifery Service office']],
       kw:'ot physio physiotherapy midwife midwifery community cha11'},
-    {id:'B35', hidden:['speech therapy', 'swallow assessment', 'lung function', 'spirometry', 'pulmonary rehab appointment', 'dietitian appointment'], x:2122, y:1898, name:'Block 35 &middot; St Joseph’s CNU', cat:'ward', items:[
+    {id:'B35', lat:51.88597964, lng:-8.462205001, hidden:['speech therapy', 'swallow assessment', 'lung function', 'spirometry', 'pulmonary rehab appointment', 'dietitian appointment'], x:2122, y:1898, name:'Block 35 &middot; St Joseph’s CNU', cat:'ward', items:[
       ['','St Joseph’s Community Nursing Unit'],['GF','Speech &amp; Language Therapy'],
       ['FF','Pulmonary Rehab, Primary Care'],['FF','Primary Care Dietician Clinic']],
       kw:'st josephs cnu nursing unit slt speech language pulmonary rehab dietician dietitian'},
@@ -1142,18 +1166,18 @@ const SEED = {
       ['GF','Immunisation offices'],['GF','Library'],['FF','Primary Care Social Worker'],['FF','Dementia Care offices'],
       ['FF','Tusla'],['FF','Community Medical Officers'],['FF','Immunisation offices']],
       kw:'immunisation vaccine vaccination library social worker dementia tusla medical officers'},
-    {id:'B37', x:2408, y:1885, name:'Block 37 &middot; Flower Pot Café', cat:'service', items:[['','Flower Pot Café']],
+    {id:'B37', lat:51.88599303, lng:-8.460705001, noFit:true, x:2408, y:1885, name:'Block 37 &middot; Flower Pot Café', cat:'service', items:[['','Flower Pot Café']],
       kw:'cafe coffee food canteen lunch tea flower pot restaurant'},
     {id:'B38', hidden:['developmental check', 'child health appointment', 'public health nurse'], x:2302, y:1903, name:'Block 38', cat:'office', items:[['','Child Health offices'],['','Medical Officers &amp; Community Nurses']],
       kw:'child health nurses medical officers'},
-    {id:'B41', x:2277, y:1732, name:'Block 41', cat:'office', items:[
+    {id:'B41', lat:51.88654549, lng:-8.461288953, x:2277, y:1732, name:'Block 41', cat:'office', items:[
       ['GF','Regional ICT'],['GF','Health Promotion &amp; Improvement']], kw:'ict it computers health promotion'},
-    {id:'B47', hidden:['dental appointment', 'filling', 'extraction', 'check up'], x:2318, y:1268, name:'Block 47', cat:'clinic', items:[['','Dental 1']], kw:'dental dentist teeth orthodontic'},
+    {id:'B47', lat:51.88834668, lng:-8.460991634, hidden:['dental appointment', 'filling', 'extraction', 'check up'], x:2318, y:1268, name:'Block 47', cat:'clinic', items:[['','Dental 1']], kw:'dental dentist teeth orthodontic'},
     {id:'B48', x:2172, y:1293, name:'Block 48', cat:'ward', items:[['','St Claire &amp; St Oliver’s']], kw:'st claire st olivers ward'},
-    {id:'B49', x:2583, y:1147, name:'Block 49', cat:'office', items:[['','Community Workers']], kw:'community workers'},
+    {id:'B49', lat:51.88882946, lng:-8.459455654, x:2583, y:1147, name:'Block 49', cat:'office', items:[['','Community Workers']], kw:'community workers'},
     {id:'B51', x:2120, y:1947, name:'Block 51', cat:'ward', items:[['','Chaplain residence'],['','Horizons residential']], kw:'chaplain horizons residential'},
-    {id:'B52', x:2018, y:1338, name:'Block 52', cat:'lab', items:[['','Public Analyst Laboratory']], kw:'public analyst laboratory'},
-    {id:'CNU', x:2072, y:1138, name:'Community Nursing Unit', cat:'ward', items:[['','Community Nursing Unit']], kw:'cnu community nursing unit new build'},
+    {id:'B52', lat:51.88838281, lng:-8.462683611, noFit:true, x:2018, y:1338, name:'Block 52', cat:'lab', items:[['','Public Analyst Laboratory']], kw:'public analyst laboratory'},
+    {id:'CNU', lat:51.88879386, lng:-8.462174658, noFit:true, x:2072, y:1138, name:'Community Nursing Unit', cat:'ward', items:[['','Community Nursing Unit']], kw:'cnu community nursing unit new build'},
 
     /* landmarks and arrival points. noFit = position is exact but its place on the
        drawing is unknown, so it is not used to work out where the other blocks sit */
@@ -1165,7 +1189,7 @@ const SEED = {
       items:[['','Way out for cars, beside the pedestrian gate']], kw:'vehicle car exit out gate douglas road'},
     {id:'E4', x:2440, y:1000, lat:51.8894025, lng:-8.4603890, noFit:true, name:'Pedestrian entrance, east', cat:'entrance',
       items:[['','Second walk-in gate off Douglas Road']], kw:'pedestrian entrance east second gate walk in'},
-    {id:'E3', x:2115, y:2000, lat:51.8851123, lng:-8.4613012, name:'South Douglas Road entrance', cat:'entrance',
+    {id:'E3', x:2115, y:2000, lat:51.8851123, lng:-8.4613012, noFit:true, name:'South Douglas Road entrance', cat:'entrance',
       items:[['','Pedestrian gate only, no vehicle access']], kw:'south douglas road entrance gate back pedestrian only walk'},
     {id:'P1', x:2255, y:1140, name:'Main car park', cat:'entrance', items:[['','Visitor parking, north of the campus']], kw:'car park parking visitor spaces'},
     {id:'L1', x:2445, y:1033, name:'Gate Lodge', cat:'service', items:[['','Gate Lodge']], kw:'gate lodge'},
@@ -1310,7 +1334,54 @@ function buildFit(){
   if(!isFinite(scale) || scale<=0) return null;
   return {th, scale, cs, cd, lat0, lng0, mlng, mlat, count:n};
 }
-function fit(){ if(!FIT) FIT = buildFit(); return FIT; }
+/* With four or more anchors a full affine fit can also absorb the slight
+   stretch in the drawing. It is only used when it is clearly better and still
+   looks like a sane map, otherwise the plain rotate and scale wins. */
+function solve3(M, v){
+  for(let i=0;i<3;i++){
+    let p=i; for(let r=i+1;r<3;r++) if(Math.abs(M[r][i])>Math.abs(M[p][i])) p=r;
+    if(Math.abs(M[p][i])<1e-12) return null;
+    [M[i],M[p]]=[M[p],M[i]]; [v[i],v[p]]=[v[p],v[i]];
+    for(let r=i+1;r<3;r++){ const f=M[r][i]/M[i][i];
+      for(let c=i;c<3;c++) M[r][c]-=f*M[i][c]; v[r]-=f*v[i]; }
+  }
+  const x=[0,0,0];
+  for(let i=2;i>=0;i--){ let s=v[i]; for(let j=i+1;j<3;j++) s-=M[i][j]*x[j]; x[i]=s/M[i][i]; }
+  return x;
+}
+function buildAffine(A){
+  if(A.length<4) return null;
+  const lat0=A[0].lat, lng0=A[0].lng, mlng=metresPerDegLng(lat0), mlat=110574;
+  const X=A.map(b=>[b.x,b.y,1]);
+  const E=A.map(b=>(b.lng-lng0)*mlng), N=A.map(b=>(b.lat-lat0)*mlat);
+  const M=[[0,0,0],[0,0,0],[0,0,0]];
+  for(let i=0;i<3;i++) for(let j=0;j<3;j++) M[i][j]=X.reduce((a,r)=>a+r[i]*r[j],0);
+  const ve=[0,1,2].map(i=>X.reduce((a,r,k)=>a+r[i]*E[k],0));
+  const vn=[0,1,2].map(i=>X.reduce((a,r,k)=>a+r[i]*N[k],0));
+  const ce=solve3(M.map(r=>r.slice()), ve.slice()), cn=solve3(M.map(r=>r.slice()), vn.slice());
+  if(!ce||!cn) return null;
+  const sx=Math.hypot(ce[0],cn[0]), sy=Math.hypot(ce[1],cn[1]);
+  const ratio=sx/sy, shear=(ce[0]*ce[1]+cn[0]*cn[1])/(sx*sy||1);
+  if(!isFinite(ratio) || ratio<0.85 || ratio>1.18 || Math.abs(shear)>0.2) return null;
+  return {kind:'affine', ce, cn, lat0, lng0, mlng, mlat, count:A.length};
+}
+function meanError(f, A){
+  if(!f) return Infinity;
+  const keep=FIT; FIT=f;
+  const e = A.reduce((a,b)=>a+dist(planToLatLng(b.x,b.y),[b.lat,b.lng]),0)/A.length;
+  FIT=keep; return e;
+}
+function fit(){
+  if(FIT) return FIT;
+  const A = anchors();
+  const sim = buildFit();
+  const aff = buildAffine(A);
+  if(sim && aff){
+    const es=meanError(sim,A), ea=meanError(aff,A);
+    FIT = (ea < es*0.8) ? aff : sim;
+  } else FIT = sim || aff;
+  return FIT;
+}
 function clearFit(){ FIT = null; }
 
 /* similarity transform derived from the two calibration references */
@@ -1328,6 +1399,10 @@ function transform(){
 }
 function planToLatLng(x,y){
   const f = fit();
+  if(f && f.kind==='affine'){
+    const E=f.ce[0]*x+f.ce[1]*y+f.ce[2], N=f.cn[0]*x+f.cn[1]*y+f.cn[2];
+    return [ f.lat0 + N/f.mlat, f.lng0 + E/f.mlng ];
+  }
   if(f){
     const sx = x-f.cs[0], sy = (-y)-f.cs[1];
     const E = f.scale*(sx*Math.cos(f.th)-sy*Math.sin(f.th)) + f.cd[0];
@@ -1343,6 +1418,11 @@ function planToLatLng(x,y){
 }
 function latLngToPlan(lat,lng){
   const f = fit();
+  if(f && f.kind==='affine'){
+    const E=(lng-f.lng0)*f.mlng-f.ce[2], N=(lat-f.lat0)*f.mlat-f.cn[2];
+    const det=f.ce[0]*f.cn[1]-f.ce[1]*f.cn[0];
+    if(Math.abs(det)>1e-12) return [ (E*f.cn[1]-f.ce[1]*N)/det, (f.ce[0]*N-f.cn[0]*E)/det ];
+  }
   if(f){
     const E = (lng-f.lng0)*f.mlng - f.cd[0], N = (lat-f.lat0)*f.mlat - f.cd[1];
     const c=Math.cos(-f.th), s=Math.sin(-f.th);
@@ -1380,38 +1460,46 @@ L.control.zoom({position:'bottomright'}).addTo(map);
 /* Tile sources that allow third party apps without a key. OpenStreetMap's own
    volunteer servers are deliberately left out: they block apps that hotlink
    them and hand back a 403 "access blocked" tile instead of a map. */
-const TILES = [
-  {id:'voyager',name:'Street map',      url:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-   attr:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/attributions">CARTO</a>', max:20, sub:'abcd'},
-  {id:'positron',name:'Street, plain',  url:'https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png',
-   attr:'&copy; OpenStreetMap contributors, &copy; CARTO', max:20, sub:'abcd'},
-  {id:'esrist', name:'Street, Esri',    url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
-   attr:'&copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors', max:19},
-  {id:'esri',   name:'Satellite',       url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-   attr:'Imagery &copy; Esri, Maxar, Earthstar Geographics', max:19}
+/* Two views, Map and Satellite, both from Esri, which allows third party use
+   without a key. Each view keeps a spare source in case the first is blocked. */
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+const VIEWS = [
+  {id:'map', name:'Map', sources:[
+    {url:ESRI+'World_Street_Map/MapServer/tile/{z}/{y}/{x}', attr:'&copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors', max:19},
+    {url:ESRI+'World_Topo_Map/MapServer/tile/{z}/{y}/{x}',   attr:'&copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors', max:19}
+  ]},
+  {id:'sat', name:'Satellite', sources:[
+    {url:ESRI+'World_Imagery/MapServer/tile/{z}/{y}/{x}', attr:'Imagery &copy; Esri, Maxar, Earthstar Geographics', max:19}
+  ]}
 ];
-let tileLayer=null, tileIdx=0, tileTried=[];
-function nextTiles(){ return TILES.findIndex((x,k)=>tileTried.indexOf(k)<0); }
-function setTiles(i, manual){
-  const t = TILES[i]; if(!t) return;
+/* an own provider set up in Setup leads the Map view, key and all */
+if(D.meta.tileUrl){
+  VIEWS[0].sources.unshift({url:D.meta.tileUrl, attr:D.meta.tileAttr||'', max:20, custom:true});
+}
+let tileLayer=null, viewIdx=0, srcIdx=0;
+function setView(v, s, manual){
+  const view = VIEWS[v]; if(!view) return;
+  const src = view.sources[s||0]; if(!src) return;
   if(tileLayer) map.removeLayer(tileLayer);
-  tileIdx=i; tileTried.push(i);
+  viewIdx=v; srcIdx=s||0;
   let ok=false, bad=0;
-  tileLayer = L.tileLayer(t.url, {maxZoom:t.max, attribution:t.attr, subdomains:t.sub||'abc',
-                                  r: (window.devicePixelRatio>1 ? '@2x' : '')});
+  tileLayer = L.tileLayer(src.url, {maxZoom:src.max||19, attribution:src.attr, subdomains:'abcd',
+                                    r:(window.devicePixelRatio>1?'@2x':'')});
   const fail = why=>{
     if(ok) return;
-    const n = nextTiles();
-    if(n >= 0){ toast(why+', trying '+TILES[n].name.toLowerCase()); setTiles(n); }
-    else toast('No map images on this network. Pins, distances and directions still work.', true);
+    if(view.sources[srcIdx+1]) setView(v, srcIdx+1, manual);       /* spare source first */
+    else if(v===0 && !manual && VIEWS[1]) { toast(why+', showing satellite'); setView(1,0,false); }
+    else toast('No map images on this network. Pins, the site plan and directions still work.', true);
   };
   tileLayer.on('tileload', ()=>{ ok=true; hideToast(); });
-  tileLayer.on('tileerror', ()=>{ if(++bad >= 6) fail('Map images blocked'); });
+  tileLayer.on('tileerror', ()=>{ if(++bad>=6) fail('Map images blocked'); });
   tileLayer.addTo(map);
-  probeTiles(t, fail);
-  if(manual) toast(t.name);
-  $('#btnLayer').classList.toggle('on', t.id==='esri');
+  probeTiles(src, fail);
+  if(manual) toast(view.name);
+  $('#btnLayer').classList.toggle('on', view.id==='sat');
+  $('#btnLayer').title = view.id==='sat' ? 'Switch to map' : 'Switch to satellite';
 }
+function setTiles(i, manual){ setView(i?1:0, 0, manual); }   /* kept for older calls */
 /* a blocked server can answer with a picture that says "blocked" rather than an
    error, so check one tile's status directly before trusting the source */
 function probeTiles(t, fail){
@@ -1428,6 +1516,63 @@ function toast(text, sticky){
   clearTimeout(toast._t); if(!sticky) toast._t=setTimeout(hideToast, 2600);
 }
 function hideToast(){ $('#mapToast').classList.remove('show'); }
+
+/* ---- the site plan itself, laid over the map -------------------------------
+   Basemaps lag behind the campus: the CNU is missing from most of them. The
+   drawing is not, so it can be stretched and turned onto the map using the same
+   fit the pins use. Drop siteplan.png beside this file to switch it on. ---- */
+const PlanOverlay = L.Layer.extend({
+  initialize:function(url, corners){ this._url=url; this._corners=corners; },
+  onAdd:function(map){
+    this._map=map;
+    const img = this._img = L.DomUtil.create('img','sfh-plan');
+    img.src=this._url; img.style.transformOrigin='0 0'; img.style.position='absolute';
+    img.style.opacity=0.85; img.style.pointerEvents='none';
+    img.onload=()=>this._reset();
+    /* its own pane, above the map images but under the route line and pins */
+    if(!map.getPane('planPane')){ map.createPane('planPane'); map.getPane('planPane').style.zIndex=250; }
+    map.getPane('planPane').appendChild(img);
+    map.on('zoom viewreset move zoomend moveend', this._reset, this);
+    this._reset();
+  },
+  onRemove:function(map){
+    if(this._img && this._img.parentNode) this._img.parentNode.removeChild(this._img);
+    map.off('zoom viewreset move zoomend moveend', this._reset, this);
+  },
+  setCorners:function(c){ this._corners=c; this._reset(); },
+  _reset:function(){
+    const img=this._img; if(!img || !img.naturalWidth) return;
+    const m=this._map, c=this._corners;
+    const tl=m.latLngToLayerPoint(c.tl), tr=m.latLngToLayerPoint(c.tr), bl=m.latLngToLayerPoint(c.bl);
+    const w=img.naturalWidth, h=img.naturalHeight;
+    const a=(tr.x-tl.x)/w, b=(tr.y-tl.y)/w, cc=(bl.x-tl.x)/h, d=(bl.y-tl.y)/h;
+    img.style.transform='matrix('+a+','+b+','+cc+','+d+','+tl.x+','+tl.y+')';
+    img.style.width=w+'px'; img.style.height=h+'px';
+  }
+});
+/* the crop of the drawing, in the same plan units the buildings use */
+const PLAN_BOX = {x0:1975, y0:830, x1:2658, y1:2062};
+let planLayer=null, planOn=false;
+function planCorners(){
+  return { tl:planToLatLng(PLAN_BOX.x0, PLAN_BOX.y0),
+           tr:planToLatLng(PLAN_BOX.x1, PLAN_BOX.y0),
+           bl:planToLatLng(PLAN_BOX.x0, PLAN_BOX.y1) };
+}
+function togglePlan(on){
+  planOn = (on==null) ? !planOn : on;
+  if(planOn){
+    if(!planLayer) planLayer = new PlanOverlay(D.meta.planImage||'siteplan.png', planCorners());
+    else planLayer.setCorners(planCorners());
+    planLayer.addTo(map);
+  } else if(planLayer) map.removeLayer(planLayer);
+  $('#btnPlan').classList.toggle('on', planOn);
+}
+function checkPlanImage(){          /* only offer the button if the file is there */
+  const probe=new Image();
+  probe.onload=()=>{ $('#btnPlan').classList.remove('hide'); if(D.meta.planDefault!==false) togglePlan(true); };
+  probe.onerror=()=>{ $('#btnPlan').classList.add('hide'); };
+  probe.src = D.meta.planImage||'siteplan.png';
+}
 
 const gBlocks = L.layerGroup().addTo(map);
 const gRoute  = L.layerGroup().addTo(map);
@@ -1447,6 +1592,7 @@ function blockIcon(b, isDest){
 /* pass a list of ids to show only those pins, or nothing for all of them */
 function drawBlocks(only){
   gBlocks.clearLayers();
+  if(planOn && planLayer) planLayer.setCorners(planCorners());
   state.shown = only || null;
   const list = only ? D.blocks.filter(b=>only.indexOf(b.id)>=0) : D.blocks;
   list.forEach(b=>{
@@ -1465,9 +1611,25 @@ function drawNet(){
       dashArray:e[2]?null:'6 5'}).addTo(gNet);
   });
   D.nodes.forEach(n=>{
-    L.marker(pos(n),{icon:icon('<div class="pin node"></div>','',14), title:n.name||n.id})
-      .on('click',()=>{ if(state.drawing){ state.lastPathNode=n.id; pathInfo('Joined to '+(n.name||n.id)+'. Tap the map to continue.'); } })
-      .addTo(gNet);
+    const m = L.marker(pos(n),{icon:icon('<div class="pin node"></div>','',14), title:n.name||n.id,
+                               draggable:!!state.moving});
+    m.on('click',()=>{
+      if(state.erasing){
+        D.nodes = D.nodes.filter(x=>x.id!==n.id);
+        D.edges = D.edges.filter(e=>e[0]!==n.id && e[1]!==n.id);
+        if(state.lastPathNode===n.id) state.lastPathNode=null;
+        save(); drawNet(); pathInfo('Point removed.');
+      } else if(state.drawing){
+        state.lastPathNode=n.id; pathInfo('Joined to '+(n.name||n.id)+'. Tap the map to continue.');
+      }
+    });
+    m.on('dragend', ev=>{
+      const ll=ev.target.getLatLng();
+      n.lat=ll.lat; n.lng=ll.lng;
+      const plan=latLngToPlan(ll.lat,ll.lng); n.x=plan[0]; n.y=plan[1];
+      save(); drawNet(); pathInfo('Point moved.');
+    });
+    m.addTo(gNet);
   });
 }
 function fitCampus(){
@@ -1481,6 +1643,33 @@ function nearestNode(ll){
   let best=null, bd=Infinity;
   D.nodes.forEach(n=>{ const d=dist(ll,pos(n)); if(d<bd){bd=d;best=n;} });
   return {node:best, d:bd};
+}
+/* the closest spot on the path network itself, which may be part way along a
+   segment. Joining the route here rather than at the nearest junction stops
+   the line cutting diagonally across whatever sits in between. */
+function nearestOnGraph(ll, stepFreeOnly){
+  let best=null;
+  D.edges.forEach(e=>{
+    if(stepFreeOnly && !e[2]) return;
+    const A=nodeLatLng(e[0]), B=nodeLatLng(e[1]);
+    if(!A||!B) return;
+    const mlng=metresPerDegLng(ll[0]);
+    const ax=0, ay=0;
+    const bx=(B[1]-A[1])*mlng, by=(B[0]-A[0])*110574;
+    const px=(ll[1]-A[1])*mlng, py=(ll[0]-A[0])*110574;
+    const len2=bx*bx+by*by;
+    let t = len2 ? ((px-ax)*bx+(py-ay)*by)/len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const point=[A[0]+(B[0]-A[0])*t, A[1]+(B[1]-A[1])*t];
+    const d=dist(ll,point);
+    if(!best || d<best.d) best={a:e[0], b:e[1], t, point, d};
+  });
+  return best;
+}
+function pathLength(ids){
+  let d=0;
+  for(let i=1;i<ids.length;i++) d+=dist(nodeLatLng(ids[i-1]), nodeLatLng(ids[i]));
+  return d;
 }
 function graph(stepFreeOnly){
   const g={};
@@ -1515,12 +1704,25 @@ function shortest(startId, endId, stepFreeOnly){
 }
 function buildRoute(fromLL, destBlock){
   const destLL = pos(destBlock);
-  const s = nearestNode(fromLL), e = nearestNode(destLL);
   let pts = [fromLL], via = [];
-  if(s.node && e.node){
-    let ids = shortest(s.node.id, e.node.id, state.stepFree);
-    if(!ids && state.stepFree) ids = shortest(s.node.id, e.node.id, false);
-    if(ids){ via = ids; ids.forEach(id=>pts.push(nodeLatLng(id))); }
+  const sf = state.stepFree;
+  let s = nearestOnGraph(fromLL, sf) || nearestOnGraph(fromLL, false);
+  let e = nearestOnGraph(destLL, sf) || nearestOnGraph(destLL, false);
+  if(s && e){
+    let best=null;
+    [s.a,s.b].forEach(sa=>[e.a,e.b].forEach(ea=>{
+      let ids = shortest(sa, ea, sf) || (sf ? shortest(sa, ea, false) : null);
+      if(!ids) return;
+      const cost = dist(fromLL,s.point) + dist(s.point,nodeLatLng(sa)) + pathLength(ids)
+                 + dist(nodeLatLng(ea),e.point) + dist(e.point,destLL);
+      if(!best || cost<best.cost) best={cost, ids};
+    }));
+    if(best){
+      pts.push(s.point);
+      best.ids.forEach(id=>pts.push(nodeLatLng(id)));
+      pts.push(e.point);
+      via = [null].concat(best.ids).concat([null]);   /* keeps the names lined up */
+    }
   }
   pts.push(destLL);
   /* straight line when the destination is basically beside you */
@@ -1572,7 +1774,7 @@ function routeSteps(route){
   const legs = routeLegs(route), steps=[], destName = strip(route.dest.name);
   legs.forEach((lg,i)=>{
     const last = i===legs.length-1;
-    const to = lg.endName ? strip(lg.endName) : (last? destName : 'the next junction');
+    const to = lg.endName ? strip(lg.endName) : (last ? destName : (i===0 ? 'the path' : 'the next junction'));
     const sub = 'Walk '+fmtDist(lg.dist)+' to '+to;
     if(i===0) steps.push({ico:'&#9650;', title:'Head '+cardinal(lg.bearing), sub, ll:lg.ll});
     else {
@@ -1604,6 +1806,18 @@ function startLocate(quiet){
     state.me=[p.coords.latitude,p.coords.longitude];
     state.meAcc=p.coords.accuracy;
     showMe();
+    /* walking the campus with Record on lays down the real footpaths */
+    if(state.recording && (state.meAcc==null || state.meAcc<=25)){
+      const last = state.lastPathNode ? D.nodes.find(n=>n.id===state.lastPathNode) : null;
+      if(!last || dist(state.me, pos(last)) > 12){
+        const id='n'+Date.now().toString(36);
+        const plan=latLngToPlan(state.me[0], state.me[1]);
+        D.nodes.push({id, x:plan[0], y:plan[1], lat:state.me[0], lng:state.me[1], name:''});
+        if(state.lastPathNode) D.edges.push([state.lastPathNode, id, $('#pathStepFree').checked?1:0]);
+        state.lastPathNode=id; save(); drawNet();
+        pathInfo('Recording, '+D.nodes.length+' points so far.');
+      }
+    }
     /* first fix on campus: show the visitor where they are straight away */
     if(!state.centredOnMe && !state.dest && state.panel==='home'){
       state.centredOnMe = true;
@@ -1745,7 +1959,10 @@ function openPlace(id){
   $('#placeNote').innerHTML = from
     ? 'About '+fmtDist(dist(from,pos(b)))+' from where you are &middot; roughly '+fmtTime(dist(from,pos(b)))+' walk'
     : 'Turn on location, or choose a starting point on the next screen, for a walking time.';
-  drawBlocks([b.id]);                 /* one pin, nothing else to confuse it */
+  const w = $('#placeWalk');
+  if(b.walk){ w.style.display='block'; w.innerHTML='<b>From the main gate:</b> '+esc(b.walk); }
+  else w.style.display='none';
+  drawBlocks([b.id]);               /* one pin, nothing else to confuse it */
   show('place');
   map.setView(pos(b), 18);
 }
@@ -1765,6 +1982,10 @@ function renderRoute(){
      (state.stepFree?' &middot; step-free':'');
   state.steps = routeSteps(r);
   paintSteps(0);
+  const wd = r.dest.walk;
+  $('#steps').insertAdjacentHTML('beforebegin','');
+  $('#routeWalk').innerHTML = wd ? '<b>Written directions from the main gate:</b> '+esc(wd) : '';
+  $('#routeWalk').style.display = wd ? 'block' : 'none';
   $('#routeFoot').innerHTML = state.offCampus
     ? 'You are not on the campus yet, so these directions start at the Douglas Road pedestrian entrance.'
     : 'Distances follow the campus roads and paths. If a door is locked or a path is closed, ask at reception in Block 4.';
@@ -1824,7 +2045,11 @@ function pickFrom(){
 /* ---------- 8. EVENTS ------------------------------------------------- */
 document.addEventListener('click', e=>{
   const go = e.target.closest('[data-go]');
-  if(go){ openPlace(go.dataset.go); return; }
+  if(go){
+    if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    openPlace(go.dataset.go);
+    return;
+  }
   const fr = e.target.closest('[data-from]');
   if(fr){
     const id=fr.dataset.from;
@@ -1847,7 +2072,8 @@ $('#btnDrive').onclick = ()=>{
 };
 $('#btnLocate').onclick = ()=>{ startLocate(); if(state.me) map.setView(state.me,18); };
 $('#btnFit').onclick = fitCampus;
-$('#btnLayer').onclick = ()=>{ tileTried=[]; setTiles((tileIdx+1)%TILES.length, true); };
+$('#btnPlan').onclick = ()=>{ togglePlan(); toast(planOn?'Site plan on':'Site plan off'); };
+$('#btnLayer').onclick = ()=>setView(viewIdx===0?1:0, 0, true);
 $('#btnCompass').onclick = enableCompass;
 $('#btnSetup').onclick = ()=>{ show('setup'); renderSetup(); };
 $('#setupBack').onclick = ()=>{ state.pickMode=null; state.drawing=false; show('home'); renderHome(); };
@@ -1940,6 +2166,8 @@ function renderSetup(){
   $('#optSpeed').value = D.meta.speed||70;
   $('#optBig').checked = !!D.big;
   $('#optHideBanner').checked = !!D.hideBanner;
+  $('#optTileUrl').value = D.meta.tileUrl||'';
+  $('#optTileAttr').value = D.meta.tileAttr||'';
 }
 function msg(sel, text, kind){ $(sel).innerHTML = '<div class="'+(kind==='warn'?'warn':'ok')+'">'+text+'</div>'; }
 function renderBlockTable(){
@@ -1975,6 +2203,9 @@ function openEditor(id){
     '<label class="f">What the public sees on the card</label>'+
     '<div id="edItems">'+lines+'</div>'+
     '<div class="srow"><button class="pillbtn" id="edAdd">+ Add a line</button></div>'+
+    '<label class="f">Written directions from the main gate</label>'+
+    '<p class="mini">Plain words, the way you would tell someone at the gate. Shown on the card and above the step by step list, and it keeps working when GPS is poor indoors or the basemap is out of date.</p>'+
+    '<textarea class="t" id="edWalk" style="min-height:70px">'+esc(b.walk||'')+'</textarea>'+
     '<label class="f">Hidden search terms</label>'+
     '<p class="mini">Comma separated. These never appear anywhere in the app, they only make the building findable. Useful for the test or scan on someone’s appointment letter when the service itself is not published on the card.</p>'+
     '<textarea class="t" id="edHidden" style="min-height:70px">'+esc((b.hidden||[]).join(', '))+'</textarea>'+
@@ -2012,6 +2243,8 @@ function openEditor(id){
     ]).filter(r=>r[1]);
     if(!b.items.length) b.items=[['', b.name]];
     b.hidden = $('#edHidden').value.split(',').map(s=>s.trim()).filter(Boolean);
+    const wtxt = $('#edWalk').value.trim();
+    if(wtxt) b.walk = wtxt; else delete b.walk;
     const la=parseFloat($('#edLat').value), ln=parseFloat($('#edLng').value);
     if(!isNaN(la)&&!isNaN(ln)){ b.lat=la; b.lng=ln; } else { delete b.lat; delete b.lng; }
     save(); drawBlocks(); renderHome(); renderBlockTable(); renderSetup();
@@ -2045,11 +2278,34 @@ $('#addBlock').onclick = ()=>{
   D.blocks.push({id, name, cat:'service', items:[['','']], kw:'', x:2300, y:1400, lat:c.lat, lng:c.lng});
   save(); drawBlocks(); renderBlockTable();
 };
-$('#pathDraw').onclick = ()=>{
-  state.drawing=!state.drawing;
-  $('#pathDraw').textContent='Draw mode: '+(state.drawing?'on':'off');
-  $('#pathDraw').classList.toggle('on', state.drawing);
-  if(state.drawing){ state.showNet=true; gNet.addTo(map); drawNet(); pathInfo('Tap the map to drop path points. Each tap joins to the last one.'); }
+function pathMode(which){
+  ['drawing','moving','erasing','recording'].forEach(k=>{ if(k!==which) state[k]=false; });
+  state[which] = !state[which];
+  $('#pathDraw').textContent   = 'Draw: '+(state.drawing?'on':'off');
+  $('#pathMove').textContent   = 'Move: '+(state.moving?'on':'off');
+  $('#pathErase').textContent  = 'Erase: '+(state.erasing?'on':'off');
+  $('#pathRecord').textContent = 'Record walk: '+(state.recording?'on':'off');
+  [['#pathDraw','drawing'],['#pathMove','moving'],['#pathErase','erasing'],['#pathRecord','recording']]
+    .forEach(([sel,k])=>$(sel).classList.toggle('on', !!state[k]));
+  state.showNet=true; gNet.addTo(map); drawNet();
+}
+$('#pathDraw').onclick = ()=>{ pathMode('drawing');
+  pathInfo(state.drawing?'Tap the map to drop path points. Each tap joins to the last one.':'Draw off.'); };
+$('#pathMove').onclick = ()=>{ pathMode('moving');
+  pathInfo(state.moving?'Drag any point to shift the path.':'Move off.'); };
+$('#pathErase').onclick = ()=>{ pathMode('erasing');
+  pathInfo(state.erasing?'Tap a point to remove it.':'Erase off.'); };
+$('#pathRecord').onclick = ()=>{
+  pathMode('recording');
+  if(state.recording){
+    state.lastPathNode = null; startLocate();
+    if(state.me) map.setView(state.me, 19);
+    pathInfo('Recording. Walk the route and a point drops every 12 m. Tap Record again at the end, then Start a new branch before walking the next path.');
+  } else pathInfo('Recording stopped.');
+};
+$('#pathWipe').onclick = ()=>{
+  if(!confirm('Delete every path point and start the network from scratch?')) return;
+  D.nodes=[]; D.edges=[]; state.lastPathNode=null; save(); drawNet(); pathInfo('Network cleared.');
 };
 $('#pathShow').onclick = ()=>{
   state.showNet=!state.showNet;
@@ -2144,6 +2400,21 @@ $('#wipe').onclick = ()=>{ if(confirm('Clear everything saved on this device and
   D.meta.name=$('#optName').value; D.meta.sub=$('#optSub').value; D.meta.speed=parseInt($('#optSpeed').value)||70;
   $('#siteName').textContent=D.meta.name; $('#siteSub').textContent=D.meta.sub; save();
 }));
+$('#optTileSave').onclick = ()=>{
+  const u=$('#optTileUrl').value.trim();
+  if(!/\{z\}/.test(u) || !/\{x\}/.test(u) || !/\{y\}/.test(u)){ alert('The URL needs {z}, {x} and {y} in it.'); return; }
+  D.meta.tileUrl=u; D.meta.tileAttr=$('#optTileAttr').value.trim(); save();
+  const c={url:u, attr:D.meta.tileAttr, max:20};
+  if(VIEWS[0].sources[0].custom) VIEWS[0].sources[0]=Object.assign(c,{custom:true});
+  else VIEWS[0].sources.unshift(Object.assign(c,{custom:true}));
+  setView(0, 0, true);
+};
+$('#optTileClear').onclick = ()=>{
+  delete D.meta.tileUrl; delete D.meta.tileAttr; save();
+  if(VIEWS[0].sources[0] && VIEWS[0].sources[0].custom) VIEWS[0].sources.shift();
+  $('#optTileUrl').value=''; $('#optTileAttr').value='';
+  setView(0, 0, true);
+};
 $('#optBig').onchange = e=>{ D.big=e.target.checked; document.body.classList.toggle('bigtext',D.big); save(); };
 $('#optHideBanner').onchange = e=>{ D.hideBanner=e.target.checked; save(); updateBanner(); };
 
@@ -2156,7 +2427,7 @@ function boot(){
   $('#siteName').textContent = strip(D.meta.name);
   $('#siteSub').innerHTML = D.meta.sub;
   document.body.classList.toggle('bigtext', !!D.big);
-  setTiles(0);
+  setTiles(0); checkPlanImage();
   renderChips(); renderHome(); drawBlocks(); fitCampus(); updateBanner();
 
   const params = new URLSearchParams(location.search);
@@ -2176,6 +2447,25 @@ function boot(){
   setTimeout(()=>{ map.invalidateSize(); if(!state.dest) fitCampus(); },350);
 }
 window.addEventListener('resize', ()=>map.invalidateSize());
+/* the on-screen keyboard used to sit over the buttons: shrink the sheet to the
+   space the keyboard leaves, and close the keyboard as soon as a search hits */
+$('#q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('#q').blur(); } });
+if(window.visualViewport){
+  const vv = window.visualViewport;
+  const fitKeyboard = ()=>{
+    const hidden = window.innerHeight - vv.height;      /* keyboard height */
+    const sheet = $('#sheet');
+    if(hidden > 120){
+      sheet.style.maxHeight = Math.max(160, vv.height - 90)+'px';
+      document.body.classList.add('kb');
+    } else {
+      sheet.style.maxHeight='';
+      document.body.classList.remove('kb');
+    }
+  };
+  vv.addEventListener('resize', fitKeyboard);
+  vv.addEventListener('scroll', fitKeyboard);
+}
 boot();
 </script>
 </body>
