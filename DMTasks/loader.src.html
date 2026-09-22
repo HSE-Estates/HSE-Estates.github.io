@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en-IE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2B6456">
+<meta name="robots" content="noindex, nofollow">
+<title>Connect</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body { background: #2B6456; color: #1F2A27; font-family: Lexend, system-ui, 'Segoe UI', Arial, sans-serif; font-size: 18px; line-height: 1.5;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; min-height: 100dvh; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); }
+  .logo { width: 110px; height: auto; margin-bottom: 18px; }
+  .card { background: #FBF8F1; border-radius: 26px; padding: 24px 20px; width: 100%; max-width: 440px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  p { margin: 0 0 14px; color: #4A5A55; }
+  label { display: block; font-weight: 700; margin: 16px 0 6px; }
+  input { width: 100%; min-height: 56px; border-radius: 14px; border: 2px solid #E3DDD0; background: #fff; padding: 12px 14px; font: inherit; color: inherit; }
+  input:focus { outline: none; border-color: #00917A; }
+  #code { text-transform: uppercase; letter-spacing: .12em; font-weight: 700; font-size: 1.2rem; }
+  .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 60px; border: 0; border-radius: 18px; font: inherit; font-weight: 700; cursor: pointer; margin-top: 20px; }
+  .go { background: #2B6456; color: #fff; font-size: 1.1rem; }
+  .go[disabled] { opacity: .6; }
+  .inst { background: #fff; color: #2B6456; border: 3px solid #00917A; margin-top: 12px; }
+  .err { color: #B42318; font-weight: 600; margin-top: 12px; min-height: 1.5em; }
+  .hint { font-size: .85rem; color: #6B7A75; margin-top: 12px; }
+  .loading { color: #fff; text-align: center; font-weight: 600; }
+  .dots { display: inline-flex; gap: 6px; margin-top: 10px; }
+  .dots i { width: 10px; height: 10px; border-radius: 50%; background: #fff; animation: b 1s infinite; }
+  .dots i:nth-child(2) { animation-delay: .2s; } .dots i:nth-child(3) { animation-delay: .4s; }
+  @keyframes b { 50% { opacity: .25; } }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<img class="logo" alt="HSE" src="data:image/png;base64,/*LOGO_WHITE*/">
+
+<div id="loading" class="loading" hidden><div>Opening…</div><div class="dots"><i></i><i></i><i></i></div></div>
+
+<form class="card" id="connect" hidden autocomplete="off">
+  <h1>Connect this device</h1>
+  <p>You only need to do this once on each phone or PC.</p>
+  <label for="url">Link</label>
+  <input id="url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" spellcheck="false">
+  <label for="code">Access code</label>
+  <input id="code" placeholder="XXXX-XXXX-XXXX" spellcheck="false" autocapitalize="characters" maxlength="20">
+  <div class="err" id="err" role="alert"></div>
+  <button class="btn go" id="go" type="submit">Connect</button>
+  <button class="btn inst" id="inst" type="button" hidden>Install on this device</button>
+  <div class="hint" id="ios" hidden>To install: tap Share, then Add to Home Screen.</div>
+</form>
+
+<script>
+(function () {
+  'use strict';
+  var KEY = 'gid-remote', APP = 'gid-app';
+  var host = location.origin + location.pathname;
+  function get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+  function set(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
+  function $(id) { return document.getElementById(id); }
+
+  // install: catch the browser's offer now; the app picks it up after it opens
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.__gidInstall = e; var b = $('inst'); if (b) b.hidden = false; });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () { });
+  var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent) && !standalone) $('ios').hidden = false;
+  $('inst').onclick = function () {
+    var e = window.__gidInstall; if (!e) return;
+    e.prompt(); window.__gidInstall = null; $('inst').hidden = true;
+  };
+
+  function call(r, body) {
+    body.code = r.code;
+    return fetch(r.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) })
+      .then(function (x) { if (!x.ok) throw new Error('status ' + x.status); return x.json(); });
+  }
+  function write(html) { document.open(); document.write(html); document.close(); }
+  function showConnect(msg) {
+    $('loading').hidden = true; $('connect').hidden = false;
+    var r = get(KEY); if (r && r.url) $('url').value = r.url;
+    $('err').textContent = msg || '';
+  }
+  function openApp(r) {
+    $('connect').hidden = true; $('loading').hidden = false;
+    call(r, { action: 'app', host: host }).then(function (o) {
+      if (!o.ok) {
+        if (o.code) { set(KEY, null); set(APP, null); showConnect(o.error); } else showConnect(o.error);
+        return;
+      }
+      set(APP, { html: o.data.html, at: Date.now() });
+      write(o.data.html);
+    }).catch(function () {
+      // no signal: open the copy from last time; it saves changes once the signal is back
+      var c = get(APP);
+      if (c && c.html) write(c.html);
+      else showConnect('No connection. Check your signal and try again.');
+    });
+  }
+
+  $('code').addEventListener('input', function () {
+    var v = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+    this.value = v.replace(/(.{4})(?=.)/g, '$1-');
+  });
+  $('connect').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var url = $('url').value.trim(), code = $('code').value.trim();
+    if (!/^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+\/|macros\/)s\/[\w-]+\/exec$/.test(url)) { $('err').textContent = 'That link does not look right. It starts with https://script.google.com and ends with /exec'; return; }
+    if (code.replace(/-/g, '').length < 12) { $('err').textContent = 'The access code has 12 letters and numbers.'; return; }
+    var r = { url: url, code: code };
+    $('go').disabled = true; $('go').textContent = 'Checking…'; $('err').textContent = '';
+    call(r, { action: 'ping' }).then(function (o) {
+      $('go').disabled = false; $('go').textContent = 'Connect';
+      if (!o.ok) { $('err').textContent = o.error; return; }
+      set(KEY, r);
+      openApp(r);
+    }).catch(function () {
+      $('go').disabled = false; $('go').textContent = 'Connect';
+      $('err').textContent = 'Could not reach that link. Check it was deployed with access set to Anyone.';
+    });
+  });
+
+  var saved = get(KEY);
+  if (saved && saved.url && saved.code) openApp(saved); else showConnect('');
+})();
+</script>
+</body>
+</html>
