@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en-IE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2B6456">
+<meta name="robots" content="noindex, nofollow">
+<title>Connect</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body { background: #2B6456; color: #1F2A27; font-family: Lexend, system-ui, 'Segoe UI', Arial, sans-serif; font-size: 18px; line-height: 1.5;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; min-height: 100dvh; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); }
+  .logo { width: 110px; height: auto; margin-bottom: 18px; }
+  .card { background: #FBF8F1; border-radius: 26px; padding: 24px 20px; width: 100%; max-width: 440px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  p { margin: 0 0 14px; color: #4A5A55; }
+  label { display: block; font-weight: 700; margin: 16px 0 6px; }
+  input { width: 100%; min-height: 56px; border-radius: 14px; border: 2px solid #E3DDD0; background: #fff; padding: 12px 14px; font: inherit; color: inherit; }
+  input:focus { outline: none; border-color: #00917A; }
+  #code { text-transform: uppercase; letter-spacing: .12em; font-weight: 700; font-size: 1.2rem; }
+  .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 60px; border: 0; border-radius: 18px; font: inherit; font-weight: 700; cursor: pointer; margin-top: 20px; }
+  .go { background: #2B6456; color: #fff; font-size: 1.1rem; }
+  .go[disabled] { opacity: .6; }
+  .inst { background: #fff; color: #2B6456; border: 3px solid #00917A; margin-top: 12px; }
+  .err { color: #B42318; font-weight: 600; margin-top: 12px; min-height: 1.5em; }
+  .hint { font-size: .85rem; color: #6B7A75; margin-top: 12px; }
+  .loading { color: #fff; text-align: center; font-weight: 600; }
+  .dots { display: inline-flex; gap: 6px; margin-top: 10px; }
+  .dots i { width: 10px; height: 10px; border-radius: 50%; background: #fff; animation: b 1s infinite; }
+  .dots i:nth-child(2) { animation-delay: .2s; } .dots i:nth-child(3) { animation-delay: .4s; }
+  @keyframes b { 50% { opacity: .25; } }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<img class="logo" alt="HSE" src="data:image/png;base64,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">
+
+<div id="loading" class="loading" hidden><div>Opening…</div><div class="dots"><i></i><i></i><i></i></div></div>
+
+<form class="card" id="connect" hidden autocomplete="off">
+  <h1>Connect this device</h1>
+  <p>You only need to do this once on each phone or PC.</p>
+  <label for="url">Link</label>
+  <input id="url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" spellcheck="false">
+  <label for="code">Access code</label>
+  <input id="code" placeholder="XXXX-XXXX-XXXX" spellcheck="false" autocapitalize="characters" maxlength="20">
+  <div class="err" id="err" role="alert"></div>
+  <button class="btn go" id="go" type="submit">Connect</button>
+  <button class="btn inst" id="inst" type="button" hidden>Install on this device</button>
+  <div class="hint" id="ios" hidden>To install: tap Share, then Add to Home Screen.</div>
+</form>
+
+<script>
+(function () {
+  'use strict';
+  var KEY = 'gid-remote', APP = 'gid-app';
+  var host = location.origin + location.pathname;
+  function get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+  function set(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
+  function $(id) { return document.getElementById(id); }
+
+  // install: catch the browser's offer now; the app picks it up after it opens
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.__gidInstall = e; var b = $('inst'); if (b) b.hidden = false; });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () { });
+  var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent) && !standalone) $('ios').hidden = false;
+  $('inst').onclick = function () {
+    var e = window.__gidInstall; if (!e) return;
+    e.prompt(); window.__gidInstall = null; $('inst').hidden = true;
+  };
+
+  function call(r, body) {
+    body.code = r.code;
+    return fetch(r.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) })
+      .then(function (x) { if (!x.ok) throw new Error('status ' + x.status); return x.json(); });
+  }
+  function write(html) { document.open(); document.write(html); document.close(); }
+  function showConnect(msg) {
+    $('loading').hidden = true; $('connect').hidden = false;
+    var r = get(KEY); if (r && r.url) $('url').value = r.url;
+    $('err').textContent = msg || '';
+  }
+  function openApp(r) {
+    $('connect').hidden = true; $('loading').hidden = false;
+    call(r, { action: 'app', host: host }).then(function (o) {
+      if (!o.ok) {
+        if (o.code) { set(KEY, null); set(APP, null); showConnect(o.error); } else showConnect(o.error);
+        return;
+      }
+      set(APP, { html: o.data.html, at: Date.now() });
+      write(o.data.html);
+    }).catch(function () {
+      // no signal: open the copy from last time; it saves changes once the signal is back
+      var c = get(APP);
+      if (c && c.html) write(c.html);
+      else showConnect('No connection. Check your signal and try again.');
+    });
+  }
+
+  $('code').addEventListener('input', function () {
+    var v = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+    this.value = v.replace(/(.{4})(?=.)/g, '$1-');
+  });
+  $('connect').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var url = $('url').value.trim(), code = $('code').value.trim();
+    if (!/^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+\/|macros\/)s\/[\w-]+\/exec$/.test(url)) { $('err').textContent = 'That link does not look right. It starts with https://script.google.com and ends with /exec'; return; }
+    if (code.replace(/-/g, '').length < 12) { $('err').textContent = 'The access code has 12 letters and numbers.'; return; }
+    var r = { url: url, code: code };
+    $('go').disabled = true; $('go').textContent = 'Checking…'; $('err').textContent = '';
+    call(r, { action: 'ping' }).then(function (o) {
+      $('go').disabled = false; $('go').textContent = 'Connect';
+      if (!o.ok) { $('err').textContent = o.error; return; }
+      set(KEY, r);
+      openApp(r);
+    }).catch(function () {
+      $('go').disabled = false; $('go').textContent = 'Connect';
+      $('err').textContent = 'Could not reach that link. Check it was deployed with access set to Anyone.';
+    });
+  });
+
+  var saved = get(KEY);
+  if (saved && saved.url && saved.code) openApp(saved); else showConnect('');
+})();
+</script>
+</body>
+</html>
