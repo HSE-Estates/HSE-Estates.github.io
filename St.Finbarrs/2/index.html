@@ -7,7 +7,8 @@
 <title>St Finbarr's Health Campus</title>
 <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/HSE-Estates/HSE-Estates.github.io/refs/heads/main/HSE-Logo-Green-NEW-no-background.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-<link rel="manifest" href="manifest.webmanifest" id="manifestLink">
+<!-- the app manifest is added by script on the staff link only (#install or #staff),
+     so browsers never offer the public an install; see setupInstallable() -->
 <meta name="apple-mobile-web-app-title" content="Find your way">
 <meta name="mobile-web-app-capable" content="yes">
 <style>/* Leaflet 1.9.4, BSD-2-Clause, bundled so the app needs no CDN */
@@ -2612,11 +2613,12 @@ let installPrompt = null;
 const isStandalone = ()=> (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
 const isIOS = ()=> /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const isAndroid = ()=> /android/i.test(navigator.userAgent);
-const STAFF_INSTALL = (()=>{
-  const asked = /(^|[#&?])(install|staff)\b/i.test(location.hash) || /[?&](install|staff)\b/i.test(location.search);
-  try{ if(asked) sessionStorage.setItem('sfh-install','1'); return asked || sessionStorage.getItem('sfh-install')==='1'; }
-  catch(e){ return asked; }
-})();
+/* only while the anchor is in the address: nothing is remembered, so a phone
+   handed to a visitor, or a public link opened later, never shows it */
+const staffLink = ()=> /(^|[#&?])(install|staff)\b/i.test(location.hash) || /[?&](install|staff)\b/i.test(location.search);
+const STAFF_INSTALL = staffLink();
+/* adding or removing the anchor in an open tab reloads, so it takes effect */
+window.addEventListener('hashchange', ()=>{ if(staffLink() !== STAFF_INSTALL) location.reload(); });
 function showInstall(on){ $('#btnInstall').classList.toggle('hide', !on || !STAFF_INSTALL || isStandalone()); }
 $('#installLabel').textContent = isAndroid() ? 'Download app' : (isIOS() ? 'Add to phone' : 'Install app');
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt = e; showInstall(true); });
@@ -2661,6 +2663,13 @@ function drawIcon(size, rounded){
 function setupInstallable(){
   if(!/^https?:$/.test(location.protocol)) return;          /* opened from disk: nothing to install */
   if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+  /* the manifest is what makes a browser offer "Install app" itself (the
+     address-bar icon on a computer, the menu item on Android). Link it on the
+     staff link, and inside the installed app so it can pick up updates. */
+  if(!STAFF_INSTALL && !isStandalone()) return;
+  const link = document.createElement('link');
+  link.rel = 'manifest'; link.id = 'manifestLink'; link.href = 'manifest.webmanifest';
+  document.head.appendChild(link);
   fetch('manifest.webmanifest', {cache:'no-store'}).then(r=>{ if(!r.ok) throw 0; }).catch(()=>{
     const here = location.origin + location.pathname;
     const man = { name:"St Finbarr's Campus Map", short_name:"St Finbarr's", start_url:here, scope:location.origin + location.pathname.replace(/[^/]*$/,''),
