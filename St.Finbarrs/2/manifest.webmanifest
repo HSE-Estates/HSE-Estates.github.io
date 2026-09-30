@@ -1,7 +1,7 @@
 {
-  "name": "St Finbarr's Campus Map",
-  "short_name": "St Finbarr's",
-  "description": "Find your way around St Finbarr's Health Campus, Douglas Road, Cork.",
+  "name": "St. Finbarr's Health Campus",
+  "short_name": "St. Finbarr's",
+  "description": "Find your way around St. Finbarr's Health Campus, Douglas Road, Cork.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -9,8 +9,23 @@
   "background_color": "#F4F7F6",
   "theme_color": "#006354",
   "icons": [
-    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-    {"src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
